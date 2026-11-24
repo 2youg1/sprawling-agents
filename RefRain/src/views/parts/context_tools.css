@@ -1,0 +1,62 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+.context-tools {
+  position: fixed;
+  z-index: var(--layer-popover);
+  inset-inline-start: var(--context-x, var(--spacing-pane));
+  inset-block-start: var(--context-y, var(--spacing-pane));
+  inline-size: max-content;
+  min-inline-size: min(10rem, var(--context-width, 90vw));
+  max-inline-size: min(23rem, var(--context-width, 90vw));
+  max-block-size: var(--context-height, 90dvh);
+  padding: var(--spacing-tight);
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--color-edge-panel);
+  border-radius: var(--radius-panel);
+  color: var(--color-text);
+  background: var(--color-raised);
+  font: inherit;
+  font-size: var(--text-label);
+}
+
+.context-tools:not([data-positioned="true"]) {
+  visibility: hidden;
+}
+
+.context-tools button[data-context-item] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-pane);
+  inline-size: 100%;
+  min-block-size: var(--spacing-key);
+  padding-inline: var(--spacing-snug);
+  border-radius: var(--radius-control);
+  text-align: start;
+  white-space: normal;
+}
+
+.context-tools[data-input="touch"] button[data-context-item] {
+  min-block-size: max(44px, var(--spacing-key));
+}
+
+.context-tools button[data-context-item]:is(:hover, :focus-visible) {
+  background: var(--color-raised-hover);
+}
+
+.context-tools button[data-context-item][aria-disabled="true"] {
+  color: var(--color-text-disabled);
+}
+
+.context-tools button[data-context-item]:focus-visible {
+  outline-offset: -2px;
+}
+
+.context-tools button[data-context-back] {
+  justify-content: start;
+  border-block-end: 1px solid var(--color-edge-panel);
+}

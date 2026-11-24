@@ -27,6 +27,8 @@ fn two_runs_in_one_room_under_review_have_separate_checkouts() {
                 policy: kernel::RunPolicy::of(kernel::Mode::Work),
                 idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, idem),
                 session: None,
+                resume: None,
+                images: Vec::new(),
                 effort: None,
             })
             .unwrap();
@@ -63,6 +65,8 @@ fn a_tree_left_locked_by_a_dead_writer_is_lent_again() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, idem),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
         })
     };
@@ -116,6 +120,8 @@ fn a_review_dispatch_sent_again_after_a_restart_is_answered_once() {
                 policy: kernel::RunPolicy::of(kernel::Mode::Work),
                 idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, idem),
                 session: None,
+                resume: None,
+                images: Vec::new(),
                 effort: None,
                 model: None,
             },
@@ -168,6 +174,8 @@ fn a_source_index_lock_cannot_block_the_private_run() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"locked"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         },
@@ -212,6 +220,8 @@ fn a_lane_that_fails_after_placing_the_tree_gives_it_back() {
                     policy: kernel::RunPolicy::of(kernel::Mode::Work),
                     idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, idem),
                     session: None,
+                    resume: None,
+                    images: Vec::new(),
                     effort: None,
                     model: None,
                 },

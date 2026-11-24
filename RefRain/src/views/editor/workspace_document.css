@@ -1,0 +1,253 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+.workspace-document {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-block-size: 0;
+  block-size: 100%;
+  inline-size: 100%;
+  background: var(--color-reading-canvas, var(--color-page));
+  color: var(--color-text);
+}
+
+.workspace-document-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-tight) var(--spacing-snug);
+  align-items: center;
+  padding: var(--spacing-tight) var(--spacing-pane);
+  border-block-end: 1px solid var(--color-edge);
+  font-size: var(--text-note);
+}
+
+:where(
+  .workspace-document-tools button,
+  .workspace-selection-menu button,
+  .workspace-document-error button
+) {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-tight);
+  min-height: var(--spacing-control);
+  padding-inline: var(--spacing-snug);
+  border: 1px solid var(--color-edge);
+  border-radius: var(--radius-control);
+  background: var(--color-raised);
+  color: var(--color-text);
+}
+
+.workspace-document-tools button[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  background: var(--color-raised-hover);
+}
+
+.workspace-document-tools button:disabled {
+  color: var(--color-text-faint);
+}
+
+.workspace-document-tools label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-tight);
+  padding-inline: var(--spacing-tight);
+}
+
+.workspace-document-version {
+  font-family: var(--font-mono);
+  color: var(--color-text-quiet);
+}
+
+.workspace-editor-host,
+.workspace-format-preview {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  background: var(--color-reading-canvas, var(--color-page));
+}
+
+.workspace-editor-host .cm-editor {
+  block-size: 100%;
+  color: var(--color-text);
+  background: var(--color-reading-canvas, var(--color-page));
+}
+
+.workspace-editor-host .cm-scroller {
+  font: var(--text-body) / var(--leading-read) var(--font-mono);
+}
+
+.workspace-editor-host .cm-gutters {
+  background: var(--color-reading-canvas, var(--color-page));
+  color: var(--color-text-faint);
+  border-color: var(--color-edge);
+}
+
+.workspace-editor-host .cm-activeLine {
+  background: var(--color-raised);
+}
+
+.workspace-editor-host .cm-content {
+  caret-color: var(--color-accent);
+}
+
+.workspace-editor-host .cm-cursor {
+  border-inline-start-color: var(--color-accent);
+}
+
+.workspace-editor-host .cm-content ::selection,
+.workspace-editor-host .cm-editor .cm-selectionBackground {
+  background: var(--color-raised-hover);
+}
+
+.workspace-format-preview {
+  display: flex;
+  align-items: start;
+  justify-content: center;
+  overflow: auto;
+}
+
+.workspace-format-preview iframe {
+  flex: 1;
+  height: 100%;
+  border: 0;
+}
+
+.workspace-format-preview img,
+.cm-markdown-image img,
+.cm-markdown-diagram img {
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+}
+
+.workspace-math-preview {
+  align-self: center;
+  padding: var(--spacing-pane);
+  font-size: var(--text-heading);
+}
+
+.workspace-document > p,
+.workspace-document-error,
+.workspace-format-preview :is(p, pre) {
+  padding: var(--spacing-tight) var(--spacing-pane);
+}
+
+.workspace-selection-backdrop,
+.workspace-selection-menu {
+  position: fixed;
+  z-index: var(--layer-popover);
+}
+
+.workspace-selection-backdrop {
+  inset: 0;
+}
+
+.workspace-selection-menu {
+  max-width: calc(100vw - 2 * var(--spacing-pane));
+  padding: var(--spacing-tight);
+  border: 1px solid var(--color-edge-input);
+  border-radius: var(--radius-control);
+  background: var(--color-raised);
+}
+
+.cm-markdown-marker {
+  color: var(--color-markdown-marker, var(--color-text-quiet));
+}
+
+.cm-markdown-heading {
+  font-family: var(--font-read);
+  font-weight: var(--font-weight-heading);
+}
+
+.cm-markdown-heading-1,
+.cm-markdown-heading-2 {
+  font-size: var(--text-heading);
+}
+
+.cm-markdown-link {
+  color: var(--color-accent);
+  text-decoration: underline;
+}
+
+.cm-markdown-code {
+  background: var(--color-raised);
+}
+
+.cm-markdown-display,
+.cm-markdown-diagram,
+.cm-markdown-table {
+  display: block;
+  padding: var(--spacing-snug);
+  overflow-x: auto;
+}
+
+.cm-markdown-table :is(th, td) {
+  padding: var(--spacing-tight) var(--spacing-snug);
+  border: 1px solid var(--color-edge);
+}
+
+.cm-markdown-table th {
+  text-align: start;
+  font-weight: var(--font-weight-label);
+}
+
+.workspace-proposal {
+  flex: none;
+  max-block-size: 45%;
+  overflow: auto;
+  padding: var(--spacing-snug) var(--spacing-pane);
+  border-block-end: 1px solid var(--color-edge);
+  background: var(--color-raised);
+}
+
+.workspace-proposal h3 {
+  font-size: var(--text-heading);
+  font-weight: var(--font-weight-heading);
+}
+
+.workspace-proposal-text {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(25ch, 100%), 1fr));
+  gap: var(--spacing-base);
+}
+
+.workspace-proposal-text :is(pre, textarea) {
+  inline-size: 100%;
+  max-block-size: 12rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: var(--text-note) / var(--leading-read) var(--font-mono);
+}
+
+.workspace-proposal-text textarea {
+  background: var(--color-page);
+  color: var(--color-text);
+  border: 1px solid var(--color-edge-input);
+}
+
+.workspace-proposal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-tight);
+}
+
+:where(.workspace-proposal-actions button) {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-tight);
+  min-height: var(--spacing-control);
+  padding-inline: var(--spacing-snug);
+  border: 1px solid var(--color-edge-input);
+  border-radius: var(--radius-control);
+  background: var(--color-raised);
+  color: var(--color-text);
+}
+
+.workspace-proposal-actions button:disabled {
+  color: var(--color-text-disabled);
+}

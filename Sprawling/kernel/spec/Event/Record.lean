@@ -20,6 +20,7 @@
 ```rust
 pub struct SkillPin { pub name: String, pub hash: B3Hash }   // hash 必填
 pub struct RunStarted {                 // 字段全部 #[serde(default)]
+    pub pictures: Vec<ImageRef>,        // 人为本次输入选定的图像，按原序保存对象引用；空列省略，旧行读空
     pub task: String, pub goal: String, pub job: Option<Locator>,
     pub parent: Option<RunId>, pub predecessor: Option<RunId>,
     pub skills: Vec<SkillPin>,          // 空亦写出

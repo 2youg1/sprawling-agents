@@ -3,19 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What the file finder's look is handed (`search.look.svelte`), built
-// from the seat's state (`search.svelte`): the title, the box as an APG
-// Combobox, the paths as its listbox, and the sentences that say what
-// the city could not. Every role, id and handler is decided here, so a
-// replacement look draws the same wiring by spreading the bags.
-
 import { fill, say } from "../../core/lang";
 import type { Lang } from "../../core/lang";
 import type { Address, FindAnswer } from "../../wire";
 import { boxKey } from "../cursor";
 
-// What a handler reads from an event, and nothing more, so the wiring
-// test presses keys and types without a DOM.
 export type KeyPress = Pick<KeyboardEvent, "key" | "isComposing" | "preventDefault">;
 export interface Typed {
   readonly currentTarget: { readonly value: string };
@@ -49,9 +41,7 @@ export interface OptionWire {
 }
 
 export interface OptionLook {
-  // The path, unique in the list; a key for `#each`.
   readonly key: string;
-  // The file's own name, then the directory it sits in.
   readonly name: string;
   readonly dir: string;
   readonly active: boolean;
@@ -63,8 +53,6 @@ export interface SearchLook {
   readonly box: BoxWire;
   readonly list: ListWire;
   readonly options: readonly OptionLook[];
-  // What the city could not say, one sentence each, in order: nothing
-  // matched, and the walk was cut short.
   readonly notes: readonly string[];
 }
 
@@ -78,15 +66,12 @@ export interface SearchState {
   readonly lang: Lang;
 }
 
-// What only the seat can do: hold the typed text and the cursor, and
-// open a path.
 export interface SearchHands {
   readonly type: (text: string) => void;
   readonly point: (at: number) => void;
   readonly open: (path: string) => void;
 }
 
-// A path drawn as its name, then the directory it sits in.
 export function partsOf(path: string): { readonly name: string; readonly dir: string } {
   const slash = path.lastIndexOf("/");
   return slash < 0

@@ -181,6 +181,8 @@ recovery: {}
                 Assignment {
                     addr: work.room,
                     session: None,
+                    resume: None,
+                    pictures: Vec::new(),
                     effort: None,
                     difficulty: work.difficulty,
                     model: None,

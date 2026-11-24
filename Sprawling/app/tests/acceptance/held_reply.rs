@@ -95,6 +95,8 @@ fn dispatch(addr: &str, material: &[u8]) -> wire::Command {
         policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, material),
         session: None,
+        resume: None,
+        images: Vec::new(),
         effort: None,
         model: None,
     }

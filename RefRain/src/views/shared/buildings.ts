@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import { derived } from "svelte/store";
-import type { Readable } from "svelte/store";
+import { derived } from "../../core/store";
+import type { Readable } from "../../core/store";
 
 import { QUERIES } from "../../core/asking";
 import { MAYOR, buildingOf } from "../../core/route";
@@ -30,5 +30,3 @@ export interface BuildingColumnProps {
   readonly onPick: (addr: Address) => void;
   readonly hall: string;
 }
-
-export { default as BuildingColumn } from "./buildings.svelte";

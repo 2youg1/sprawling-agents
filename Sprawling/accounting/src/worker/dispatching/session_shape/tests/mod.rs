@@ -20,16 +20,8 @@ use std::sync::{Arc, Mutex, PoisonError};
 use crate::worker::fixture::*;
 use crate::worker::*;
 
-/// One frozen segment as the record states it: which slot, which hash,
-/// and how many bytes went into the prompt.
 type Row = (String, String, u64);
 
-/// Every prefix this city froze, read off the ledger as it is written.
-///
-/// A watcher rather than a read-back, because the two runs have to be
-/// compared as the assembler produced them: a later re-assembly would
-/// read files that may have moved since and would be comparing
-/// something other than what the runs were sent.
 type Prefixes = Arc<Mutex<Vec<Vec<Row>>>>;
 
 fn watch(worker: &mut RunWorker, seen: &Prefixes) {
@@ -59,9 +51,6 @@ fn row_of(row: &serde_json::Value) -> Option<Row> {
     ))
 }
 
-/// The bytes behind a recorded prefix, read back from the store. Equal
-/// hashes already say the bytes are equal; this is the reading a person
-/// can check without trusting the hash to mean what it says.
 fn bytes_of(city_root: &std::path::Path, rows: &[Row]) -> BTreeMap<String, Vec<u8>> {
     let store = storage::Cas::open(&kernel::layout::CityLayout::new(city_root).cas()).unwrap();
     rows.iter()
@@ -81,12 +70,13 @@ fn ask(addr: &Address, effort: Option<kernel::Effort>, key: &[u8]) -> wire::Comm
         policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, key),
         session: None,
+        resume: None,
+        images: Vec::new(),
         effort,
         model: None,
     }
 }
 
-/// A dispatch that names the model it runs on.
 fn ask_on(addr: &Address, model: &str, key: &[u8]) -> wire::Command {
     let mut dispatch = ask(addr, None, key);
     if let wire::Command::Dispatch { model: named, .. } = &mut dispatch {

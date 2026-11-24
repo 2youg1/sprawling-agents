@@ -61,7 +61,7 @@
         # Bun's version lives in `RefRain/package.json`, in the `packageManager`
         # field `oven-sh/setup-bun` reads on every workflow (AGENTS.md, the
         # loop). nixpkgs answers the same question from its own pin and lags:
-        # it carries 1.4.2 while the client names 1.4.4, and this flake builds
+        # it carries 1.4.2 while the client names 1.4.5, and this flake builds
         # the bundle the binary embeds, so a bundle built by another Bun is
         # another artifact. The version is read from that manifest and the
         # archives come from Bun's own release, digested per platform; a bump
@@ -79,19 +79,19 @@
           {
             aarch64-darwin = {
               name = "darwin-aarch64";
-              hash = "c240d7f0ccb90c263a849fcdb09b7ee62630d921348ed6aafda86b9d577bc510";
+              hash = "b5d6bc2e13caf14e57c89661e89efd073ff16165b41bfe43882616410609cd10";
             };
             x86_64-darwin = {
               name = "darwin-x64";
-              hash = "50a3491f73abc2fe81673171a85762d3bc2cc1680ccecadd983de99adf77977e";
+              hash = "a4972e778cce4b6a194d7d289f326aa61576d71d80b7a53e9da2f3739566e5fd";
             };
             aarch64-linux = {
               name = "linux-aarch64";
-              hash = "baa6bb36f51d6e58561e02bbea825038a9df454f673d6d776e8bbf86f8c7850e";
+              hash = "18656a3bf0ea5641f5796ae4213b75255579a70a0fded2f337933785568cdf84";
             };
             x86_64-linux = {
               name = "linux-x64-baseline";
-              hash = "e0446eb55995772eb9894bebae9a6be368d985a8b9271ee124486f9946eedd76";
+              hash = "dcb23a18a1c2fff12d57bcef696dbbb42eb67fde29f43816ecb595459a24c463";
             };
           }
           .${system}

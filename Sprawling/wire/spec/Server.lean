@@ -169,7 +169,7 @@ pub commands: Arc<dyn Fn(WireCommand, Reply) -> Result<(), AxError> + Send + Syn
 
 **五个查询各有自己的答**（`InboxView`／`DiscardView`／`RegistryView`／`ArchiveSearch`／`Metrics`）。三条口径：①**队列折叠着看不消费着看**（`Inbox::pull` 要拿走才给内容，看一眼就取走的视图会改变它所报告的对象）；②归档在被问的那一刻读盘（同 `BuildingView`，文件是权威）；③**`Metrics` 恒不携钱**——钱是 `CostView` 的，一个数字两个主人就是两个数字开始互相矛盾的起点。
 
-**`DiscardLine.restoration` 携 `Option<Restoration>` 而非一个句子**。回收站那一行的「怎么拿回来」的唯一措辞处在客户端（`RefRain/src/views/record/bin.svelte` 按 `tracked`／`interred`／`rebuildable` 三臂措辞）；服务端若把它拼成一句话，就是**一件事两个渲染权威**，而服务端那句还拼不出可执行的那句话。所以计划以它自己的形状上线（载荷本来就是 `Restoration` 序列化出来的，故读得回去）；`None` 的意思是**这一条记录用了本构建读不懂的方案**，界面据此画一行而不给动作——行恒不隐藏，因为藏起一件被删的东西比承认读不懂它的方案更糟。这类「语法换形而名字没换」的改动不动 `QUERY_NAMES` 与 `COMMAND_NAMES`，故只能由 `WIRE_V` 进位让旧页面在握手期被拒。
+**`DiscardLine.restoration` 携 `Option<Restoration>` 而非一个句子**。回收站那一行的「怎么拿回来」的唯一措辞处在客户端（`RefRain/src/views/record/history_views.tsx` 按 `tracked`／`interred`／`rebuildable` 三臂措辞）；服务端若把它拼成一句话，就是**一件事两个渲染权威**，而服务端那句还拼不出可执行的那句话。所以计划以它自己的形状上线（载荷本来就是 `Restoration` 序列化出来的，故读得回去）；`None` 的意思是**这一条记录用了本构建读不懂的方案**，界面据此画一行而不给动作——行恒不隐藏，因为藏起一件被删的东西比承认读不懂它的方案更糟。这类「语法换形而名字没换」的改动不动 `QUERY_NAMES` 与 `COMMAND_NAMES`，故只能由 `WIRE_V` 进位让旧页面在握手期被拒。
 
 **`POST /acp` 与 `AcpSink`**。外来编辑器的请求走自己的路由，不挤 Command 面：它自带鉴权、要一个当场的回答，而 Command 面的回答是事件流。三条口径：①**令牌在本 crate 判**（配对令牌住这里，常数时间比对也就住这里），只把 `authentic` 一位传进去——拒词由 `agent_protocols::admit` 措辞，「未配对者只学到一位」因此只有一个权威；②回给编辑器的只有 `AcpProgress` 三字段，run id 是工人接单时才铸的，故受理那一刻诚实的答案是「已受理、未完成」；③编辑器出示native key（读钥匙文件，`Sprawling/app/spec/Keying.lean` §8-22）或一个会话令牌，与 control surface 同一条规矩。
 
@@ -200,6 +200,8 @@ Unavailable {
 -/
 
 /-! D20 送页面的两条路由是一个公开函数，城的端口与远程监听各把它并进自己的路由表
+
+壁纸的 WebP 与字体的 WOFF2 随客户端包加载，`ClientAssets` 分别以 `image/webp` 与 `font/woff2` 返回。资源的类型由同一处后缀映射决定，磁盘与嵌入资源的响应使用同一规则。
 
 **决定**：`/` 与 `/{*asset}` 两条路由连同它们的响应头由 `bundle_routes` 造出，对路由表的状态类型泛型，自带 `Arc<ClientAssets>` 作状态；`router` 把它并进来，装配层的远程监听也把它并进来。
 
@@ -268,6 +270,7 @@ pub struct PairAnswer { pub device: DeviceId }               // §8-91
 pub struct ChallengeAnswer { pub nonce: String }
 
 // POST /session               { "device", "nonce", "signature" }
+//                          或 { "public_key", "nonce", "signature" }
 pub struct SessionBody { pub device: DeviceId, pub nonce: String, pub signature: String }
 pub struct SessionAnswer { pub token: String }               // 页面只把它放在内存里
 ```
@@ -277,7 +280,7 @@ pub struct SessionAnswer { pub token: String }               // 页面只把它�
 - **字节怎么写**：`public_key` 是 Ed25519 公钥的 32 字节，`nonce` 是 32 字节，`signature` 是 64 字节，`token` 是 32 字节，线上一律写成小写十六进制；`label` 至多 `LABEL_MAX`（64）个字符，空或含控制字符即 422。页面用 `crypto.subtle.exportKey("raw", publicKey)` 得到公钥。签的字节是 `sprawling local session v1
 <nonce>
 <origin>`，`origin` 是页面自己的 `location.origin`，服务端取这次请求过了入口判定的 Origin 头去验。
-- **答复**：`/pair` 200 `{ device }`；`/session/challenge` 200 `{ nonce }`；`/session` 200 `{ token }`，nonce 过期或用过、设备不认识、签名不对都是 403 `E_GATE_DENIED`。三条路只收浏览器（§8-94 第 6 步），不问凭据——它们就是换凭据的地方。
+- **答复**：`/pair` 200 `{ device }`；`/session/challenge` 200 `{ nonce }`；`/session` 的设备 ID 写法答 200 `{ token }`。配对回执未知时，浏览器用预存设备钥签新 nonce，按公钥写法查询配对状态，城从公钥推出设备 ID 并验证该已登记设备的签名，成功答 200 `{ device, token }`。此查证沿用原配对记录。nonce 过期或用过、设备不认识、签名不对都是 403 `E_GATE_DENIED`。三条路只收浏览器（§8-94 第 6 步），由握手发放凭据。
 
 ```rust
 // 这台电脑上的这扇门的句柄：装配层建一次，交给 ServeConfig，也交给控制台与开浏览器的那一方。

@@ -19,7 +19,12 @@ pub(crate) struct RoomSessions {
 
 impl RoomSessions {
     pub(crate) fn absorb(&mut self, record: &EventRecord) -> Result<(), AxError> {
-        let Some(room) = record.addr() else {
+        let assigned = self.by_run.get(&record.run()).cloned();
+        let Some(room) = assigned
+            .as_ref()
+            .map(|session| &session.room)
+            .or_else(|| record.addr())
+        else {
             return Ok(());
         };
         let (seq, at) = (record.seq(), record.t());
@@ -75,13 +80,21 @@ impl RoomSessions {
         } else {
             None
         };
+        let target = assigned
+            .as_ref()
+            .map(|session| session.began)
+            .or_else(|| historical_target(record.data()));
         let parent = started
             .as_ref()
             .and_then(|line| line.parent)
             .and_then(|run| self.by_run.get(&run).cloned());
         let runs = u64::from(started.is_some());
         let mut opened_run = None;
-        match self.by_room.get_mut(room).and_then(|held| held.last_mut()) {
+        let current = self.by_room.get_mut(room).and_then(|held| match target {
+            Some(began) => held.iter_mut().find(|line| line.began == began),
+            None => held.last_mut(),
+        });
+        match current {
             Some(current) => {
                 let first = current.runs == 0;
                 current.runs = current.runs.saturating_add(runs);
@@ -112,7 +125,7 @@ impl RoomSessions {
                 current.at = at;
                 describe(current, record)?;
             }
-            None if runs > 0 => {
+            None if runs > 0 && target.is_none() => {
                 let mut opened = SessionLine {
                     began: seq,
                     start: SessionStart::Dispatched {
@@ -148,6 +161,22 @@ impl RoomSessions {
         Ok(())
     }
 
+    pub(crate) fn line(&self, room: &Address, began: kernel::Seq) -> Option<(bool, &SessionLine)> {
+        let lines = self.by_room.get(room)?;
+        lines
+            .iter()
+            .enumerate()
+            .find(|(_, line)| line.began == began)
+            .map(|(at, line)| (at.saturating_add(1) == lines.len(), line))
+    }
+
+    pub(crate) fn in_room(&self, room: &Address, record: &EventRecord) -> bool {
+        self.by_run.get(&record.run()).map_or_else(
+            || record.addr() == Some(room),
+            |session| &session.room == room,
+        )
+    }
+
     pub(crate) fn answer(&self, room: &Address) -> SessionsAnswer {
         let held = self.by_room.get(room).map_or(&[][..], Vec::as_slice);
         let sessions: Vec<SessionLine> = held.iter().rev().take(SESSIONS_MAX).cloned().collect();
@@ -157,6 +186,13 @@ impl RoomSessions {
             sessions,
         }
     }
+}
+
+pub(crate) fn historical_target(data: &kernel::Payload) -> Option<kernel::Seq> {
+    data.as_map()
+        .get("session_began")?
+        .as_u64()
+        .map(kernel::Seq::new)
 }
 
 fn describe(stretch: &mut SessionLine, record: &EventRecord) -> Result<(), AxError> {

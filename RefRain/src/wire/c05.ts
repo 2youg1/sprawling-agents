@@ -30,9 +30,11 @@ import {
   Face,
   Glass,
   Laid,
-  Lighting,
   PrefixSlot,
 } from "./c04";
+
+export const Lighting = Schema.Literals(["system", "dark", "light"]).annotate({ identifier: "Lighting" });
+export type Lighting = typeof Lighting.Type;
 
 export const Motion = Schema.Literals(["system", "on", "off"]).annotate({ identifier: "Motion" });
 export type Motion = typeof Motion.Type;
@@ -424,13 +426,4 @@ export const PrivacyOutcome = Schema.Struct({
   result: PrivacyResult,
 }).annotate({ identifier: "PrivacyOutcome" });
 export type PrivacyOutcome = typeof PrivacyOutcome.Type;
-
-export const PrivacyAnswer = Schema.Struct({
-  controls: Schema.Array(PrivacyControlEntry),
-  history: PrivacyHistory,
-  host: PrivacyHost,
-  not_written: Schema.Array(PrivacyNotWrittenEntry),
-  outcomes: Schema.Array(PrivacyOutcome),
-}).annotate({ identifier: "PrivacyAnswer" });
-export type PrivacyAnswer = typeof PrivacyAnswer.Type;
 

@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import { get } from "svelte/store";
+import { get } from "./store";
 
 import { QUERIES } from "./asking";
 import { putPreferences } from "./commands";

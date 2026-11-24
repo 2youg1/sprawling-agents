@@ -149,6 +149,8 @@ fn dispatch(
     session: Option<kernel::SessionName>,
 ) -> Result<(), AxError> {
     worker.handle(wire::Command::Dispatch {
+        images: Vec::new(),
+        resume: None,
         addr: Address::parse(LAB).unwrap(),
         task: "Answer.".to_owned(),
         goal: "one answer from the model this worker was handed".to_owned(),

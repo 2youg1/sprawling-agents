@@ -76,13 +76,9 @@ impl Ledger for RecordingLedger {
     }
 }
 
-/// One tool call on the first turn, nothing after: the shortest script
-/// that still exercises a wave.
 pub(super) struct ScriptedModel {
     pub(super) waves: Vec<Vec<ToolCall>>,
-    /// Every user message this model was shown, in order, so a test can
-    /// ask what actually reached the window rather than what was
-    /// recorded about it.
+
     pub(super) seen: std::rc::Rc<std::cell::RefCell<Vec<String>>>,
 }
 
@@ -90,7 +86,7 @@ impl Model for ScriptedModel {
     fn call(&mut self, req: &ModelRequest) -> Result<ModelReturn, AxError> {
         self.seen
             .borrow_mut()
-            .push(format!("{:?}", req.chat.messages));
+            .push(serde_json::to_string(&req.chat.messages).unwrap());
         let calls = if self.waves.is_empty() {
             Vec::new()
         } else {
@@ -106,11 +102,6 @@ impl Model for ScriptedModel {
     }
 }
 
-/// A model whose every call fails with one code.
-///
-/// The two codes this fixture is used with are the two halves of the
-/// carrier table: one that names an event to write, and one the table
-/// calls loadtime. A run has to end under both.
 pub(super) struct FailingModel {
     pub(super) code: kernel::AxCode,
 }
@@ -124,8 +115,6 @@ impl Model for FailingModel {
     }
 }
 
-/// A model that fails for a reason worth retrying, a stated number of
-/// times, and then answers.
 pub(super) struct FlakyModel {
     pub(super) failures_left: u32,
     pub(super) calls: std::rc::Rc<std::cell::RefCell<u32>>,
@@ -166,6 +155,7 @@ pub(super) fn call(id: &str) -> ToolCall {
 pub(super) fn plan() -> RunPlan {
     let addr = Address::parse("lab/room1").unwrap();
     RunPlan {
+        pictures: Vec::new(),
         run: RunId::from_bytes([7; 16]),
         who: "resident".to_owned(),
         addr: addr.clone(),
@@ -218,8 +208,6 @@ pub(super) fn handoff() -> Handoff {
     .unwrap()
 }
 
-/// A counter clock: the same closure citysim uses, so the assertions here
-/// and the simulator's byte fixtures are talking about one discipline.
 pub(super) fn counter() -> impl FnMut() -> Result<TimeMs, AxError> {
     let mut tick: u64 = 0;
     move || {

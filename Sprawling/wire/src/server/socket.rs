@@ -18,7 +18,7 @@ use crate::reception::inbound::Inbound;
 use crate::reception::{
     Keys, SessionState, SessionStep, Standing, Stream, WelcomeFacts, decide_frame, decide_standing,
 };
-use crate::reply::{Delivered, Reply};
+use crate::reply::{Delivered, Outcome, Reply};
 
 use super::config::{Answering, ShellState};
 use super::seat::Seat;
@@ -39,7 +39,7 @@ async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
     let mut logs = state.logs.subscribe();
     let mut outputs = state.outputs.subscribe();
 
-    let (refused, mut refusals) = tokio::sync::mpsc::unbounded_channel::<AxError>();
+    let (reported, mut reports) = tokio::sync::mpsc::unbounded_channel::<ServerFrame>();
 
     let mut stream = Stream::opening();
     let mut watching: Option<Watching> = None;
@@ -71,13 +71,20 @@ async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
                         }
                     }
                     SessionStep::Deliver(command) => {
-                        let back = refused.clone();
-                        let reply = Reply::to(move |error| match back.send(error) {
-                            Ok(()) => Delivered::ToThePeer,
-                            Err(_) => Delivered::PeerGone,
+                        let back = reported.clone();
+                        let key = command.idem().copied();
+                        let reply = Reply::outcomes(move |outcome| {
+                            let frame = match outcome {
+                                Outcome::Accepted(key) => ServerFrame::Accepted(key),
+                                Outcome::Refused(error) => ServerFrame::Refusal(Box::new(error.for_request(key))),
+                            };
+                            match back.send(frame) {
+                                Ok(()) => Delivered::ToThePeer,
+                                Err(_) => Delivered::PeerGone,
+                            }
                         });
                         if let Err(error) = (state.commands)(*command, reply)
-                            && send(&mut socket, &ServerFrame::Refusal(Box::new(error))).await.is_err() {
+                            && send(&mut socket, &ServerFrame::Refusal(Box::new(error.for_request(key)))).await.is_err() {
                             return;
                         }
                     }
@@ -119,9 +126,9 @@ async fn session(mut socket: WebSocket, state: Arc<ShellState>) {
                 return;
             }
 
-            late = refusals.recv() => {
-                let Some(error) = late else { return };
-                if send(&mut socket, &ServerFrame::Refusal(Box::new(error))).await.is_err() {
+            late = reports.recv() => {
+                let Some(frame) = late else { return };
+                if send(&mut socket, &frame).await.is_err() {
                     return;
                 }
             }

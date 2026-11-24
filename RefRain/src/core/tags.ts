@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { Option, Schema } from "effect";
-import { writable } from "svelte/store";
-import type { Readable } from "svelte/store";
+import { writable } from "./store";
+import type { Readable } from "./store";
 
 import { QUERIES } from "./asking";
 import { putPreferences } from "./commands";

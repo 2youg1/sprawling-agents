@@ -6,7 +6,7 @@
 use kernel::{Address, AxError, B3Hash, EventKind, EventRecord, RunId, Seq, TimeMs};
 use serde::{Deserialize, Serialize};
 
-pub const WIRE_V: u32 = 81;
+pub const WIRE_V: u32 = 82;
 mod ask;
 mod monitor;
 
@@ -93,6 +93,7 @@ pub enum ServerFrame {
     Event(Box<EventRecord>),
     Answered(Box<Answered>),
     Refusal(Box<AxError>),
+    Accepted(kernel::IdemKey),
 
     Delta(Delta),
 

@@ -15,7 +15,6 @@ use kernel::degradation::VolumeSpace;
 
 const GIB: u64 = 1024 * 1024 * 1024;
 
-/// One GiB free on a 1000 GiB volume, whose floor is 4 GiB.
 fn close_to_full(_city: &Path) -> Option<VolumeSpace> {
     Some(VolumeSpace {
         free_bytes: GIB,
@@ -49,6 +48,8 @@ fn a_volume_below_its_floor_refuses_a_dispatch_before_anything_is_written() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })

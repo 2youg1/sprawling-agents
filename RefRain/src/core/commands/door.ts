@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { mintIdem } from "../idem";
-import type { Command } from "../../wire";
+import type { Command, IdemKey } from "../../wire";
 
 export function openRemoteDoor(lastingMs: number): Command {
   return { open_remote_door: { lasting_ms: lastingMs, idem: mintIdem() } };
@@ -14,8 +14,8 @@ export function replaceCityKey(): Command {
   return { replace_city_key: { idem: mintIdem() } };
 }
 
-export function confirmRemoteDoor(code: string): Command {
-  return { confirm_remote_door: { code, idem: mintIdem() } };
+export function confirmRemoteDoor(code: string, approval: IdemKey): Command {
+  return { confirm_remote_door: { code, approval, idem: mintIdem() } };
 }
 
 export function closeRemoteDoor(): Command {

@@ -15,7 +15,6 @@ use framing::read_http_request;
 use crate::worker::fixture::*;
 use crate::worker::*;
 
-/// Writes a `[[mcp]]` table naming one server at the building layer.
 fn write_server_table(city_root: &Path, addr: &str, command: &str, args: &[String]) {
     let addr = Address::parse(addr).unwrap();
     let path = city::config_path(city_root, &addr, city::Layer::Building).unwrap();
@@ -33,9 +32,6 @@ fn write_server_table(city_root: &Path, addr: &str, command: &str, args: &[Strin
     .unwrap();
 }
 
-/// One line that serves as every answer this fake server gives: the
-/// negotiated version and who it is for the handshake, a listing
-/// with one tool, and content for when that tool is called.
 const SERVER_ANSWER: &str = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"serverInfo\":{\"name\":\"apps\",\"version\":\"1\"},\"tools\":[{\"name\":\"ping\",\"description\":\"answer with pong\",\"inputSchema\":{\"type\":\"object\"}}],\"content\":[{\"type\":\"text\",\"text\":\"pong\"}]}}";
 
 #[test]
@@ -61,6 +57,8 @@ fn a_configured_server_becomes_a_tool_the_model_is_told_about_and_can_call() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -88,10 +86,6 @@ fn a_configured_server_becomes_a_tool_the_model_is_told_about_and_can_call() {
     );
 }
 
-/// Two different calls to one tool in one turn are two calls. A key
-/// made of the turn's millisecond stamp and the tool's name would
-/// return the second as a duplicate of the first, and the model would
-/// read that as a fault in itself.
 #[test]
 fn the_same_tool_twice_with_different_arguments_runs_twice() {
     let dir = tempfile::tempdir().unwrap();
@@ -132,6 +126,8 @@ fn the_same_tool_twice_with_different_arguments_runs_twice() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -187,8 +183,6 @@ fn a_confidential_building_starts_no_server_and_a_dead_one_is_simply_absent() {
     );
 }
 
-/// A stdio declaration under `label`, as a building's `[[mcp]]`
-/// table would carry it.
 fn stdio_server(label: &str, (command, args): (String, Vec<String>)) -> kernel::McpServer {
     kernel::McpServer {
         label: kernel::ServerLabel::parse(label).unwrap(),
@@ -200,7 +194,6 @@ fn stdio_server(label: &str, (command, args): (String, Vec<String>)) -> kernel::
     }
 }
 
-/// Runs the production admission path with one test building's frozen references.
 fn admitted(
     worker: &RunWorker,
     config: &kernel::FrozenConfig,
@@ -231,16 +224,11 @@ fn no_secrets() -> gateway::SecretResolver {
     })
 }
 
-/// How many tools `server` offered, and whether this call connected
-/// it, in a shape a lane's thread can hand back.
 fn reach(residents: &Residents, server: &kernel::McpServer, root: &Path) -> (usize, bool) {
     let (tools, reached) = residents.tools(server, root, false, &no_secrets()).unwrap();
     (tools.len(), matches!(reached, Reached::Connected(_)))
 }
 
-/// Two lanes reaching two servers share one table: a handshake that
-/// has not been answered yet holds up the lanes asking for its own
-/// server and nobody else (`Sprawling/app/Spec.lean` §8-4).
 #[test]
 #[allow(
     clippy::disallowed_methods,
@@ -311,10 +299,6 @@ fn a_second_dispatch_reaches_the_server_the_first_one_started() {
     );
 }
 
-/// A dispatch whose server has not answered its handshake yet leaves
-/// the desk free: the command is answered on the accounting thread,
-/// and the lane that will drive the run is the one that waits for
-/// the server (`Sprawling/app/Spec.lean` §8-113).
 #[test]
 fn a_dispatch_whose_server_still_shakes_hands_leaves_the_desk_free() {
     let dir = tempfile::tempdir().unwrap();
@@ -324,9 +308,6 @@ fn a_dispatch_whose_server_still_shakes_hands_leaves_the_desk_free() {
     write_server_table(dir.path(), "lab", &command, &args);
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
-    // The gate opens on its own after a while, so a desk that waits
-    // for the handshake still returns and the assertion below fails
-    // rather than hangs.
     let (answered, heard) = std::sync::mpsc::channel::<()>();
     let opener = {
         let gate = gate.clone();
@@ -348,6 +329,8 @@ fn a_dispatch_whose_server_still_shakes_hands_leaves_the_desk_free() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         },

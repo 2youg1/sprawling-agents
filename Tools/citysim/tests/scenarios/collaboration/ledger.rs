@@ -24,8 +24,6 @@ use kernel::{Address, EventKind, EventRecord, IdemKey, RunId, Seq};
 
 use super::roles::{Counted, hands, idem};
 
-/// A founded city whose main model sits behind a loopback port nothing
-/// answers, so the vault's keep-warm never leaves this process.
 pub(super) fn city(
     dir: &Path,
     factory: impl accounting::ModelFactory + std::marker::Send + 'static,
@@ -107,6 +105,8 @@ pub(super) fn dispatch(addr: &str, goal: &str) -> wire::Command {
         policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, goal.as_bytes()),
         session: None,
+        resume: None,
+        images: Vec::new(),
         effort: None,
         model: None,
     }
@@ -114,8 +114,6 @@ pub(super) fn dispatch(addr: &str, goal: &str) -> wire::Command {
 
 pub(super) type Lines = Vec<(EventRecord, String)>;
 
-/// Serves the city through `attend`, posts `commands` in order, and reads the
-/// history until `done` holds, in counted looks.
 pub(super) fn serve(
     worker: RunWorker,
     ledger: &Path,
@@ -136,10 +134,8 @@ pub(super) fn serve(
     )
 }
 
-/// What the history must hold before a command is posted.
 pub(super) type Mark = Box<dyn Fn(&Lines) -> bool>;
 
-/// Waits, in counted looks, until the history holds `mark`.
 pub(super) fn look_until(ledger: &Path, mark: &dyn Fn(&Lines) -> bool) {
     for _ in 0..3_000 {
         if mark(&read(ledger)) {
@@ -149,8 +145,6 @@ pub(super) fn look_until(ledger: &Path, mark: &dyn Fn(&Lines) -> bool) {
     }
 }
 
-/// Serves the city through `attend`, posts each command once the history
-/// holds the mark beside it, and reads the history until `done` holds.
 pub(super) fn serve_in_turn(
     mut worker: RunWorker,
     ledger: &Path,
@@ -251,7 +245,6 @@ pub(super) fn frozen(lines: &Lines) -> usize {
         .count()
 }
 
-/// Every run that started has frozen.
 pub(super) fn quiet(lines: &Lines) -> bool {
     let starts = lines
         .iter()

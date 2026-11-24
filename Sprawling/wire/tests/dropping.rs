@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The drop route hands the file's name and bytes to the city and
-//! answers with the path the city kept it at (`Sprawling/wire/spec/Server.lean` §8-49).
-//!
-//! Driven in process through `tower::ServiceExt::oneshot`, for the same
-//! reason the recording route is: this is a white-box check of the
-//! router, and a check that raised the product's server would be
-//! standing outside, which is `Tools/adversary/`'s ground (`xtask boundary`).
-
 #![cfg(feature = "server")]
 #![allow(
     clippy::unwrap_used,
@@ -33,6 +25,7 @@ use wire::{Answer, Command, Reply, ServeConfig};
 async fn send(uri: &str, bytes: Vec<u8>) -> (u16, String) {
     let (events, _held) = tokio::sync::broadcast::channel(16);
     let config = ServeConfig {
+        workspace: None,
         deltas: tokio::sync::broadcast::channel(16).0,
         logs: tokio::sync::broadcast::channel(16).0,
         outputs: tokio::sync::broadcast::channel(16).0,
@@ -116,8 +109,6 @@ async fn send(uri: &str, bytes: Vec<u8>) -> (u16, String) {
     (status, String::from_utf8_lossy(&body).into_owned())
 }
 
-/// The name arrives percent-encoded and reaches the city as the person
-/// spelled it, and the path the city answers is the whole response.
 #[tokio::test]
 async fn the_kept_path_answers_the_request_that_carried_the_file() {
     let (status, said) = send("/drop?name=%E7%AC%94%E8%AE%B0.txt", b"four".to_vec()).await;
@@ -127,7 +118,6 @@ async fn the_kept_path_answers_the_request_that_carried_the_file() {
     );
 }
 
-/// A request that names no file is refused before the city is asked.
 #[tokio::test]
 async fn a_drop_without_a_name_is_refused() {
     let (status, said) = send("/drop", b"four".to_vec()).await;
@@ -135,7 +125,6 @@ async fn a_drop_without_a_name_is_refused() {
     assert!(said.contains("name"), "{said}");
 }
 
-/// The city's refusal comes back with its recovery, not as silence.
 #[tokio::test]
 async fn the_citys_refusal_comes_back_whole() {
     let (status, said) = send("/drop?name=a%2Fb", b"four".to_vec()).await;
@@ -143,8 +132,6 @@ async fn the_citys_refusal_comes_back_whole() {
     assert!(said.contains("rename the file"), "{said}");
 }
 
-/// A file larger than axum's own 2 MiB default still arrives: the limit
-/// on this route is the one the SPEC states.
 #[tokio::test]
 async fn a_file_past_the_framework_default_still_arrives() {
     let (status, said) = send("/drop?name=big.bin", vec![0; 3 * 1024 * 1024]).await;

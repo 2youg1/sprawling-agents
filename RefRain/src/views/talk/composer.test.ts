@@ -7,7 +7,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { RunBelief } from "../../core/belief";
 import { Address, RunId, Seq, TimeMs } from "../../wire";
-import { boxKey, menuColumns, modelMove, picksFor, sessionModel } from "./composer";
+import { boxKey, menuColumns, modelMove, picksFor, sessionModel, startedIn } from "./composer";
 import type { BoxKey } from "./composer";
 
 const ignore = (): void => undefined;
@@ -59,6 +59,15 @@ describe("the session's model", () => {
     ];
     expect(sessionModel(runs, Seq.make(2))).toBe("fake-small");
   });
+
+  test("a recent follow-up to an older session cannot start or freeze the current one", () => {
+    const historical = {
+      ...run("00000000-0000-4000-8000-000000000001", 12, "fake-historical"),
+      sessionBegan: Seq.make(2),
+    };
+    expect(sessionModel([historical], Seq.make(9))).toBeNull();
+    expect(startedIn([historical], Seq.make(9))).toBe(false);
+  });
 });
 
 describe("picking a model", () => {
@@ -102,9 +111,6 @@ describe("a key in the box", () => {
     { menu: true, empty: false },
   ] as const;
 
-  // Every key, with and without Shift, in every box: a key that confirms
-  // an input method's composition is the input method's, so an Enter that
-  // picks a candidate never sends half a sentence.
   test("a composing key is always the box's", () => {
     const decided: BoxKey[] = keys.flatMap((key) =>
       boxes.flatMap((box) => [false, true].map((shift) => boxKey(pressed(key, shift, true), box))),
@@ -126,8 +132,6 @@ describe("a key in the box", () => {
     ]);
   });
 
-  // Under an open menu Tab completes and every other key is offered to
-  // the menu first; one the menu does not take is the box's own again.
   test("an open menu takes Tab and is offered the rest", () => {
     expect(keys.map((key) => boxKey(pressed(key), boxes[2]))).toEqual([
       "menu",

@@ -21,6 +21,7 @@ import {
   Effort,
   ExposureTable,
   GitOid,
+  KeepWarm,
   McpReference,
   Proxying,
   RunId,
@@ -330,9 +331,6 @@ export const CityClosing = Schema.Struct({
 }).annotate({ identifier: "CityClosing" });
 export type CityClosing = typeof CityClosing.Type;
 
-export const KeepWarm = Schema.Literals(["off", "five_minute"]).annotate({ identifier: "KeepWarm" });
-export type KeepWarm = typeof KeepWarm.Type;
-
 export const CitySettings = Schema.Struct({
   catalog: Schema.optional(Schema.NullOr(ExposureTable)),
   effort: Schema.optional(Schema.NullOr(Effort)),
@@ -350,6 +348,7 @@ export const DeviceForgetting = Schema.Struct({
 export type DeviceForgetting = typeof DeviceForgetting.Type;
 
 export const DoorAnswer = Schema.Struct({
+  approval: Schema.optional(Schema.NullOr(IdemKey)),
   code: Schema.String,
   idem: IdemKey,
 }).annotate({ identifier: "DoorAnswer" });

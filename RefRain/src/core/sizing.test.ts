@@ -14,5 +14,6 @@ test("a size under the floor is refused and any whole size from it up is read", 
   expect(sizingOf(" 24 ")).toEqual({ kind: "sized", px: 24 });
   expect(sizingOf("96")).toEqual({ kind: "sized", px: 96 });
   expect(sizingOf("15.5")).toEqual({ kind: "refused" });
+  expect(sizingOf("4294967296")).toEqual({ kind: "refused" });
   expect(sizingOf("")).toEqual({ kind: "cleared" });
 });

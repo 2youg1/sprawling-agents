@@ -77,3 +77,13 @@ pub struct SupplierAccounts { pub supplier: kernel::ServerLabel, pub accounts: V
 - **读不动就整份 `Unavailable`**：任一级的 `[search]` 读不成时，`city::settled_search` 拒，整个 `Config` 答复与读不动 `effort` 时一样是带原因的 `Unavailable`（D47）。
 - `WIRE_V` 随本组改形进一位（D1、D49）。
 -/
+
+
+/-!
+### 8-86a 城一级的推理档与缓存保温回读
+
+`ConfigAnswer::city_effort` 和 `ConfigAnswer::city_keep_warm` 从城的
+`CONFIG.toml` 独立读取，和 `effort` 里当前地址实际生效的档位并列。
+配置缺席时省略相应字段。设置页用这两个值选中实际的城级配置，并在保存后
+回读目标字段；近一级的覆盖、别处的设置变动和计时不确认该次写入。
+-/

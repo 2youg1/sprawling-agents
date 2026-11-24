@@ -4,15 +4,13 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use super::contrast::{apca_lc, bronze_tier};
-use super::tables::{parse_text_tokens, parse_type_scale, text_surface_ceiling, tier_slack};
+use super::tables::{
+    contrast_rung, parse_text_tokens, parse_type_scale, text_surface_ceiling, tier_slack,
+};
 use super::{Mode, token_violation};
 use crate::report::Violation;
 
-pub(super) fn judge_readability(
-    source: &str,
-    greys: &[(String, u16)],
-    mode: Mode,
-) -> Vec<Violation> {
+pub(super) fn judge_readability(source: &str, mode: Mode) -> Vec<Violation> {
     let mut violations = Vec::new();
     let named = |rule: &str, violation: String| {
         token_violation(rule, format!("{}: {violation}", mode.name()))
@@ -26,12 +24,8 @@ pub(super) fn judge_readability(
         ));
         return violations;
     }
-    let Some(surface) = text_surface_ceiling(source).and_then(|name| {
-        greys
-            .iter()
-            .find(|(rung, _)| *rung == name)
-            .map(|(_, l)| *l)
-    }) else {
+    let Some(surface) = text_surface_ceiling(source).and_then(|name| contrast_rung(source, &name))
+    else {
         violations.push(named(
             "the surface furthest from the page that carries text is a rung of the ramp",
             "TEXT_SURFACE_CEILING names no rung of GRAY_RAMP".to_owned(),
@@ -47,9 +41,16 @@ pub(super) fn judge_readability(
         return violations;
     };
 
-    for (name, lightness, claimed) in &tokens {
-        let reached = apca_lc(*lightness, surface);
-        if reached + slack < f64::from(*claimed) {
+    for (name, colour, claimed) in &tokens {
+        let Some(ink) = colour else {
+            violations.push(named(
+                "text contrast is measurable",
+                format!("{name} has no readable OKLCH ink"),
+            ));
+            continue;
+        };
+        let reached = apca_lc(*ink, surface);
+        if reached.abs() + slack < f64::from(*claimed) {
             violations.push(named(
                 "a text token reaches the tier it claims",
                 format!("{name} claims Lc {claimed} and reaches {reached:.1}"),
@@ -74,7 +75,9 @@ pub(super) fn judge_readability(
             Some(_) => {}
         }
         if let Some(tier) = derived
-            && !tokens.iter().any(|(_, _, claim)| *claim >= tier)
+            && !tokens
+                .iter()
+                .any(|(_, colour, claim)| colour.is_some() && *claim >= tier)
         {
             violations.push(token_violation(
                 "some text token can serve every type step",

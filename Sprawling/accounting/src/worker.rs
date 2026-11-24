@@ -205,6 +205,10 @@ impl RunWorker {
         self.ledger.observe(sink);
     }
 
+    pub fn attachment_store(&self) -> Arc<std::sync::Mutex<Cas>> {
+        Arc::clone(&self.lane_store)
+    }
+
     pub fn serve(&mut self, serving: Serving) {
         let outputs = Arc::clone(&serving.outputs);
         self.flight.backlog = self.flight.backlog.clone().with_sink(runtime::Sink::new(

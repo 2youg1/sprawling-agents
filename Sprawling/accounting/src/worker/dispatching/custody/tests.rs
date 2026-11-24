@@ -17,13 +17,10 @@ use std::path::Path;
 use crate::worker::fixture::*;
 use crate::worker::*;
 
-/// An anthropic-shaped key, put together at run time so that the tree
-/// itself holds no key shape for `xtask secret` to find.
 fn pasted() -> String {
     ["sk-", "ant-", &"Kx7q".repeat(10)].concat()
 }
 
-/// Every file under `dir` whose bytes contain `needle`.
 fn files_holding(dir: &Path, needle: &[u8]) -> Vec<std::path::PathBuf> {
     let mut found = Vec::new();
     for entry in std::fs::read_dir(dir).unwrap() {
@@ -41,9 +38,6 @@ fn files_holding(dir: &Path, needle: &[u8]) -> Vec<std::path::PathBuf> {
     found
 }
 
-/// A key pasted into the task text reaches the vault and nothing else:
-/// no request the model receives, no ledger line and no file in the city
-/// holds it, and the reference that stands in its place resolves to it.
 #[test]
 fn a_pasted_key_reaches_the_vault_and_nothing_else() {
     let key = pasted();
@@ -59,13 +53,13 @@ fn a_pasted_key_reaches_the_vault_and_nothing_else() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"paste"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
         .unwrap();
 
-    // The worker holds a byte-range lock on a city file while it lives,
-    // and Windows refuses a read of a locked range; drop it before the scan.
     let vault = worker.vault_handle();
     drop(worker);
     let asked = provider.bodies().join("\n");

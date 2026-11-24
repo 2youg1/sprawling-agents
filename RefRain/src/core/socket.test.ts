@@ -4,12 +4,12 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { afterEach, describe, expect, test } from "bun:test";
-import { get } from "svelte/store";
+import { get } from "./store";
 
 import { doctorRefresh, steer } from "./commands";
 import { plainDial } from "./line";
 import { openConnection } from "./socket";
-import { RunId, WIRE_HASH, WIRE_V } from "../wire";
+import { IdemKey, RunId, WIRE_HASH, WIRE_V } from "../wire";
 
 class FakeSocket {
   static readonly opened: FakeSocket[] = [];
@@ -105,6 +105,39 @@ afterEach(() => {
 });
 
 describe("the browser half", () => {
+  test("two refusals for the same error and subject keep separate command identities", () => {
+    install();
+    const conn = openConnection(plainDial("ws://city.invalid/ws"), "en");
+    const socket = FakeSocket.opened[0];
+    socket?.onopen?.();
+    socket?.onmessage?.({
+      data: JSON.stringify({
+        welcome: { wire_v: WIRE_V, schema: WIRE_HASH, resume_from: null, city: null },
+      }),
+    });
+    const first = IdemKey.make(`idem1-${"1".repeat(32)}`);
+    const second = IdemKey.make(`idem1-${"2".repeat(32)}`);
+    for (const request of [first, second]) {
+      socket?.onmessage?.({
+        data: JSON.stringify({
+          refusal: {
+            code: "E_INVALID_ARGS",
+            action: "save a document",
+            subject: "book/chapter.md",
+            recovery: "reopen the versioned file",
+            nearby: [],
+            retry: "no",
+            request,
+          },
+        }),
+      });
+    }
+    const receipts = get(conn.receipts);
+    expect(receipts.get(first)).toMatchObject({ kind: "refused", error: { request: first } });
+    expect(receipts.get(second)).toMatchObject({ kind: "refused", error: { request: second } });
+    expect(get(conn.belief).notices.map(({ error }) => error.request)).toEqual([first, second]);
+  });
+
   test("cancels the reconnect when a frame cannot be read", () => {
     install();
     const conn = openConnection(plainDial("ws://city.invalid/ws"), "en");

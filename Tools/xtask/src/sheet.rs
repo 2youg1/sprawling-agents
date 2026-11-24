@@ -17,34 +17,16 @@ pub(crate) struct Line<'t> {
 }
 
 pub(crate) fn lines<'t>(rel: &str, text: &'t str) -> impl Iterator<Item = Line<'t>> {
-    let whole = [".css", ".html"].iter().any(|ext| rel.ends_with(ext));
-    let component = rel.ends_with(".svelte");
-    text.lines()
-        .enumerate()
-        .scan(false, move |inside, (index, text)| {
-            let reading = if whole {
-                Reading::Sheet
-            } else if !component {
-                Reading::Code
-            } else if text.starts_with("</style") {
-                *inside = false;
-                Reading::Code
-            } else if *inside {
-                Reading::Sheet
-            } else if !text.starts_with("<style") {
-                Reading::Code
-            } else if text.contains("</style") {
-                Reading::Sheet
-            } else {
-                *inside = true;
-                Reading::Code
-            };
-            Some(Line {
-                number: index.saturating_add(1),
-                text,
-                reading,
-            })
-        })
+    let reading = if [".css", ".html"].iter().any(|ext| rel.ends_with(ext)) {
+        Reading::Sheet
+    } else {
+        Reading::Code
+    };
+    text.lines().enumerate().map(move |(index, text)| Line {
+        number: index.saturating_add(1),
+        text,
+        reading,
+    })
 }
 
 pub(crate) fn declared<'l>(line: &'l str, prefix: &'l str) -> impl Iterator<Item = &'l str> {
@@ -75,36 +57,13 @@ mod tests {
     use super::{Reading, declared, lines};
 
     #[test]
-    fn a_component_reads_its_top_level_style_block_as_a_sheet_and_the_rest_as_code() {
-        let text = "<script>
-  const page = `<style>.x { color: red; }</style>`;
-</script>
-{#each rows as row}{row}{/each}
-<style>
-  .a { color: var(--color-text); }
-</style>
-<p></p>
-<style>.b {}</style>
-";
-        let read: Vec<(usize, Reading)> = lines("RefRain/src/views/a.svelte", text)
-            .map(|line| (line.number, line.reading))
-            .collect();
-        assert_eq!(
-            read,
-            [
-                (1, Reading::Code),
-                (2, Reading::Code),
-                (3, Reading::Code),
-                (4, Reading::Code),
-                (5, Reading::Code),
-                (6, Reading::Sheet),
-                (7, Reading::Code),
-                (8, Reading::Code),
-                (9, Reading::Sheet),
-            ]
+    fn native_styles_are_read_as_separate_stylesheets() {
+        let text = "a { color: var(--color-text); }";
+        assert!(lines("RefRain/src/x.css", text).all(|line| line.reading == Reading::Sheet));
+        assert!(
+            lines("RefRain/src/x.tsx", r#"<span class="text-text" />"#)
+                .all(|line| line.reading == Reading::Code)
         );
-        assert!(lines("RefRain/src/x.css", "a\nb").all(|line| line.reading == Reading::Sheet));
-        assert!(lines("RefRain/src/x.ts", "<style>\na").all(|line| line.reading == Reading::Code));
     }
 
     #[test]

@@ -11,6 +11,11 @@ use kernel::{AxError, Effort, KeepWarm};
 
 use super::write::{Change, change_at};
 
+pub fn stated_city_config(city_root: &Path) -> Result<super::ConfigLayer, AxError> {
+    let path = kernel::layout::CityLayout::new(city_root).city_config();
+    super::ladder::stated(&path, super::Layer::City)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CitySetting<'a> {
     KeepWarm(KeepWarm),

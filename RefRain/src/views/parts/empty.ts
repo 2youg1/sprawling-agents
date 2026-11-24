@@ -3,16 +3,16 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { Snippet } from "svelte";
+import type { Snippet } from "../../core/snippet";
 
 import type { Key } from "../../core/lang";
 
-export interface EmptyStateProps {
+export interface EmptyStateProps<Content = Snippet> {
   readonly missing: Key;
 
-  readonly shape?: Snippet;
+  readonly shape?: Content;
 
-  readonly action?: Snippet;
+  readonly action?: Content;
 
   readonly seat?: EmptySeat;
 }
@@ -23,17 +23,20 @@ export interface ShapeWire {
   readonly "aria-hidden": "true";
 }
 
-export interface EmptyLook {
+export interface EmptyLook<Content = Snippet> {
   readonly seat: EmptySeat;
   readonly shapeWire: ShapeWire;
 
-  readonly shape: Snippet | undefined;
+  readonly shape: Content | undefined;
 
   readonly sentence: string;
-  readonly action: Snippet | undefined;
+  readonly action: Content | undefined;
 }
 
-export function lookOf(props: EmptyStateProps, sentence: string): EmptyLook {
+export function lookOf<Content>(
+  props: EmptyStateProps<Content>,
+  sentence: string,
+): EmptyLook<Content> {
   return {
     seat: props.seat ?? "centred",
     shapeWire: { "aria-hidden": "true" },

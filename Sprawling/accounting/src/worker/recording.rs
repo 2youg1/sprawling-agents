@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use kernel::{Address, AxError, EventDraft, EventKind, Ledger, Payload, RunId};
+use kernel::{Address, AxError, EventDraft, EventKind, EventRef, Ledger, Payload, RunId, Seq};
 
 use crate::effect;
 use crate::worker::booking::OpenClaims;
@@ -40,6 +40,51 @@ impl<L: Ledger> Stamping<'_, L> {
         })?;
         Ok(())
     }
+}
+
+pub(in crate::worker) struct RunOpening<'a, L> {
+    pub(in crate::worker) ledger: &'a mut L,
+    pub(in crate::worker) command: Option<kernel::IdemKey>,
+    pub(in crate::worker) session: Option<Seq>,
+    pub(in crate::worker) image_input: bool,
+}
+
+impl<L: Ledger> Ledger for RunOpening<'_, L> {
+    fn append(&mut self, draft: EventDraft) -> Result<EventRef, AxError> {
+        self.ledger.append(self.stamp(draft)?)
+    }
+
+    fn append_all(&mut self, drafts: Vec<EventDraft>) -> Result<Vec<EventRef>, AxError> {
+        let stamped = drafts
+            .into_iter()
+            .map(|draft| self.stamp(draft))
+            .collect::<Result<_, _>>()?;
+        self.ledger.append_all(stamped)
+    }
+}
+
+impl<L> RunOpening<'_, L> {
+    fn stamp(&self, mut draft: EventDraft) -> Result<EventDraft, AxError> {
+        draft.data = in_session(self.session, draft.data)?;
+        if draft.kind == EventKind::RunStarted {
+            draft.data = super::commanding::entrance::stamped(self.command, draft.data)?;
+            if self.image_input {
+                let mut fields = draft.data.as_map().clone();
+                fields.insert("image_input".to_owned(), true.into());
+                draft.data = Payload::new(fields)?;
+            }
+        }
+        Ok(draft)
+    }
+}
+
+fn in_session(session: Option<Seq>, data: Payload) -> Result<Payload, AxError> {
+    let Some(began) = session else {
+        return Ok(data);
+    };
+    let mut fields = data.as_map().clone();
+    fields.insert("session_began".to_owned(), began.value().into());
+    Payload::new(fields)
 }
 
 #[derive(Clone)]
@@ -89,11 +134,16 @@ impl RunWorker {
         addr: &Address,
         run: RunId,
         origin: kernel::Origin,
+        resume: Option<Seq>,
     ) -> Result<(), AxError> {
         let t = self.clock.now()?;
-        let draft = runtime::fork::fork_draft(origin, run, addr.clone(), t, "owner".to_owned())?;
+        let mut draft =
+            runtime::fork::fork_draft(origin, run, addr.clone(), t, "owner".to_owned())?;
+        draft.data = in_session(resume, draft.data)?;
         self.ledger.append(draft)?;
-        self.origins.spent(addr);
+        if resume.is_none() {
+            self.origins.spent(addr);
+        }
         Ok(())
     }
 
@@ -213,6 +263,7 @@ impl RunWorker {
         addr: Option<&Address>,
         data: &Payload,
     ) -> Result<(), AxError> {
+        self.doorstep.entrance.absorb(kind, data);
         [
             self.origins.absorb(kind, run, addr, data),
             self.governance.absorb(kind, run, addr, data),

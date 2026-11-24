@@ -3,8 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { Snippet } from "svelte";
-import type { HTMLDialogAttributes } from "svelte/elements";
+import type { Snippet } from "../../core/snippet";
+import type { JSX } from "@solidjs/web";
+import type { ElementRef } from "../../core/element_ref";
 
 export type Stands = "centre" | "below-top" | "in-flow";
 
@@ -12,7 +13,8 @@ export interface Cancelling {
   readonly preventDefault: () => void;
 }
 
-export type SheetWire = Omit<HTMLDialogAttributes, "oncancel"> & {
+export type SheetWire = Omit<JSX.DialogHtmlAttributes<HTMLDialogElement>, "onCancel"> & {
+  readonly [binding: symbol]: ElementRef<HTMLDialogElement>;
   readonly oncancel?: (event: Cancelling) => void;
 };
 

@@ -8,7 +8,7 @@ import RefRain.spec.Views.Parts
 /-!
 # tabs：自动激活的页签
 
-规定 `RefRain/src/views/parts/tabs.svelte`（APG Tabs，自动激活），键表在 `RefRain/spec/Views/Parts.lean` §7-4。自动激活是 APG 对「面板内容已在本地、切换无可察延迟」的推荐读法：焦点到哪个页签，哪个页签就是当前的，所以状态只有一个下标，「选中」与「聚焦」不可能分开。
+规定 `RefRain/src/views/parts/tabs.solid.tsx`（APG Tabs，自动激活），键表在 `RefRain/spec/Views/Parts.lean` §7-4。自动激活是 APG 对「面板内容已在本地、切换无可察延迟」的推荐读法：焦点到哪个页签，哪个页签就是当前的，所以状态只有一个下标，「选中」与「聚焦」不可能分开。
 
 性质：
 

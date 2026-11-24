@@ -60,6 +60,8 @@ impl Interrupting {
                     return Some(Interrupt::Steer {
                         speaker: runtime::conversation::Speaker::City,
                         text,
+                        request: None,
+                        pictures: Vec::new(),
                     });
                 }
                 collab::WaitTurn::Waiting => {}
@@ -133,5 +135,7 @@ fn steer_of(letter: &collab::Letter) -> Interrupt {
             sender: letter.sender().map(|state| state.as_str().to_owned()),
         }),
         text: letter.text().to_owned(),
+        request: None,
+        pictures: Vec::new(),
     }
 }

@@ -35,6 +35,8 @@ struct ErrorDetail {
     gate: Option<GateRefusal>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     provider: Option<ProviderFailureKind>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    request: Option<crate::IdemKey>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -97,6 +99,7 @@ impl AxError {
                     account: AccountDisposition::Keep,
                     gate: None,
                     provider: None,
+                    request: None,
                 }),
             },
         }
@@ -161,6 +164,12 @@ impl AxError {
 
     pub fn provider_failure(&self) -> Option<ProviderFailureKind> {
         self.detail.provider
+    }
+
+    #[must_use]
+    pub fn for_request(mut self, request: Option<crate::IdemKey>) -> Self {
+        self.detail.request = request;
+        self
     }
 
     #[must_use]

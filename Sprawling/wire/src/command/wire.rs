@@ -83,6 +83,8 @@ impl From<WireCommand> for Command {
                 policy,
                 idem,
                 session,
+                resume,
+                images,
                 effort,
                 model,
             } => Self::Dispatch {
@@ -92,6 +94,8 @@ impl From<WireCommand> for Command {
                 policy,
                 idem,
                 session,
+                resume,
+                images,
                 effort,
                 model,
             },
@@ -167,7 +171,17 @@ impl From<WireCommand> for Command {
             Command::CreateBuilding { addr, template, rules, source, idem } =>
                 Self::CreateBuilding { addr, template, rules, source, idem },
             Command::PutSecret { value, .. } => match value {},
-            Command::Steer { run, text, idem } => Self::Steer { run, text, idem },
+            Command::Steer {
+                run,
+                text,
+                images,
+                idem,
+            } => Self::Steer {
+                run,
+                text,
+                images,
+                idem,
+            },
             Command::Cancel { run, idem } => Self::Cancel { run, idem },
             Command::Halt { scope, idem } => Self::Halt { scope, idem },
             Command::Reveal { at, idem } => Self::Reveal { at, idem },

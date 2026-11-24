@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Narrow Rust host for the Zig city face. Projects `wire::Committed` →
-//! scene Entry bytes; Session.carry stays here. C trampolines live in
-//! `console_ffi::shell_abi` (`Calyx/Spec.lean` D7).
-
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
@@ -92,7 +88,6 @@ struct Bridge {
     face: Mutex<tokio::sync::watch::Receiver<Face>>,
     pairing: Mutex<tokio::sync::watch::Receiver<String>>,
     shown: Mutex<Face>,
-    pairing_sent: Mutex<String>,
     notice_tx: std::sync::mpsc::SyncSender<String>,
 }
 
@@ -114,7 +109,8 @@ pub(super) fn start(
         Err(std::sync::mpsc::TrySendError::Full(_)) => {}
         Err(std::sync::mpsc::TrySendError::Disconnected(_)) => {}
     });
-    let pairing = inside.door.pairing_code();
+    let mut pairing = inside.door.pairing_code();
+    pairing.mark_changed();
     let session = match Session::begin() {
         Ok(session) => Some(session),
         Err(err) => {
@@ -132,7 +128,6 @@ pub(super) fn start(
         face: Mutex::new(face),
         pairing: Mutex::new(pairing),
         shown: Mutex::new(Face::Opening),
-        pairing_sent: Mutex::new(String::new()),
         notice_tx,
     });
     let notices = Arc::clone(&bridge);
@@ -181,9 +176,7 @@ impl Bridge {
             surface,
         };
         let code: i32 = run_city_ui(&config, self.as_ref());
-        if code != 0 {
-            // Zig city UI ended with a non-zero status; the host has no further surface.
-        }
+        if code != 0 {}
     }
 
     fn pump(&self) {
@@ -202,9 +195,6 @@ impl Bridge {
             && matches!(pairing.has_changed(), Ok(true))
         {
             let code = pairing.borrow_and_update().clone();
-            if let Ok(mut sent) = self.pairing_sent.lock() {
-                *sent = code.clone();
-            }
             self.push(HostEventKind::Pairing, code.into_bytes());
         }
         loop {

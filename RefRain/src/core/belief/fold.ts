@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// One run's reading, moved forward by one record. The store in
-// `belief.ts` decides which run a record belongs to and whether it is
-// new; this decides what the record does to that run.
-
 import { PHASES, afterWait } from "../doing";
 import {
   askOf,
@@ -19,11 +15,11 @@ import {
   waitOf,
 } from "../reading";
 
-import type { EventRecord, RunId, Seq } from "../../wire";
+import { Seq } from "../../wire";
+import type { EventRecord, RunId } from "../../wire";
 
 import type { RunBelief } from "./shape";
 
-// A run the page meets for the first time, at the position it met it.
 export function unseen(run: RunId, at: Seq): RunBelief {
   return {
     run,
@@ -42,10 +38,7 @@ export function unseen(run: RunId, at: Seq): RunBelief {
   };
 }
 
-// One record forward, answering the run it produced and the name of the
-// first field in it this build could not read.
 export function fold(held: RunBelief, record: EventRecord): [RunBelief, string | null] {
-  // Every record ends the ask; only the request itself states one.
   const moved: RunBelief = { ...held, lastSeq: record.seq, ask: null };
   switch (record.kind) {
     case "run_started": {
@@ -57,6 +50,11 @@ export function fold(held: RunBelief, record: EventRecord): [RunBelief, string |
           started: record.t,
           task: opening.task,
           goal: opening.goal,
+          sessionBegan:
+            typeof record.data.session_began === "number"
+              ? Seq.make(record.data.session_began)
+              : undefined,
+          imageInput: record.data.image_input === true,
           doing: PHASES.run_started,
         },
         bad,
@@ -90,8 +88,6 @@ export function fold(held: RunBelief, record: EventRecord): [RunBelief, string |
       const [ask, bad] = askOf(record);
       return [{ ...moved, doing: PHASES.approval_requested, ask }, bad];
     }
-    // A reply wait states a phase only with the room it names; a payload
-    // this build cannot read leaves the run where it was.
     case "signal_wait_started": {
       const [wait, bad] = waitOf(record);
       return [wait === null ? moved : { ...moved, doing: { kind: "awaiting_reply", wait } }, bad];
@@ -116,11 +112,6 @@ export function fold(held: RunBelief, record: EventRecord): [RunBelief, string |
         bad,
       ];
     }
-    // Every other kind only advances the position. Listed rather than
-    // defaulted so a new kind is a decision here, not a silence, and
-    // grouped a family to a line so the list reads as one block: the
-    // reader's question is which kinds move a run, not where one name
-    // sits among sixty.
     case "session_opened":
     case "city_initialized":
     case "city_halted":

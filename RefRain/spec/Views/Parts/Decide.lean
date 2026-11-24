@@ -6,7 +6,7 @@
 /-!
 # decide：请决定卡的三个键
 
-规定 `RefRain/src/views/parts/decide.svelte` 的键（`role="group"`，Accel-Shift-Y／E／X），键表在 `RefRain/spec/Views/Workspace.lean` §7-11，卡的种类与答复见 `RefRain/Spec.lean` §7C 与 §4-55。一张卡至多三个答复，各在一个键上；卡上没有的答复、说明了为什么按不动的答复，按键落空；三个答复键都带 accel（`RefRain/Spec.lean` D92），不带 accel 的一下按键——焦点在文本框里也好、停在卡上也好——不是答复，所以误打的一个字母不会替人作决定。
+规定 `RefRain/src/views/parts/decide_view.tsx` 的键（`role="group"`，Accel-Shift-Y／E／X），键表在 `RefRain/spec/Views/Workspace.lean` §7-11，卡的种类与答复见 `RefRain/Spec.lean` §7C 与 §4-55。一张卡至多三个答复，各在一个键上；卡上没有的答复、说明了为什么按不动的答复，按键落空；三个答复键都带 accel（`RefRain/Spec.lean` D92），不带 accel 的一下按键——焦点在文本框里也好、停在卡上也好——不是答复，所以误打的一个字母不会替人作决定。
 
 性质：
 

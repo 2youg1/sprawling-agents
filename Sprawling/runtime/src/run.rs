@@ -26,6 +26,7 @@ pub use charter::Charter;
 pub use harness::{Conclusion, Cut, HarnessRun};
 
 pub struct RunPlan {
+    pub pictures: Vec<kernel::ImageRef>,
     pub run: RunId,
     pub who: String,
     pub addr: Address,

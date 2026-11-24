@@ -3,16 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  * Copyright (c) 2026 2youg1 and the sprawling contributors */
 
-/* `optional` rather than `swap`, because the files are beside the page
- * rather than across a network: the browser is given a moment to use
- * Paper Mono and never swaps the face afterwards. A face that arrives
- * late therefore costs the first paint nothing and moves no text a
- * person is already reading, which is what `swap` could not promise.
- * `index.html` preloads the one file the whole page is set in, so that
- * moment is long enough. **One file, not three**: the release's variable
- * face carries every weight from 100 to 800 and all six of the features
- * the appearance section switches, at 53,344 B — less than half of the
- * three static weights it replaces, and one preload rather than two. */
 @font-face {
   font-family: "Paper Mono";
   src: url("../fonts/PaperMono-Variable.woff2") format("woff2");
@@ -21,13 +11,6 @@
   font-display: optional;
 }
 
-/* Maple Mono, three static files, shipped beside Paper Mono because the
- * doctor's NF CN build extends the same design with Han glyphs and Nerd
- * Font icons, and because a person may choose it for a role
- * (wire D123). `swap` rather than Paper Mono's `optional`, for the reason
- * Libron's files use it: these are fetched only once a person has chosen
- * the face, usually mid-visit, and `optional` would keep the fallback for
- * the rest of that visit. Nothing preloads them: no page opens in one. */
 @font-face {
   font-family: "Maple Mono";
   src: url("../fonts/MapleMono-Regular.woff2") format("woff2");
@@ -50,13 +33,6 @@
   font-display: swap;
 }
 
-/* Libron, the serif face reading text may be set in (wire D52), one
- * declaration per file the release ships. `swap` rather than Maple Mono's
- * `optional`: these files are fetched only once a person has chosen
- * Libron, usually mid-visit, and `optional` would let the browser keep
- * the fallback for the rest of that visit, so the choice would show
- * nothing until a reload. Nothing preloads them, for the same reason:
- * a page that reads in the interface's face never needs them. */
 @font-face {
   font-family: "Libron";
   src: url("../fonts/Libron-Regular.woff2") format("woff2");
@@ -83,5 +59,15 @@
   src: url("../fonts/Libron-BoldItalic.woff2") format("woff2");
   font-weight: 700;
   font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Sarasa Gothic SC";
+  src:
+    local("Sarasa Gothic SC"),
+    url("../fonts/SarasaGothicSC-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
   font-display: swap;
 }

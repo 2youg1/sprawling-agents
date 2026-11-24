@@ -12,7 +12,7 @@ use crate::walk;
 
 use crate::walk::CLIENT_SRC as VIEWS;
 
-const VIEW_EXTS: [&str; 4] = ["svelte", "ts", "html", "css"];
+const VIEW_EXTS: [&str; 4] = ["ts", "tsx", "html", "css"];
 
 const ROLES: [&str; 22] = [
     "page",
@@ -39,6 +39,11 @@ const ROLES: [&str; 22] = [
     "drawn-figure",
 ];
 
+const DERIVED_ROLES: [(&str, &str); 2] = [
+    ("reading-canvas", "var(--reading-canvas, var(--color-page))"),
+    ("markdown-marker", "var(--color-text-quiet)"),
+];
+
 struct Named<'a> {
     name: &'a str,
     value: &'a str,
@@ -57,6 +62,9 @@ pub(super) fn judge_roles(root: &Path, source: &str) -> Result<Vec<Violation>, X
         .collect();
 
     for held in &roles {
+        if DERIVED_ROLES.iter().any(|(role, _)| *role == held.name) {
+            continue;
+        }
         if !ROLES.contains(&held.name) {
             violations.push(refuse(
                 "every surface role is one of the names `xtask::color::roles` knows",
@@ -94,9 +102,23 @@ pub(super) fn judge_roles(root: &Path, source: &str) -> Result<Vec<Violation>, X
         }
     }
 
+    for (role, value) in DERIVED_ROLES {
+        let actual: Vec<_> = declared(source)
+            .filter(|held| held.name == role)
+            .map(|held| held.value)
+            .collect();
+        if actual.as_slice() != [value] {
+            violations.push(refuse(
+                "a derived role has one declared source",
+                format!("--color-{role} resolves from {actual:?}"),
+                &format!("declare `--color-{role}: {value}` once"),
+            ));
+        }
+    }
+
     let spelled = spellings(root)?;
     for role in ROLES {
-        let utility = source.contains(&format!("@utility {role} {{"));
+        let utility = source.contains(&format!(".{role} {{"));
         if !spelled
             .iter()
             .any(|text| names(text, role) || (utility && class_word(text, role)))
@@ -304,15 +326,15 @@ fn refuse(rule: &str, violation: String, alternative: &str) -> Violation {
 )]
 mod tests {
     use super::judge_roles;
-    use crate::color::scan::tests::SVELTE_FIXTURE;
+    use crate::color::scan::tests::STYLE_FIXTURE;
 
     #[test]
     fn a_component_style_reads_declared_roles_and_declares_no_colour() {
         let root = std::env::temp_dir().join(format!("color-roles-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
-        let path = root.join("RefRain/src/views/panel.svelte");
+        let path = root.join("RefRain/src/views/panel.css");
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        std::fs::write(&path, SVELTE_FIXTURE).unwrap();
+        std::fs::write(&path, STYLE_FIXTURE).unwrap();
         let source = "  --color-g3: oklch(0.3 0.014 250);
   --color-accent: oklch(0.6 calc(0.151 * var(--chroma)) 250);
 ";
@@ -325,9 +347,9 @@ mod tests {
                 .map(|v| v.location.as_str())
                 .collect::<Vec<_>>(),
             [
-                "RefRain/src/views/panel.svelte:8",
-                "RefRain/src/views/panel.svelte:9",
-                "RefRain/src/views/panel.svelte:10",
+                "RefRain/src/views/panel.css:2",
+                "RefRain/src/views/panel.css:3",
+                "RefRain/src/views/panel.css:4",
             ]
         );
         std::fs::remove_dir_all(&root).unwrap();

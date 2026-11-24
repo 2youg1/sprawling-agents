@@ -4,9 +4,20 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { describe, expect, test } from "bun:test";
-import type { DoctorCustodyLifetime } from "../../wire";
+import { mintIdem } from "../../core/idem";
+import type { CommandReceipt } from "../../core/socket";
+import type { DoctorCustodyLifetime, IdemKey } from "../../wire";
 import { restartOf, VERBS } from "./remote";
-import { IDLE, answerOf, step, type Door, type DoorEvent, type DoorSent } from "./remote_door";
+import {
+  IDLE,
+  answerOf,
+  doorCommand,
+  receiptOf,
+  step,
+  type Door,
+  type DoorEvent,
+  type DoorSent,
+} from "./remote_door";
 
 describe("restartOf", () => {
   test("each vault lifetime says what a restart does to a pairing", () => {
@@ -122,6 +133,53 @@ describe("door step (RefRain/spec/Views/Door.lean)", () => {
         { kind: "unsent" },
       ]).door,
     ).toEqual({ phase: { kind: "idle" }, typed: "", focus: { kind: "opener", opener: "door" } });
+  });
+
+  test("a timeout keeps the result unknown and only the confirmation's own late receipt settles it", () => {
+    const confirmation = mintIdem();
+    const foreign = mintIdem();
+    const { door: unknown, sent } = run([
+      { kind: "press", opener: "key" },
+      { kind: "pending" },
+      { kind: "type", text: "ABCD EFGH" },
+      { kind: "submit" },
+      { kind: "timed_out" },
+    ]);
+    expect(unknown).toEqual({
+      phase: { kind: "unknown", opener: "key", during: "confirming" },
+      typed: "",
+      focus: { kind: "opener", opener: "key" },
+    });
+    expect(sent).toEqual([{ kind: "replace" }, { kind: "confirm", code: "ABCD EFGH" }]);
+    const receipts = new Map<IdemKey, CommandReceipt>([[foreign, { kind: "accepted" }]]);
+    expect(receiptOf(confirmation, receipts)).toBeNull();
+    expect(step(unknown, { kind: "press", opener: "key" })).toEqual([unknown, null]);
+    receipts.set(confirmation, { kind: "accepted" });
+    const received = receiptOf(confirmation, receipts);
+    if (received === null) expect.unreachable("the matching receipt was discarded");
+    expect(step(unknown, received)).toEqual([
+      { phase: { kind: "idle" }, typed: "", focus: { kind: "opener", opener: "key" } },
+      null,
+    ]);
+  });
+
+  test("checking an unknown result makes retry available without emitting a command", () => {
+    const { door: unknown } = run([{ kind: "press", opener: "door" }, { kind: "timed_out" }]);
+    expect(step(unknown, { kind: "settled" })).toEqual([unknown, null]);
+    const [checked, sent] = step(unknown, { kind: "checked" });
+    expect(sent).toBeNull();
+    expect(step(checked, { kind: "press", opener: "door" })[1]).toEqual({ kind: "open" });
+  });
+
+  test("confirmation names the originating approval without reusing its request identifier", () => {
+    const approval = mintIdem();
+    const sent = { kind: "confirm", code: "ABCD EFGH" } as const;
+    expect(doorCommand(sent, 0)).toBeNull();
+    const command = doorCommand(sent, 0, approval);
+    if (command === null || !("confirm_remote_door" in command))
+      expect.unreachable("confirmation was not emitted");
+    expect(command.confirm_remote_door.approval).toBe(approval);
+    expect(command.confirm_remote_door.idem).not.toBe(approval);
   });
 
   test("an unsent event while nothing is in flight changes nothing", () => {

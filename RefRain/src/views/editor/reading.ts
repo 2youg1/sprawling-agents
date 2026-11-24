@@ -5,11 +5,10 @@
 
 import { say } from "../../core/lang";
 import type { Key, Lang } from "../../core/lang";
-import type { B3Hash } from "../../wire";
 
-export type Reading = "source" | "preview" | "diff" | "versions";
+export type Reading = "source" | "live" | "preview" | "diff" | "versions";
 
-export function short(version: B3Hash): string {
+export function short(version: string): string {
   return version.slice(0, 7);
 }
 

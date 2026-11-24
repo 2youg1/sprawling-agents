@@ -21,8 +21,14 @@ use super::checkpoint::{CheckpointPolicy, Wave, WaveCheckpoint};
 use super::{Active, Advance, Frozen, Run, RunHooks, RunPlan, SafePoint};
 
 fn fold_steer(conversation: &mut Conversation, interrupt: &Interrupt) {
-    if let Interrupt::Steer { speaker, text } = interrupt {
-        conversation.push_steer(speaker, text);
+    if let Interrupt::Steer {
+        speaker,
+        text,
+        pictures,
+        ..
+    } = interrupt
+    {
+        conversation.push_steer(speaker, text, pictures);
     }
 }
 
@@ -97,12 +103,12 @@ impl Run<Active> {
 
         conversation.push_inherited(&plan.inherited);
         conversation.push_task_lines(
-            &plan.task,
-            &plan.goal,
+            (&plan.task, &plan.goal),
             plan.opening,
             &plan
                 .dispatched_by
                 .handed_down_by(plan.predecessor, plan.parent),
+            &plan.pictures,
         );
         let model_window = kernel::Tokens::new(plan.shape.context_tokens);
         let (window, locked) = match plan.context_lock {
@@ -266,9 +272,11 @@ impl Run<Active> {
             .push_tool_results(report.wave_results().to_vec());
 
         if let Some(policy) = taken {
-            self.state
-                .conversation
-                .push_steer(&crate::conversation::Speaker::City, &policy_note(&policy));
+            self.state.conversation.push_steer(
+                &crate::conversation::Speaker::City,
+                &policy_note(&policy),
+                &[],
+            );
         }
 
         if let Some(reminder) = report

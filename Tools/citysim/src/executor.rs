@@ -86,8 +86,10 @@ fn answer_at(
     let wave = matches!(point, SafePoint::BeforeWave { .. });
     match steer {
         Some((at, text)) if wave && *at == index => Interrupt::Steer {
+            pictures: Vec::new(),
             speaker: runtime::conversation::Speaker::Person,
             text: text.clone(),
+            request: None,
         },
         _ => Interrupt::None,
     }
@@ -166,6 +168,7 @@ pub fn run_scenario_on(
     )?;
 
     let plan = RunPlan {
+        pictures: Vec::new(),
         run,
         who: who.clone(),
         addr: addr.clone(),

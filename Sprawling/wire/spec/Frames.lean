@@ -9,6 +9,8 @@
 规定 `frames`、`frames::query`、`frames::tests`、`answer::building`（`Sprawling/wire/src/` 下同名的文件）。线上的信封：五种帧、`WIRE_V` 与 schema 哈希，线的另一端由这一端生成，以及只在线上活着的三类帧（增量、日志、命令输出）。本文件是 `Sprawling/wire/Spec.lean` 的一个分部；下面每一节保留它在 wire 规格里的标签 §8-n，别处引作 `Sprawling/wire/Spec.lean §8-n`，决定引作 `wire D<n>`。
 -/
 
+/-! 对话提交回执：`accepted` 携原请求的 `IdemKey`。带 `request` 的拒绝与原提交关联。同一请求重送时沿用原键；接收结果未知时保留原草稿并查该键，其他账本事件不构成回执。本次线上变更由 `WIRE_V` 82 标识。 -/
+
 /-!
 ### 8-1 wire::frames（形状 2 值类型 ＋ 形状 1 编解码）＋command／answer／carried_name
 

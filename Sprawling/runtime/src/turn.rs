@@ -279,10 +279,17 @@ impl<S> Turn<'_, S> {
         match interrupt {
             Interrupt::None | Interrupt::Policy { .. } => Ok(None),
             Interrupt::Cancel => Ok(Some(self.cancel_here(ledger)?)),
-            Interrupt::Steer { speaker, text } => {
+            Interrupt::Steer {
+                speaker,
+                text,
+                pictures,
+                request,
+            } => {
                 let steer = SteerReceived {
+                    pictures: pictures.clone(),
                     source: speaker.recorded(),
                     text,
+                    idem: request,
                 };
                 self.journal
                     .append_authored(Authored::SteerReceived, Payload::of(&steer)?);

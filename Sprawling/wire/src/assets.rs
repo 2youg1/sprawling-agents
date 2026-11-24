@@ -107,6 +107,8 @@ fn content_type_of(rel: &str) -> &'static str {
         "css" => "text/css; charset=utf-8",
         "json" | "map" => "application/json",
         "svg" => "image/svg+xml",
+        "webp" => "image/webp",
+        "woff2" => "font/woff2",
         _ => "application/octet-stream",
     }
 }
@@ -139,6 +141,12 @@ mod tests {
             gz: b"gzipped-snippet",
         },
     ];
+
+    #[test]
+    fn the_bundle_names_offline_images_and_fonts() {
+        assert_eq!(content_type_of("assets/marble.webp"), "image/webp");
+        assert_eq!(content_type_of("assets/paper.woff2"), "font/woff2");
+    }
 
     #[test]
     fn the_embedded_bundle_answers_the_paths_the_page_asks_for() {

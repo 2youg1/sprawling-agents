@@ -37,6 +37,7 @@ use super::guard::{Stamp, Stored, enter, preflight, stamp};
 use super::pairing::{accept_pairing, offer_challenge, open_session};
 use super::socket::upgrade;
 use super::uploads::{accept_acp, accept_drop, accept_recording};
+use super::workspace::{self, SAVE_BYTES_MAX, WorkspaceSink};
 use enrolment::accept_enrolment;
 
 pub type Answering = Arc<dyn Fn(Query) -> (Seq, Result<Answer, AxError>) + Send + Sync>;
@@ -52,6 +53,8 @@ pub struct ServeConfig {
     pub transcribe_sink: TranscribeSink,
 
     pub drop_sink: DropSink,
+
+    pub workspace: Option<WorkspaceSink>,
 
     pub acp: AcpSink,
 
@@ -120,6 +123,7 @@ pub(crate) struct ShellState {
     pub(crate) acp: AcpSink,
     pub(crate) transcribe_sink: TranscribeSink,
     pub(crate) drop_sink: DropSink,
+    pub(crate) workspace: Option<WorkspaceSink>,
 
     pub(crate) face: BindFace,
     pub(crate) door: LocalDoor,
@@ -171,6 +175,7 @@ pub fn router(
         acp: Arc::clone(&config.acp),
         transcribe_sink: Arc::clone(&config.transcribe_sink),
         drop_sink: Arc::clone(&config.drop_sink),
+        workspace: config.workspace.clone(),
         face,
         door: config.door.clone(),
         city: config.city.clone(),
@@ -195,6 +200,17 @@ pub fn router(
             door(
                 Door::Drop,
                 post(accept_drop).layer(DefaultBodyLimit::max(DROP_BYTES_MAX)),
+            ),
+        )
+        .route(
+            "/workspace",
+            door(Door::Workspace, post(workspace::request)),
+        )
+        .route(
+            "/workspace/save",
+            door(
+                Door::Workspace,
+                post(workspace::save).layer(DefaultBodyLimit::max(SAVE_BYTES_MAX)),
             ),
         )
         .route("/acp", entered(Arrival::Door(Door::Acp), post(accept_acp)))
@@ -235,6 +251,16 @@ async fn admit_request(
     request: Request,
     next: Next,
 ) -> Response {
+    if door == Door::Workspace && !matches!(state.face, BindFace::Loopback { .. }) {
+        return workspace::refusal(
+            AxError::failure(
+                kernel::AxCode::GateDenied,
+                "open local workspace files",
+                "the listener is not bound to loopback",
+            )
+            .with_recovery("open RefRain on a loopback listener on the city host"),
+        );
+    }
     let offered = request
         .headers()
         .get(header::AUTHORIZATION)
@@ -245,6 +271,7 @@ async fn admit_request(
     };
     match decide_admission(door, pairing) {
         Admission::Admit(Pairing::Held | Pairing::Absent) => next.run(request).await,
+        Admission::Refuse(err) if door == Door::Workspace => workspace::refusal(err),
         Admission::Refuse(err) => (StatusCode::FORBIDDEN, refusal_text(&err)).into_response(),
     }
 }

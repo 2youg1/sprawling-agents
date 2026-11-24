@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { Readable } from "svelte/store";
+import type { Readable } from "../store";
 
 import type { RunId } from "../../wire";
 import type { Belief, RunBelief } from "./shape";

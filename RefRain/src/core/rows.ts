@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { Result } from "effect";
-import { readable, writable } from "svelte/store";
-import type { Readable } from "svelte/store";
+import { readable, writable } from "./store";
+import type { Readable } from "./store";
 
 export interface Store {
   readonly getItem: (key: string) => string | null;
@@ -37,8 +37,6 @@ function attempted<T>(act: () => T): T | null {
   return Result.getOrNull(Result.try(act));
 }
 
-const PROBE_KEY = "sprawling.probe";
-
 interface Unkept {
   readonly store: Readable<ReadonlySet<string>>;
   mark(key: string, held: "tab" | "browser"): void;
@@ -60,30 +58,25 @@ function unkeptRows(): Unkept {
   };
 }
 
-function guarded(store: Store, spare: Rows): Rows {
+function guarded(store: Store): Rows {
   const unkept = unkeptRows();
+  const pending = new Map<string, string | null>();
+
+  function change(key: string, value: string | null, keep: () => void): void {
+    const stored = attempted(() => {
+      keep();
+      return true;
+    });
+    if (stored === null) pending.set(key, value);
+    else pending.delete(key);
+    unkept.mark(key, stored === null ? "tab" : "browser");
+  }
+
   return {
-    getItem: (key) => attempted(() => store.getItem(key)) ?? spare.getItem(key),
-    setItem: (key, value) => {
-      const took = attempted(() => {
-        store.setItem(key, value);
-        return true;
-      });
-      if (took === null) {
-        spare.setItem(key, value);
-      } else {
-        spare.removeItem(key);
-      }
-      unkept.mark(key, took === null ? "tab" : "browser");
-    },
-    removeItem: (key) => {
-      attempted(() => {
-        store.removeItem(key);
-        return true;
-      });
-      spare.removeItem(key);
-      unkept.mark(key, "browser");
-    },
+    getItem: (key) =>
+      pending.has(key) ? (pending.get(key) ?? null) : attempted(() => store.getItem(key)),
+    setItem: (key, value) => change(key, value, () => store.setItem(key, value)),
+    removeItem: (key) => change(key, null, () => store.removeItem(key)),
     unkept: unkept.store,
   };
 }
@@ -105,17 +98,8 @@ function tabOnly(spare: Rows): Rows {
 }
 
 export function keptRows(reach: () => Store): Rows {
-  const spare = memory();
   const store = attempted<Store>(reach);
-  if (store === null) {
-    return tabOnly(spare);
-  }
-  const kept = attempted(() => {
-    store.setItem(PROBE_KEY, PROBE_KEY);
-    store.removeItem(PROBE_KEY);
-    return true;
-  });
-  return kept === null ? tabOnly(spare) : guarded(store, spare);
+  return store === null ? tabOnly(memory()) : guarded(store);
 }
 
 let reached: Rows | undefined;

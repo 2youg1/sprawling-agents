@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { Option } from "effect";
-import { get } from "svelte/store";
+import { get } from "../core/store";
 
 import { cancel, openSession } from "../core/commands";
 import type { Belief } from "../core/belief";

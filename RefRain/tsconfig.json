@@ -1,6 +1,8 @@
 {
   "compilerOptions": {
     "target": "ES2022",
+    "jsx": "preserve",
+    "jsxImportSource": "@solidjs/web",
     "module": "ESNext",
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
@@ -17,14 +19,5 @@
     "noEmit": true,
     "types": ["bun"]
   },
-  "include": [
-    "src",
-    "swap",
-    "scripts",
-    "vite.config.ts",
-    "vite.swap.config.ts",
-    "svelte.config.ts",
-    "eslint.config.ts",
-    "svelte.config.test.ts"
-  ]
+  "include": ["src", "swap", "scripts", "vite.config.ts", "vite.swap.config.ts"]
 }

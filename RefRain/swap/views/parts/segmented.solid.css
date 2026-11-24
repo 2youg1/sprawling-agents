@@ -1,0 +1,56 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+.refrain-segmented-alt-choices {
+  display: inline-flex;
+  flex-direction: column;
+  gap: var(--spacing-snug);
+  max-width: 100%;
+}
+.refrain-segmented-alt-band {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-tight);
+  min-width: 0;
+}
+.refrain-segmented-alt-heading {
+  color: var(--color-text-faint);
+  font-size: var(--text-note);
+}
+.refrain-segmented-alt-option {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-snug);
+  width: 100%;
+  min-height: var(--spacing-control-sm);
+  padding: 0 var(--spacing-snug);
+  border: 1px solid var(--color-edge-panel);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-text-quiet);
+  font-size: var(--text-label);
+  text-align: start;
+  transition: border-color var(--transition-duration-panel) var(--ease-leave);
+}
+.refrain-segmented-alt-option[aria-checked="true"] {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+  transition-timing-function: var(--ease-arrive);
+}
+.refrain-segmented-alt-option[aria-disabled="true"] {
+  color: var(--color-text-disabled);
+}
+.refrain-segmented-alt-mark {
+  display: inline-flex;
+  opacity: 0;
+  transition: opacity var(--transition-duration-panel) var(--ease-leave);
+}
+.refrain-segmented-alt-option[aria-checked="true"] .refrain-segmented-alt-mark {
+  opacity: 1;
+  transition-timing-function: var(--ease-arrive);
+}
+.refrain-segmented-alt-label {
+  min-width: 0;
+}

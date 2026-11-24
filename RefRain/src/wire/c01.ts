@@ -196,6 +196,7 @@ export const RunSummary = Schema.Struct({
   last_seq: Seq,
   pr: Schema.optional(Schema.NullOr(Schema.String)),
   run: RunId,
+  session_began: Schema.optional(Schema.NullOr(Seq)),
   started: Schema.optional(Schema.NullOr(TimeMs)),
   task: Schema.optional(Schema.NullOr(Schema.String)),
   waiting: Schema.optional(Schema.NullOr(Waiting)),
@@ -251,6 +252,9 @@ export const CommitsAnswer = Schema.Struct({
   more: Schema.Boolean,
 }).annotate({ identifier: "CommitsAnswer" });
 export type CommitsAnswer = typeof CommitsAnswer.Type;
+
+export const KeepWarm = Schema.Literals(["off", "five_minute"]).annotate({ identifier: "KeepWarm" });
+export type KeepWarm = typeof KeepWarm.Type;
 
 export const ConfigLayer = Schema.Literals(["default", "city", "building", "resident"]).annotate({ identifier: "ConfigLayer" });
 export type ConfigLayer = typeof ConfigLayer.Type;
@@ -333,6 +337,8 @@ export type TuningDefaults = typeof TuningDefaults.Type;
 
 export const ConfigAnswer = Schema.Struct({
   addr: Address,
+  city_effort: Schema.optional(Schema.NullOr(Effort)),
+  city_keep_warm: Schema.optional(Schema.NullOr(KeepWarm)),
   context_lock_tokens: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
   effort: Schema.optional(Schema.NullOr(SettledEffort)),
   first: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
@@ -415,12 +421,4 @@ export const Restoration = Schema.Union([
   }),
 ]).annotate({ identifier: "Restoration" });
 export type Restoration = typeof Restoration.Type;
-
-export const DiscardLine = Schema.Struct({
-  at: TimeMs,
-  path: Schema.String,
-  restoration: Schema.optional(Schema.NullOr(Restoration)),
-  restored: Schema.Boolean,
-}).annotate({ identifier: "DiscardLine" });
-export type DiscardLine = typeof DiscardLine.Type;
 

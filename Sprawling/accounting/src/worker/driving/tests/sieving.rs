@@ -14,7 +14,6 @@
 use super::super::*;
 use crate::worker::fixture::*;
 
-/// The command that prints one file, on this machine.
 fn print_command(name: &str) -> String {
     if cfg!(windows) {
         format!("cmd /C type {name}")
@@ -23,12 +22,6 @@ fn print_command(name: &str) -> String {
     }
 }
 
-/// A real dispatch whose command prints more than the sieve's floor
-/// reaches the model sieved, and the way back to the original resolves
-/// (`Sprawling/app/Spec.lean` §8-43).
-///
-/// Before this, `driving` handed the bench's outcome to the turn as it
-/// came, so the sieve ran in the simulator and never in the product.
 #[test]
 fn a_command_output_over_the_floor_reaches_the_model_sieved_with_the_way_back() {
     let dir = tempfile::tempdir().unwrap();
@@ -73,6 +66,8 @@ arm = \"native\"
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::new(0), b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -124,8 +119,6 @@ arm = \"native\"
         noise,
         "the way back does not resolve to what the command printed"
     );
-    // The read tool admits a model-chosen path through `Address::parse`
-    // and resolves it from the city root; the rest address must pass both.
     let rest = kernel::Address::parse(account["rest_path"].as_str().unwrap()).unwrap();
     assert!(
         rest.is_within(&kernel::Address::parse("lab/room1").unwrap()),
@@ -139,14 +132,6 @@ arm = \"native\"
     );
 }
 
-/// A real dispatch in a city that wrote no `[clock]`: the command's
-/// result reaches the ledger ending with the clock line, and the second
-/// it names is the one its `tool_result` line records: the turn reads
-/// the answer moment before the face accounts the result (`Sprawling/app/Spec.lean`
-/// §8-125, `Sprawling/runtime/Spec.lean` §8-15).
-///
-/// Before this, the product handed the pipeline no stamp at all, so a
-/// model in a real city never learned when a command ran.
 #[test]
 fn a_served_command_result_ends_with_the_second_its_call_answered() {
     let dir = tempfile::tempdir().unwrap();
@@ -176,6 +161,8 @@ fn a_served_command_result_ends_with_the_second_its_call_answered() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::new(0), b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })

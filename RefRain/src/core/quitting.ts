@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import { readonly, writable } from "svelte/store";
-import type { Readable } from "svelte/store";
+import { readonly, writable } from "./store";
+import type { Readable } from "./store";
 
 const asked = writable(0);
 

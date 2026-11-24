@@ -2,7 +2,7 @@
 # `client-checks` run here, at the repository root, and this is the bunfig
 # bun reads from there.
 #
-# `printWidth` is rustfmt's 100, so the TypeScript, CSS and Svelte next to
+# `printWidth` is rustfmt's 100, so the TypeScript, JSX and CSS next to
 # the Rust wrap where the Rust wraps. The default 80 re-wraps a third of the
 # client a second time and puts every line of `Tools/xtask/src/channel/shim.js`
 # on three.

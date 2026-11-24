@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The field's wiring as RefRain/spec/Views/Parts.lean §7-2 states it:
-// the label names the box, `aria-invalid` is exactly "the city refused
-// it", `aria-describedby` is the page's description followed by this
-// field's one line, an error replaces the help rather than joining it,
-// and a box nobody may change puts back what the person typed. These
-// hold for any look that spreads the bags, which is why the test
-// imports no look.
-
 import { describe, expect, test } from "bun:test";
 
 import { lookOf, type FieldProps, type Typed } from "./field";
@@ -47,7 +39,7 @@ describe("field wiring", () => {
     }).toEqual({
       for: "f1-box",
       id: "f1-box",
-      invalid: false,
+      invalid: "false",
       described: undefined,
       note: undefined,
     });
@@ -76,7 +68,7 @@ describe("field wiring", () => {
       note: look.note,
     }).toEqual({
       refused: true,
-      invalid: true,
+      invalid: "true",
       described: "f1-note",
       note: { kind: "error", text: "no such host", wire: { id: "f1-note", role: "alert" } },
     });
@@ -85,17 +77,17 @@ describe("field wiring", () => {
   test("an edit lands in an open box and is put back in a disabled one", () => {
     const open = recorded({ label: "Key", value: "old" });
     const event = typed("new");
-    lookOf(open.props, "f1").box.oninput(event);
+    lookOf(open.props, "f1").box.onInput(event);
     expect([open.seen, event.currentTarget.value]).toEqual([["new"], "new"]);
 
     const shut = recorded({ label: "Key", value: "old", disabled: true });
     const refused = typed("new");
     const look = lookOf(shut.props, "f2");
-    look.box.oninput(refused);
+    look.box.onInput(refused);
     expect([shut.seen, refused.currentTarget.value, look.box["aria-disabled"]]).toEqual([
       [],
       "old",
-      true,
+      "true",
     ]);
   });
 

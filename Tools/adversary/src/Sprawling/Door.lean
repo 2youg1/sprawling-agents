@@ -273,7 +273,7 @@ def Verb.frame : Verb → String
       , ("sandbox", Json.mkObj
           [ ("shell", Json.bool false)
           , ("container", Json.mkObj
-              [ ("image", .str ("sha256:" ++ String.mk (List.replicate 64 'a')))
+              [ ("image", .str ("sha256:" ++ String.ofList (List.replicate 64 'a')))
               , ("user", Json.num (JsonNumber.fromNat 1000))
               , ("cpu_millis", Json.num (JsonNumber.fromNat cpuMillis))
               , ("memory_bytes", Json.num (JsonNumber.fromNat 67108864))
@@ -399,9 +399,10 @@ private structure Said where
 `IO.Process.output` drains both pipes before it waits, which is the deadlock a
 hand-written version has to remember: a pipe left unread keeps the child alive,
 so waiting first would hang the pair on any output larger than one buffer. -/
-private def capture (binary : System.FilePath) (arguments : Array String) : IO Said := do
+private def capture (binary : System.FilePath) (arguments : Array String)
+    (environment : Array (String × Option String) := #[]) : IO Said := do
   let out ← IO.Process.output
-    { cmd := binary.toString, args := arguments, stdin := .null }
+    { cmd := binary.toString, args := arguments, env := environment, stdin := .null }
   return { exitCode := out.exitCode, out := out.stdout, err := out.stderr }
 
 /-- Finds the binary, preferring what the caller was told to use.
@@ -445,8 +446,8 @@ def Door.status (door : Door) : IO String := do
   return said.out
 
 /-- Raises a city in a directory that does not have one. -/
-def Door.raise (door : Door) (city : System.FilePath) : IO Unit := do
-  let said ← capture door.binary #["init", city.toString]
+def Door.raise (door : Door) (city home : System.FilePath) : IO Unit := do
+  let said ← capture door.binary #["init", city.toString] #[("USERPROFILE", some home.toString)]
   if said.exitCode != 0 then
     throw <| IO.userError s!"a city could not be raised (exit {said.exitCode}): {said.err}"
 

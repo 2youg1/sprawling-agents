@@ -11,6 +11,10 @@
     "en": "a whole number of pixels from {min} up; an empty box takes the size the page is drawn at",
     "zh": "{min} 起的整数像素；留空即采用页面本来的字号"
   },
+  "appearance_body_not_saved": {
+    "en": "Body size {actual} px was not saved. Enter a whole number from {min} px up.",
+    "zh": "正文字号 {actual} px 未保存。请输入 {min} px 或更大的整数。"
+  },
   "appearance_body_unit": {
     "en": "px",
     "zh": "px"
@@ -74,6 +78,86 @@
   "appearance_glass_on": {
     "en": "let it show through",
     "zh": "透出"
+  },
+  "wallpaper_title": {
+    "en": "Session wallpaper",
+    "zh": "会话壁纸"
+  },
+  "wallpaper_note": {
+    "en": "Preview a Session background and adjust reading brightness. Apply keeps both on this device.",
+    "zh": "预览会话背景并调整阅读亮度。应用后，两项设置保存在此设备。"
+  },
+  "wallpaper_solid": {
+    "en": "Solid",
+    "zh": "纯色"
+  },
+  "wallpaper_marble": {
+    "en": "Marble",
+    "zh": "大理石"
+  },
+  "wallpaper_local": {
+    "en": "Local image",
+    "zh": "本地图像"
+  },
+  "wallpaper_choose_another": {
+    "en": "Choose another image",
+    "zh": "选择其他图像"
+  },
+  "wallpaper_copy": {
+    "en": "{name} · Copy kept by this browser",
+    "zh": "{name} · 副本保存在此浏览器"
+  },
+  "wallpaper_source": {
+    "en": "{name} · Linked local image",
+    "zh": "{name} · 已关联本地图像"
+  },
+  "wallpaper_canvas": {
+    "en": "Reading canvas",
+    "zh": "阅读画布"
+  },
+  "wallpaper_brightness": {
+    "en": "Reading brightness",
+    "zh": "阅读亮度"
+  },
+  "wallpaper_apply": {
+    "en": "Apply appearance",
+    "zh": "应用外观"
+  },
+  "wallpaper_revert": {
+    "en": "Revert preview",
+    "zh": "撤销预览"
+  },
+  "wallpaper_wait": {
+    "en": "Finish the current appearance operation first.",
+    "zh": "请等待当前外观操作完成。"
+  },
+  "wallpaper_no_changes": {
+    "en": "The preview matches the saved appearance.",
+    "zh": "预览与已保存的外观相同。"
+  },
+  "wallpaper_invalid": {
+    "en": "The image could not be opened. Choose a PNG, JPEG, WebP or AVIF of up to {limit} MiB and {edge} pixels on each side.",
+    "zh": "无法打开图像。请选择不超过 {limit} MiB 且单边不超过 {edge} 像素的 PNG、JPEG、WebP 或 AVIF。"
+  },
+  "wallpaper_read_failed": {
+    "en": "Saved appearance could not be read. Solid is in use. Reopen RefRain to try reading it again.",
+    "zh": "无法读取已保存的外观。当前使用纯色。重新打开 RefRain 可重试读取。"
+  },
+  "wallpaper_write_failed": {
+    "en": "Appearance could not be saved. The preview is still shown. Free browser storage or allow site data, then apply again.",
+    "zh": "无法保存外观，当前仍显示预览。请释放浏览器存储空间或允许网站保存数据，然后重新应用。"
+  },
+  "wallpaper_unavailable": {
+    "en": "The saved image is unavailable. Solid is in use. Restore file access or choose another image.",
+    "zh": "已保存的图像目前不可用，当前使用纯色。可恢复文件访问或选择其他图像。"
+  },
+  "wallpaper_restore_access": {
+    "en": "Restore file access",
+    "zh": "恢复文件访问"
+  },
+  "colours_unmeasured": {
+    "en": "{token} could not be measured against the surface. Check that the colors resolve and the backdrop is known.",
+    "zh": "无法测量 {token} 在该表面上的对比度。请检查颜色是否可解析、背景是否已知。"
   },
   "appearance_lighting": {
     "en": "lighting",
@@ -1179,6 +1263,66 @@
     "en": "how the document is read",
     "zh": "文档的读法"
   },
+  "refrain_live": {
+    "en": "Live rendering",
+    "zh": "实时渲染"
+  },
+  "refrain_diagram": {
+    "en": "Mermaid diagram",
+    "zh": "Mermaid 图表"
+  },
+  "refrain_typewriter": {
+    "en": "Typewriter scrolling",
+    "zh": "打字机滚动"
+  },
+  "refrain_attach_selection": {
+    "en": "Attach selected text",
+    "zh": "将选区附到草稿"
+  },
+  "refrain_attach_unsaved": {
+    "en": "Save the selected edits before attaching them so the text can be found by version.",
+    "zh": "请先保存选区中的修改，再附入草稿，以便按版本找回这段文字。"
+  },
+  "refrain_preview_failed": {
+    "en": "This preview could not be displayed. The source is still available.",
+    "zh": "无法显示预览，可继续查看源码。"
+  },
+  "refrain_external_changed": {
+    "en": "The source changed. The draft is still here.",
+    "zh": "原文已变，草稿仍保留在这里。"
+  },
+  "refrain_previous_draft": {
+    "en": "An unsaved edit belongs to an earlier file version. Copy the changes to recover them.",
+    "zh": "有未保存的编辑属于文件旧版。可复制改动以恢复。"
+  },
+  "refrain_registered_draft_unkept": {
+    "en": "The browser could not retain this draft. Copy it before leaving.",
+    "zh": "浏览器未能保存此草稿。离开前请复制。"
+  },
+  "refrain_proposal_review": {
+    "en": "Review proposed edit",
+    "zh": "审阅修改提案"
+  },
+  "refrain_proposal_local_overlap": {
+    "en": "An unsaved edit overlaps the proposed range. Resolve that edit before trying this proposal.",
+    "zh": "一项未保存的编辑与提案选区重叠。请先处理该项编辑，再尝试此提案。"
+  },
+  "refrain_proposal_invalid": {
+    "en": "The proposal does not match the source range or contains invalid text.",
+    "zh": "提案与原文选区不符，或含有无效文字。"
+  },
+  "refrain_copy_diagnostic": {
+    "en": "Copy diagnostic",
+    "zh": "复制诊断"
+  },
+  "refrain_copy_draft": {
+    "en": "Copy unsaved draft",
+    "zh": "复制未保存的草稿"
+  },
+  "refrain_format_opaque": {
+    "en": "No preview is available for this file format or encoding.",
+    "zh": "此文件的格式或编码没有可用的预览。"
+  },
   "refrain_source": {
     "en": "source",
     "zh": "源码"
@@ -1470,6 +1614,54 @@
   "format_pdf_settings": {
     "en": "Adobe CMaps · fonts the file leaves out drawn with the device's own faces",
     "zh": "Adobe CMap · 文件没带的字体用设备自带的字体画"
+  },
+  "pdf_original": {
+    "en": "Hold for original",
+    "zh": "按住看原图"
+  },
+  "pdf_details": {
+    "en": "Document details",
+    "zh": "文档详情"
+  },
+  "pdf_one_page": {
+    "en": "1 page",
+    "zh": "1 页"
+  },
+  "pdf_zoom": {
+    "en": "Magnify page",
+    "zh": "临时放大"
+  },
+  "pdf_close_zoom": {
+    "en": "Return to page width",
+    "zh": "回到页宽"
+  },
+  "pdf_zoom_pan": {
+    "en": "Pan magnified page",
+    "zh": "平移放大的页面"
+  },
+  "pdf_select_region": {
+    "en": "Select region",
+    "zh": "框选区域"
+  },
+  "pdf_attach": {
+    "en": "Attach selected material",
+    "zh": "将选中内容附到草稿"
+  },
+  "pdf_attaching": {
+    "en": "Preparing the selected region…",
+    "zh": "正在提取选区…"
+  },
+  "pdf_reference": {
+    "en": "Show referenced range",
+    "zh": "定位引用范围"
+  },
+  "pdf_crop_failed": {
+    "en": "The attachment was not added. Wait for the page to draw, then try again or select a larger area.",
+    "zh": "附件未加入草稿。请等页面绘制完成后重试，或选取更大的区域。"
+  },
+  "pdf_changed": {
+    "en": "The source has changed. The original range could not be verified.",
+    "zh": "原文已变，无法核对原范围。"
   },
   "format_width": {
     "en": "{width} px wide",
@@ -4775,6 +4967,178 @@
     "en": "decide: no",
     "zh": "请决定：否"
   },
+  "shell_navigation": {
+    "en": "Workspace navigation",
+    "zh": "工作区导航"
+  },
+  "shell_edge_actions": {
+    "en": "Workspace actions",
+    "zh": "工作区操作"
+  },
+  "shell_switch_subject": {
+    "en": "Switch Files and Session",
+    "zh": "切换文件和 Session"
+  },
+  "shell_switch_subject_short": {
+    "en": "Files / Session",
+    "zh": "文件 / Session"
+  },
+  "shell_layout_tools": {
+    "en": "Layout",
+    "zh": "布局"
+  },
+  "shell_library_tools": {
+    "en": "Library",
+    "zh": "资料库"
+  },
+  "shell_close_list": {
+    "en": "Close list",
+    "zh": "关闭列表"
+  },
+  "shell_current_folder": {
+    "en": "Current folder: {path}",
+    "zh": "当前文件夹：{path}"
+  },
+  "shell_parent_folder": {
+    "en": "Parent folder",
+    "zh": "上一级"
+  },
+  "shell_empty_folder": {
+    "en": "This folder is empty.",
+    "zh": "此文件夹为空。"
+  },
+  "shell_empty_library": {
+    "en": "Register a folder in Library to browse it here.",
+    "zh": "在「资料库」登记文件夹后，从这里浏览。"
+  },
+  "shell_file_mode": {
+    "en": "File mode",
+    "zh": "文件模式"
+  },
+  "shell_split": {
+    "en": "Split view",
+    "zh": "分屏"
+  },
+  "shell_draft": {
+    "en": "Conversation",
+    "zh": "对话"
+  },
+  "shell_no_file": {
+    "en": "Open the file list to select a document.",
+    "zh": "打开文件列表并选择一份文档。"
+  },
+  "shell_active_run": {
+    "en": "Agent activity",
+    "zh": "Agent 活动"
+  },
+  "shell_idle_run": {
+    "en": "This session has no active run.",
+    "zh": "当前会话没有正在运行的任务。"
+  },
+  "context_tools_title": {
+    "en": "Context actions",
+    "zh": "上下文操作"
+  },
+  "shell_go_back": {
+    "en": "Back to list",
+    "zh": "返回列表"
+  },
+  "shell_use_session": {
+    "en": "Use current session",
+    "zh": "使用当前会话"
+  },
+  "shell_choose_target": {
+    "en": "Choose a conversation for this attachment",
+    "zh": "为这个附件选择会话"
+  },
+  "shell_new_session": {
+    "en": "New session",
+    "zh": "新会话"
+  },
+  "workspace_response_not_bytes": {
+    "en": "The response did not contain file bytes.",
+    "zh": "响应中没有文件内容。"
+  },
+  "workspace_no_response": {
+    "en": "The local listener did not return a response.",
+    "zh": "本地监听器没有返回响应。"
+  },
+  "workspace_unreadable_http": {
+    "en": "The local listener returned HTTP {status}.",
+    "zh": "本地监听器返回 HTTP {status}。"
+  },
+  "workspace_unreadable_response": {
+    "en": "RefRain could not read the workspace response.",
+    "zh": "RefRain 无法读取工作区响应。"
+  },
+  "workspace_reconnect": {
+    "en": "Reconnect to RefRain on this computer. Reopen the file to check its current version.",
+    "zh": "重新连接这台电脑上的 RefRain。重新打开文件，核对当前版本。"
+  },
+  "shell_workspace_root": {
+    "en": "Local folder path",
+    "zh": "本地文件夹路径"
+  },
+  "shell_register_workspace": {
+    "en": "Add workspace",
+    "zh": "登记工作区"
+  },
+  "shell_select_workspace": {
+    "en": "Workspace",
+    "zh": "工作区"
+  },
+  "shell_recent_files": {
+    "en": "Recent files",
+    "zh": "最近文件"
+  },
+  "shell_file_loading": {
+    "en": "Opening document…",
+    "zh": "正在打开文档…"
+  },
+  "shell_next_files": {
+    "en": "More files",
+    "zh": "更多文件"
+  },
+  "shell_reference_changed": {
+    "en": "The source document has changed.",
+    "zh": "原文已变。"
+  },
+  "shell_relink": {
+    "en": "Relink file",
+    "zh": "重新关联文件"
+  },
+  "shell_relink_path": {
+    "en": "Workspace-relative path",
+    "zh": "工作区内的相对路径"
+  },
+  "shell_file_category": {
+    "en": "Category",
+    "zh": "分类"
+  },
+  "shell_save_category": {
+    "en": "Save category",
+    "zh": "保存分类"
+  },
+  "shell_close_file": {
+    "en": "Close file",
+    "zh": "关闭文件"
+  },
+  "shell_file_details": {
+    "en": "File details",
+    "zh": "文件详情"
+  },
+  "shell_file_link": {
+    "en": "Document link",
+    "zh": "文档链接"
+  },
+  "shell_cancel": {
+    "en": "Cancel",
+    "zh": "取消"
+  },
+  "shell_copy_diagnostic": {
+    "en": "Copy diagnostic",
+    "zh": "复制诊断"
+  },
   "edge_layers": {
     "en": "layers",
     "zh": "图层"
@@ -7099,6 +7463,10 @@
     "en": "approvals",
     "zh": "审批"
   },
+  "setup_base_url_example": {
+    "zh": "例如 https://api.openai.com/v1",
+    "en": "For example, https://api.openai.com/v1"
+  },
   "setup_base_url": {
     "en": "base_url",
     "zh": "base_url"
@@ -7314,6 +7682,10 @@
   "saving_unverified": {
     "en": "sent, but no receipt came back; check before saving again",
     "zh": "已发出但没等到回执，待核对"
+  },
+  "saving_check": {
+    "en": "Check saved value",
+    "zh": "核对已保存的值"
   },
   "saving_save": {
     "en": "save",
@@ -8015,6 +8387,14 @@
     "en": "save the document",
     "zh": "保存这份文件"
   },
+  "setup_governed_compare": {
+    "en": "Review the latest stored document",
+    "zh": "核对当前已保存的文档"
+  },
+  "setup_governed_rebase": {
+    "en": "Use this version as the base",
+    "zh": "用此版本作为基线"
+  },
   "setup_governed_unchanged": {
     "en": "nothing changed yet",
     "zh": "还没有改动"
@@ -8488,8 +8868,8 @@
     "zh": "城市已接收"
   },
   "talk_delivery_unknown": {
-    "en": "the connection dropped before the city answered - not sent again",
-    "zh": "城市回答之前连接断了，不会重发"
+    "en": "Receipt unconfirmed. Your draft is still here.",
+    "zh": "尚未确认回执。草稿仍保留在此处。"
   },
   "talk_ttft": {
     "en": "TTFT",
@@ -8787,6 +9167,14 @@
     "en": "deny",
     "zh": "拒绝"
   },
+  "wait_receipt_pending": {
+    "en": "Decision sent. Waiting for the city to update the request.",
+    "zh": "决定已提交，正在等城更新请求。"
+  },
+  "wait_receipt_unknown": {
+    "en": "The decision result is unknown. Check the receipt before trying again.",
+    "zh": "决定结果待核对。请先查看回执再重试。"
+  },
   "wait_deny_keeps": {
     "en": "deny stops the work and undoes nothing; files a run deleted are kept in the recycle bin.",
     "zh": "拒绝只停下这件活，不撤销已经发生的事；run 删掉的文件留在回收站里。"
@@ -8914,6 +9302,34 @@
   "wire_frame_undecodable": {
     "en": "this page speaks wire v{ours} and the server sent a frame it cannot read",
     "zh": "本页说 wire v{ours}，而服务端送来的这一帧它读不了"
+  },
+  "wire_frame_json": {
+    "en": "Frame {frame} has invalid JSON (position {at})",
+    "zh": "第 {frame} 帧的 JSON 语法无效（位置 {at}）"
+  },
+  "diagnostic_details": {
+    "en": "Diagnostic details",
+    "zh": "诊断详情"
+  },
+  "diagnostic_copy": {
+    "en": "Copy diagnostic",
+    "zh": "复制诊断"
+  },
+  "diagnostic_to_draft": {
+    "en": "Add diagnostic to draft",
+    "zh": "将诊断加入草稿"
+  },
+  "diagnostic_copied": {
+    "en": "Diagnostic copied",
+    "zh": "已复制诊断"
+  },
+  "diagnostic_copy_blocked": {
+    "en": "Clipboard access failed. Select and copy the details above.",
+    "zh": "浏览器未能访问剪贴板。可选中上方详情并复制。"
+  },
+  "wire_frame_schema": {
+    "en": "Frame {frame} at {path}. {expected}. Received type {actual}",
+    "zh": "第 {frame} 帧的 {path} 字段校验失败。{expected}。收到的类型为 {actual}"
   },
   "wire_join_action": {
     "en": "join this city's control surface",
@@ -9236,20 +9652,20 @@
     "zh": "要不要动起来"
   },
   "appearance_blend_note": {
-    "en": "how much of the world layer shows beside the conversation in the blend tier",
-    "zh": "混合档里，对话两侧的世界层显出多少"
+    "en": "how strongly the background of the temporary activity panel stands out",
+    "zh": "临时活动面板的背景深浅"
   },
   "appearance_glass_note": {
     "en": "whether the edge keys let the page behind them show through",
-    "zh": "左下三键是否透出背后的页面"
+    "zh": "左下按键是否透出背后的页面"
   },
   "appearance_tier": {
     "en": "tier",
     "zh": "档位"
   },
   "appearance_tier_note": {
-    "en": "how much of the world layer the page draws; the layers key moves through the same three",
-    "zh": "页面画出多少世界层；图层键在同样的三档之间切换"
+    "en": "Zen focuses on the conversation. Panorama also shows the workspace.",
+    "zh": "禅模式专注对话，全景模式同时显示工作区。"
   },
   "setup_key_kept": {
     "en": "archived - leave blank to keep it",
@@ -10391,9 +10807,49 @@
     "en": "Tags are kept by the city, and the city is not connected",
     "zh": "标签由城市保管，而城市没有连上"
   },
-  "talk_past": {
-    "en": "An earlier session. It is read-only: the city goes on with the room's current session.",
-    "zh": "较早的一段对话，只读：城市只接着这个房间当前的一段说下去。"
+  "talk_attachments": {
+    "en": "Attachments",
+    "zh": "附件"
+  },
+  "talk_attachment_region": {
+    "en": "Selected PDF region",
+    "zh": "选中的 PDF 区域"
+  },
+  "talk_remove_attachment": {
+    "en": "Remove {file} from draft",
+    "zh": "从草稿移除 {file}"
+  },
+  "talk_remove_attachment_short": {
+    "en": "Remove",
+    "zh": "移除"
+  },
+  "talk_attachment_image_unavailable": {
+    "en": "This conversation currently accepts text selections only. Your draft and image are still here.",
+    "zh": "此会话目前只能接收文字选区。草稿和图片仍在这里。"
+  },
+  "talk_attachment_image_failed": {
+    "en": "The image could not be prepared. Select up to four smaller PNG crops and try again. Your draft is still here.",
+    "zh": "未能准备图片。请选择最多四张较小的 PNG 裁图后重试。草稿仍在这里。"
+  },
+  "talk_attachment_storage_failure": {
+    "en": "Browser storage could not save or restore these attachments. Keep this tab open until you send them.",
+    "zh": "浏览器存储未能保存或恢复附件。请在发送前保留此标签页。"
+  },
+  "talk_attachment_offline": {
+    "en": "The connection is closed. The draft is ready to send after reconnecting.",
+    "zh": "连接已关闭。重新连接后可发送草稿。"
+  },
+  "talk_recheck_receipt": {
+    "en": "Check this send again",
+    "zh": "再次核对此次发送"
+  },
+  "talk_open_citation": {
+    "en": "Open cited selection in {file}",
+    "zh": "打开 {file} 中的引用选区"
+  },
+  "talk_review_rewrite": {
+    "en": "Review proposed edit to {file}",
+    "zh": "审阅对 {file} 的修改提案"
   },
   "talk_current": {
     "en": "Back to the current session",
@@ -10847,6 +11303,10 @@
     "en": "use the built-in {token}",
     "zh": "{token} 改回内置值"
   },
+  "colours_only_tab": {
+    "en": "Browser storage refused to save this theme. This tab keeps the preview.",
+    "zh": "浏览器存储没有保存此主题。当前标签页仍保留预览。"
+  },
   "colours_css": {
     "en": "override stylesheet",
     "zh": "覆盖样式表"
@@ -11188,16 +11648,36 @@
     "zh": "城市拒绝了：{code}"
   },
   "remote_door_done_door": {
-    "en": "the code was sent; the city's console says whether the door opened",
-    "zh": "确认码已送出；门开没开，城市的控制台上写着"
+    "en": "The city confirmed that the remote door opened.",
+    "zh": "城市已确认远程门已打开。"
   },
   "remote_door_done_key": {
-    "en": "the code was sent; the city's console says whether the key was replaced",
-    "zh": "确认码已送出；钥匙换没换，城市的控制台上写着"
+    "en": "The city confirmed that the key was replaced.",
+    "zh": "城市已确认城钥匙已更换。"
+  },
+  "remote_door_requesting": {
+    "en": "Requesting approval from the city…",
+    "zh": "正在向城市请求批准…"
+  },
+  "remote_door_confirming": {
+    "en": "Confirmation submitted. Waiting for the city's result…",
+    "zh": "已提交确认，正在等待城市执行结果…"
+  },
+  "remote_door_outcome_unknown": {
+    "en": "Submitted. The result is unknown. Check operation {code} on the city console before starting again.",
+    "zh": "已提交，结果待核对。请先到城市控制台核对操作 {code}，再重新发起。"
+  },
+  "remote_door_done_close": {
+    "en": "The city confirmed that the remote door is closed.",
+    "zh": "城市已确认远程门已关闭。"
+  },
+  "remote_door_checked": {
+    "en": "I checked the city console",
+    "zh": "我已核对城市控制台"
   },
   "remote_door_closing": {
-    "en": "the close was sent; the city's console says when the door closed",
-    "zh": "关门已送出；门何时关上，城市的控制台上写着"
+    "en": "Close submitted. Waiting for the city's result…",
+    "zh": "已提交关门操作，正在等待城市执行结果…"
   },
   "context_second_building": {
     "en": "the building whose second reminder is shown",
@@ -11910,6 +12390,54 @@
   "pair_pairing": {
     "en": "pairing…",
     "zh": "正在配对…"
+  },
+  "pair_opening": {
+    "en": "Opening the local browser session…",
+    "zh": "正在打开本地浏览器会话…"
+  },
+  "pair_check": {
+    "en": "Check this browser again",
+    "zh": "再次核对此浏览器"
+  },
+  "pair_checking": {
+    "en": "Checking this browser…",
+    "zh": "正在核对此浏览器…"
+  },
+  "pair_unknown": {
+    "en": "The city has not confirmed whether this browser was paired. Check its status.",
+    "zh": "城市尚未确认这个浏览器是否配对。请核对状态。"
+  },
+  "pair_unconfirmed": {
+    "en": "The city did not find a pairing for this browser key. Check again or enter a fresh code from the terminal.",
+    "zh": "城市没有找到这个浏览器密钥的配对记录。请再次核对或输入终端中的新配对码。"
+  },
+  "pair_session_pending": {
+    "en": "This browser was paired. Its current session is unconfirmed. Check the session again to continue.",
+    "zh": "这个浏览器已经配对，当前会话尚未确认。请再次核对会话以继续。"
+  },
+  "pair_issue_timeout": {
+    "en": "The request to {path} did not answer in time.",
+    "zh": "请求 {path} 未在时限内收到回执。"
+  },
+  "pair_issue_action": {
+    "en": "Open the local browser session",
+    "zh": "打开本地浏览器会话"
+  },
+  "pair_issue_network": {
+    "en": "The browser could not finish the request to {path}.",
+    "zh": "浏览器未能完成对 {path} 的请求。"
+  },
+  "pair_issue_response": {
+    "en": "The request to {path} returned an unreadable response.",
+    "zh": "请求 {path} 返回了无法读取的回执。"
+  },
+  "pair_issue_refused": {
+    "en": "The city refused the request to {path}.",
+    "zh": "城市拒绝了对 {path} 的请求。"
+  },
+  "pair_issue_unconfirmed": {
+    "en": "The status check found no pairing for this browser key.",
+    "zh": "状态核对未找到这个浏览器密钥的配对记录。"
   },
   "pair_open_used": {
     "en": "This link has been used. Enter the pairing code from the terminal instead.",

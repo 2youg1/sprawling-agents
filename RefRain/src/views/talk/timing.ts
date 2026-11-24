@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import { readable } from "svelte/store";
-import type { Readable } from "svelte/store";
+import { readable } from "../../core/store";
+import type { Readable } from "../../core/store";
 
 import { fill, say } from "../../core/lang";
 import type { Lang } from "../../core/lang";

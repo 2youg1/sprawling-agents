@@ -35,7 +35,7 @@ pub mod providers;
 pub mod published;
 pub mod rounds;
 pub mod served;
-mod sessions;
+pub(crate) mod sessions;
 pub mod skills;
 pub mod snapshot;
 #[cfg(test)]

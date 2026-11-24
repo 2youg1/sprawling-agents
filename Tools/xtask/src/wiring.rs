@@ -133,7 +133,7 @@ fn emitted(root: &Path, all: &[String]) -> Result<BTreeSet<String>, XtaskError> 
         .iter()
         .map(|name| (name.clone(), format!("{}: {{", wire_tag(name))))
         .collect();
-    for file in walk::files_with_ext(&base, &["ts", "svelte"])? {
+    for file in walk::files_with_ext(&base, &["ts", "tsx"])? {
         if walk::rel(root, &file).contains(".test.") {
             continue;
         }

@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { Snippet } from "svelte";
-
 import type {
   Address,
   AxError,
@@ -96,12 +94,4 @@ export function refusesCard(error: AxError, doc: Address, card: B3Hash): boolean
   if (error.subject === doc) return true;
   if (!DECIDING_ACTIONS.has(error.action)) return false;
   return error.subject.includes(card) || !NAMES_A_CARD.test(error.subject);
-}
-
-export interface ProposalsLook {
-  readonly band: { readonly "aria-labelledby": string };
-  readonly heading: { readonly id: string };
-
-  readonly title: string;
-  readonly cards: Snippet;
 }

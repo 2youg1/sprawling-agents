@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The names a request carries are the names the page reads: held for
-//! the whole session they were frozen in, and taken anew after `/new`
-//! (`Sprawling/accounting/spec/Worker/Freezing/Naming.lean` §8-15).
-
 #![allow(clippy::wildcard_enum_match_arm, reason = "test code")]
 
 use std::path::Path;
@@ -19,7 +15,6 @@ fn idem(tag: &str) -> kernel::IdemKey {
     kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, tag.as_bytes())
 }
 
-/// Names the Mayor through the card, from the text the page last read.
 fn call_the_mayor(worker: &mut RunWorker, city: &Path, name: &str) {
     let base = std::fs::read_to_string(city::Governed::Mayor.path(city)).unwrap_or_default();
     worker
@@ -42,14 +37,14 @@ fn dispatch(worker: &mut RunWorker, tag: &str) {
             policy: kernel::RunPolicy::of(kernel::Mode::Chat),
             idem: idem(tag),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
         .unwrap();
 }
 
-/// What the page reads: the Mayor's name and the version a new session
-/// freezes, through the same query a page sends.
 fn page(city: &Path) -> (Option<String>, kernel::B3Hash) {
     let wire::Answer::Identity(answer) = crate::views::ask(city, &wire::Query::Identity).unwrap()
     else {
@@ -61,7 +56,6 @@ fn page(city: &Path) -> (Option<String>, kernel::B3Hash) {
     (stated.mayor, stated.version)
 }
 
-/// The identity version every `run_started` line recorded, in order.
 fn frozen_versions(city: &Path) -> Vec<Option<kernel::B3Hash>> {
     let ledger = kernel::layout::CityLayout::new(city).ledger();
     runtime::replay::verify_ledger_dir(&ledger)
@@ -80,10 +74,6 @@ fn frozen_versions(city: &Path) -> Vec<Option<kernel::B3Hash>> {
         .collect()
 }
 
-/// The name on the settings card is the name in the request the model is
-/// sent, under one version both sides can point at. A rename leaves the
-/// running session as it was frozen - its next request still says the
-/// old name - and the session `/new` opens takes the new one.
 #[test]
 fn a_new_session_freezes_the_name_the_page_shows() {
     let dir = tempfile::tempdir().unwrap();
@@ -128,8 +118,6 @@ fn a_new_session_freezes_the_name_the_page_shows() {
         .unwrap();
     dispatch(&mut worker, "third");
 
-    // The chat requests, in order; the endpoint's model list was asked
-    // for first, with no body.
     let bodies: Vec<String> = provider
         .bodies()
         .into_iter()

@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Process boundary: Command/Query/Event wire, WebSocket server, auth,
-//! read-only multi-city aggregation.
-//!
-//! The kernel types that appear on this crate's own signatures are
-//! re-exported below. The client reads the wire and nothing else
-//! (ARCHITECTURE section 8), so a client that cannot name `EventRecord`
-//! cannot read the frames it is sent; a boundary crate that hands out
-//! frames owes the vocabulary to read them.
-
 mod aggregate;
 mod answer;
 #[cfg(feature = "server")]
@@ -149,7 +140,7 @@ pub use reception::{SessionState, SessionStep, WelcomeFacts, decide_frame};
 pub use reception::{decide_admission, offered_pairing};
 #[cfg(feature = "server")]
 pub use reception::{decide_bind, decide_handshake};
-pub use reply::{AcpProgress, Delivered, Reply};
+pub use reply::{AcpProgress, Delivered, Outcome as ReplyOutcome, Reply};
 #[cfg(feature = "server")]
 pub use server::{AcpSink, Answering, MonitorFeed, TranscribeSink};
 #[cfg(feature = "server")]
@@ -175,3 +166,12 @@ pub use kernel::{McpServer, McpTransport, SandboxLimits, ServerLabel};
 pub use kernel::{NodeId, PursuitState, RoadmapStatus, WHOLE_PPB};
 pub use kernel::{Payload, Sealed, Seq, TimeMs, Tokens, UsdMicros};
 pub use kernel::{Ruling, SessionName, WriteDomain};
+
+#[cfg(feature = "server")]
+pub use server::WorkspaceWatch;
+#[cfg(feature = "server")]
+pub use server::{ReadingPosition, WorkspaceChange, WorkspaceEntry, WorkspaceEntryKind};
+#[cfg(feature = "server")]
+pub use server::{WorkspaceInfo, WorkspaceOperation, WorkspacePage, WorkspaceRecord};
+#[cfg(feature = "server")]
+pub use server::{WorkspaceReply, WorkspaceRequest, WorkspaceSave, WorkspaceSink, WorkspaceTarget};

@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-use kernel::AxError;
+use kernel::{AxError, IdemKey};
 use serde::Serialize;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -17,20 +17,59 @@ pub enum Delivered {
 }
 
 #[derive(Clone)]
-pub struct Reply(Option<Arc<dyn Fn(AxError) -> Delivered + Send + Sync>>);
+pub struct Reply {
+    sink: Option<Arc<dyn Fn(Outcome) -> Delivered + Send + Sync>>,
+    request: Option<IdemKey>,
+}
+
+pub enum Outcome {
+    Accepted(IdemKey),
+    Refused(AxError),
+}
 
 impl Reply {
     pub fn to(sink: impl Fn(AxError) -> Delivered + Send + Sync + 'static) -> Reply {
-        Reply(Some(Arc::new(sink)))
+        Self::outcomes(move |outcome| match outcome {
+            Outcome::Refused(error) => sink(error),
+            Outcome::Accepted(_) => Delivered::NobodyAsked,
+        })
+    }
+
+    pub fn outcomes(sink: impl Fn(Outcome) -> Delivered + Send + Sync + 'static) -> Reply {
+        Reply {
+            sink: Some(Arc::new(sink)),
+            request: None,
+        }
     }
 
     pub fn nowhere() -> Reply {
-        Reply(None)
+        Reply {
+            sink: None,
+            request: None,
+        }
+    }
+
+    #[must_use]
+    pub fn for_request(mut self, request: Option<IdemKey>) -> Self {
+        self.request = request;
+        self
+    }
+
+    pub fn request(&self) -> Option<IdemKey> {
+        self.request
     }
 
     pub fn refuse(&self, error: AxError) -> Delivered {
-        match &self.0 {
-            Some(sink) => sink(error),
+        self.send(Outcome::Refused(error))
+    }
+
+    pub fn accept(&self, key: IdemKey) -> Delivered {
+        self.send(Outcome::Accepted(key))
+    }
+
+    fn send(&self, outcome: Outcome) -> Delivered {
+        match &self.sink {
+            Some(sink) => sink(outcome),
             None => Delivered::NobodyAsked,
         }
     }
@@ -38,7 +77,7 @@ impl Reply {
 
 impl std::fmt::Debug for Reply {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let face = if self.0.is_some() {
+        let face = if self.sink.is_some() {
             "Reply(a peer)"
         } else {
             "Reply(nowhere)"

@@ -125,6 +125,6 @@ export function rowsLookOf(state: RowsState, hands: RowsHands): RowsLook {
 
 function endOf(entry: Entry, lang: Lang): RowLook["end"] {
   if (entry.why !== undefined) return { kind: "hint", text: say(lang, entry.why) };
-  if (entry.action !== undefined) return { kind: "chord", action: entry.action };
+  if (entry.keyAction !== undefined) return { kind: "chord", action: entry.keyAction };
   return { kind: "hint", text: entry.hint };
 }

@@ -10,7 +10,7 @@ use crate::sheet::{self, Reading};
 use crate::theme;
 use crate::walk;
 
-const SCAN_EXTS: [&str; 4] = ["svelte", "ts", "css", "html"];
+const SCAN_EXTS: [&str; 4] = ["ts", "tsx", "css", "html"];
 
 const NUMERIC_FUNCTIONS: [&str; 2] = ["linear(", "steps("];
 
@@ -254,8 +254,7 @@ mod tests {
         let written = [
             (
                 "RefRain/src/theme.css",
-                "@import \"tailwindcss\";
-@import \"./theme/tokens-motion.css\";
+                "@import \"./theme/tokens-motion.css\";
 ",
             ),
             (
@@ -266,7 +265,7 @@ mod tests {
 ",
             ),
             (
-                "RefRain/src/views/panel.svelte",
+                "RefRain/src/views/panel.tsx",
                 "<div style=\"transition: x 1s cubic-bezier(0, 0, 0.1, 1)\"></div>
 ",
             ),
@@ -283,7 +282,7 @@ mod tests {
                 .iter()
                 .map(|v| v.location.as_str())
                 .collect::<Vec<_>>(),
-            ["RefRain/src/views/panel.svelte:1"]
+            ["RefRain/src/views/panel.tsx:1"]
         );
         std::fs::remove_dir_all(&root).unwrap();
     }
@@ -334,11 +333,14 @@ mod tests {
         let _ = std::fs::remove_dir_all(&root);
         let written = [
             (
-                "RefRain/src/views/panel.svelte",
+                "RefRain/src/views/panel.tsx",
                 "<div class=\"transition-opacity motion-reduce:transition-none\"></div>
 <p class=\"still:transition-none\"></p>
-<style>
-  .a { transition: opacity 200ms; }
+",
+            ),
+            (
+                "RefRain/src/views/panel.css",
+                "  .a { transition: opacity 200ms; }
   .b { transition: opacity var(--transition-duration-short) var(--ease-arrive); }
   @keyframes x {}
   .c {
@@ -346,7 +348,6 @@ mod tests {
       1.5s both;
   }
   .d { transition-duration: .2s; transition-property: opacity; }
-</style>
 ",
             ),
             (
@@ -356,7 +357,7 @@ mod tests {
 ",
             ),
             (
-                "RefRain/swap/views/parts/x.look.svelte",
+                "RefRain/swap/views/parts/x.look.solid.tsx",
                 "<div class=\"motion-safe:duration-short\"></div>
 ",
             ),
@@ -374,13 +375,13 @@ mod tests {
                 .map(|v| v.location.as_str())
                 .collect::<Vec<_>>(),
             [
-                "RefRain/src/views/panel.svelte:1",
-                "RefRain/src/views/panel.svelte:4",
-                "RefRain/src/views/panel.svelte:6",
-                "RefRain/src/views/panel.svelte:9",
-                "RefRain/src/views/panel.svelte:11",
+                "RefRain/src/views/panel.css:1",
+                "RefRain/src/views/panel.css:3",
+                "RefRain/src/views/panel.css:6",
+                "RefRain/src/views/panel.css:8",
+                "RefRain/src/views/panel.tsx:1",
                 "RefRain/src/views/plain.css:1",
-                "RefRain/swap/views/parts/x.look.svelte:1",
+                "RefRain/swap/views/parts/x.look.solid.tsx:1",
             ]
         );
         std::fs::remove_dir_all(&root).unwrap();

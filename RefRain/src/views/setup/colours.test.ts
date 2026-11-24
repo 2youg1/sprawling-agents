@@ -3,19 +3,15 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The colour page's logic: which tokens it offers, how an override is
-// worn and taken off, and the legibility it warns about. The page and
-// the shell run in a browser; these run on fakes of the two surfaces
-// the logic touches, the root's inline style and one style element.
-
 import { describe, expect, test } from "bun:test";
-import { get } from "svelte/store";
+import { get } from "../../core/store";
 
+import { apcaLc, apcaOn, type Rgba } from "../../core/apca";
+import vectors from "../../theme/apca-vectors.json";
 import { loadPreferences } from "../../core/prefs";
 import { BUILT_IN_THEME } from "../../core/theme_override";
 import { memory } from "../../core/rows";
 import {
-  apcaLc,
   colourTokens,
   shortfalls,
   textClaims,
@@ -105,6 +101,30 @@ describe("wearing an override", () => {
 });
 
 describe("legibility", () => {
+  test("APCA matches shared signed sRGB reference observations", () => {
+    for (const { name, text, surface, backdrop, lc } of vectors) {
+      const [tr, tg, tb, ta] = text;
+      const [sr, sg, sb, sa] = surface;
+      const [br, bg, bb] = backdrop;
+      if (
+        tr === undefined ||
+        tg === undefined ||
+        tb === undefined ||
+        ta === undefined ||
+        sr === undefined ||
+        sg === undefined ||
+        sb === undefined ||
+        sa === undefined ||
+        br === undefined ||
+        bg === undefined ||
+        bb === undefined
+      ) {
+        expect.unreachable(name);
+      }
+      expect(apcaOn([tr, tg, tb, ta], [sr, sg, sb, sa], [br, bg, bb]), name).toBeCloseTo(lc, 6);
+    }
+  });
+
   test("APCA reads the published reference pairs", () => {
     expect(apcaLc([0x88, 0x88, 0x88], [0xff, 0xff, 0xff])).toBeCloseTo(63.06, 1);
     expect(apcaLc([0, 0, 0], [0xff, 0xff, 0xff])).toBeCloseTo(106.04, 1);
@@ -129,10 +149,10 @@ describe("legibility", () => {
         { token: "--color-text-quiet", tier: 75 },
       ],
     });
-    const drawn: Record<string, readonly [number, number, number]> = {
-      "--color-g2": [0x22, 0x26, 0x2c],
-      "--color-text": [0xf0, 0xf2, 0xf5],
-      "--color-text-quiet": [0x55, 0x58, 0x5c],
+    const drawn: Record<string, Rgba> = {
+      "--color-g2": [0x22, 0x26, 0x2c, 1],
+      "--color-text": [0xf0, 0xf2, 0xf5, 1],
+      "--color-text-quiet": [0x55, 0x58, 0x5c, 1],
     };
     expect(shortfalls(claims, (token) => drawn[token] ?? null).map((each) => each.token)).toEqual([
       "--color-text-quiet",

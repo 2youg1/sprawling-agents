@@ -1,0 +1,33 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+.inspect-patch {
+  line-height: calc(3 * var(--spacing-baseline));
+}
+
+.inspect-patch .lead {
+  padding-left: calc(9 * var(--spacing-baseline));
+}
+
+.inspect-patch .code {
+  grid-template-columns: calc(7 * var(--spacing-baseline)) calc(2 * var(--spacing-baseline)) auto;
+}
+
+.inspect-patch .chosen {
+  box-shadow: inset var(--spacing-hair) 0 0 var(--color-accent);
+}
+
+.inspect-patch .number {
+  transition: color var(--transition-duration-short) var(--ease-leave);
+}
+.inspect-patch .number:hover {
+  transition-timing-function: var(--ease-arrive);
+}
+
+@media (forced-colors: active) {
+  .inspect-patch .chosen {
+    border-left: var(--spacing-hair) solid Highlight;
+  }
+}

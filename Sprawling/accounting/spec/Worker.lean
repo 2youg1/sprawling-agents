@@ -151,6 +151,11 @@ impl CommandDesk {
 `dispatch_into_lane` 拒绝时，`hand_over_at_call` 照旧写那一行 `Refuse` 级诊断，然后 `deliver_unstarted` 把子房间的交代（房间、「没有开起来」、拒绝与恢复语）存进内容库，来源记作父 run 与子房间，由它造 `Stopped` 回程，写在父 run 名下：信的 id 是 `handback-<父 run>-<n>`，`n` 是这次请求在父 run 的 `DelegateDesk` 上的序号（从 0 起），同一 run 两次派往同一个房间也得两个 id，重放得同一个 id；写信的是子房间的地址。之后与 `deliver_sent` 同一条路：进房间表、以子房间为说话者为父房间敲门（父 run 还在跑时敲门推迟，父 run 读过就跳过），写 `signal_landed`。投递本身失败也只写诊断，不打断同一批的其余请求。理由：子 run 从没有过 run id，信只能写在叫它的那个 run 名下；序号来自桌子，桌子是这些请求的唯一记录。被否决的做法：以时钟读数或内容摘要作 id：同一毫秒、同一拒绝的两次请求会得同一个 id，第二封被房间的去重丢掉。图在 handback 落地时派出的后继节点（`dispatching::handback` 的 `hand_down_what_is_ready`）不走这条路：它的拒绝今天仍是那次落地的错误，父房间收不到回程；要接上它，先为这样的节点定一个不靠桌子序号的 id。
 -/
 
+/-! ### 选区图像与会话提交
+
+`accounting::worker::dispatching::images` 验证 PNG 编码与尺寸并将裁图原始字节写入对应 run 的 CAS。派遣使用实际路由模型的输入能力。Steer 依据 `run_started.image_input` 与指定 run 的房间验证图片，收到该 run 的 `steer_received.idem` 后才回执。run 结束时未被消费的 Steer 带原请求键拒绝。同一键核对第一结果。历史续聊以房间与起始 seq 选择原会话、从其尾部恢复对话，写入 `session_began`，不会打开新段或读当前段的 Handoff。
+-/
+
 /-! ### 接口仍写在 sprawling 规格里的模块
 
 下面这些模块的接口与取舍今天写在 `Sprawling/app/Spec.lean` 的这几节里，按标签列出；`architecture.toml` 里它们的行指向本分部，这张表把读者带到那一节。它们搬进本 crate 的规格是 D15 记下的下一步。

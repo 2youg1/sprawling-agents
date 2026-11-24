@@ -12,7 +12,7 @@ use super::collaboration::CollaborationFold;
 use super::{Entrance, Governance, SessionOrigins, Standing};
 use crate::views::snapshot::start::SnapshotFold;
 
-const STANDING_FOLD_RULES: &str = "standing-fold-e2ee39bedd7b050b";
+const STANDING_FOLD_RULES: &str = "standing-fold-07a348ed59a5bd48";
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub(super) struct StandingFolds {
@@ -82,7 +82,7 @@ impl SnapshotFold for StandingFolds {
         self.governance
             .absorb(record.kind(), record.run(), record.addr(), record.data())?;
         self.collaboration.absorb(record)?;
-        self.entrance.absorb(record.data());
+        self.entrance.absorb(record.kind(), record.data());
         self.origins
             .absorb(record.kind(), record.run(), record.addr(), record.data())
     }

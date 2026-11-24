@@ -27,6 +27,8 @@ fn a_building_whose_rules_do_not_parse_stops_the_run_rather_than_guessing() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -75,6 +77,8 @@ fn a_run_is_told_who_shares_its_building_and_what_to_bring_them() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -147,6 +151,8 @@ fn a_signal_one_run_sends_is_read_by_the_run_that_pulls_it() {
                     b"dispatch",
                 ),
                 session: None,
+                resume: None,
+                images: Vec::new(),
                 effort: None,
                 model: None,
             })
@@ -219,6 +225,8 @@ fn a_resident_of_the_hall_is_given_no_way_to_build() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -316,6 +324,8 @@ fn a_note_beside_the_hall(city: &std::path::Path) -> git2::Repository {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })

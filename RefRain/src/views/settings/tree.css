@@ -1,0 +1,19 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+.settings-tree-chevron {
+  transition: rotate var(--transition-duration-short) var(--ease-leave);
+}
+
+[aria-expanded="true"] > .settings-tree-chevron {
+  rotate: 90deg;
+  transition-timing-function: var(--ease-arrive);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-tree-chevron {
+    transition: none;
+  }
+}

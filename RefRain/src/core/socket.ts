@@ -3,8 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import { writable } from "svelte/store";
-import type { Readable } from "svelte/store";
+import { Result } from "effect";
+import { writable } from "./store";
+import type { Readable } from "./store";
 
 import type { Lang } from "./lang";
 import { createAsking } from "./asking";
@@ -15,7 +16,7 @@ import type { Watching } from "./watching";
 import type { Belief } from "./belief";
 import { NO_TAIL, appended } from "./live_output";
 import type { Tail } from "./live_output";
-import { decodeFrame, encodeFrame } from "./frames";
+import { encodeFrame, inspectFrame } from "./frames";
 import { createUnsent, isSpeech } from "./unsent";
 import { langOf, say } from "./lang";
 import { createGapWalk } from "./gap_walk";
@@ -31,8 +32,8 @@ import {
 import { closeCity } from "./access";
 import type { Link, LinkAction, LinkEvent, LinkState } from "./link";
 import type { Dial, Line } from "./line";
-import { AskId } from "../wire";
-import type { CloseMode, Command, Query, RunId, ServerFrame } from "../wire";
+import { AskId, IdemKey } from "../wire";
+import type { AxError, CloseMode, Command, Query, RunId, ServerFrame } from "../wire";
 
 export interface Connection {
   readonly state: Readable<LinkState>;
@@ -42,6 +43,7 @@ export interface Connection {
   readonly live: Readable<Readonly<Partial<Record<RunId, Tail>>>>;
 
   readonly unsent: Readable<number>;
+  readonly receipts: Readable<ReadonlyMap<IdemKey, CommandReceipt>>;
 
   readonly command: (command: Command) => boolean;
   readonly retry: () => void;
@@ -54,6 +56,11 @@ export interface Connection {
   readonly markNoticesSeen: () => void;
   readonly monitor: Pick<Watching, "samples" | "watch" | "watchSummary" | "setBeat">;
 }
+
+export type CommandReceipt =
+  { readonly kind: "accepted" } | { readonly kind: "refused"; readonly error: AxError };
+
+const RECEIPTS_KEPT = 128;
 
 export function bearing(token: string | null): Readonly<Record<string, string>> {
   return token === null ? {} : { authorization: `Bearer ${token}` };
@@ -73,11 +80,21 @@ export function openConnection(dial: Dial, lang: Lang): Connection {
   const unsent = createUnsent();
   const live = writable<Readonly<Partial<Record<RunId, Tail>>>>({});
   const closing = writable<CloseMode | null>(null);
+  const receipts = writable<ReadonlyMap<IdemKey, CommandReceipt>>(new Map());
+
+  function receipt(key: IdemKey, next: CommandReceipt): void {
+    receipts.update((held) => {
+      if (held.has(key)) return held;
+      const entries = [...held, [key, next] as const];
+      return new Map(entries.slice(-RECEIPTS_KEPT));
+    });
+  }
 
   const queue: ServerFrame[] = [];
   let scheduled = false;
 
   let lastAsk = 0;
+  let frameNumber = 0;
 
   let reconnect: ReturnType<typeof setTimeout> | null = null;
 
@@ -127,8 +144,20 @@ export function openConnection(dial: Dial, lang: Lang): Connection {
         }
         asking.invalidate(action.event);
         if (bad !== null) store.refused(unreadableRecord(lang, bad));
+        const { kind, data } = action.event;
+        if (
+          bad === null &&
+          (kind === "run_started" || kind === "steer_received") &&
+          typeof data.idem === "string"
+        ) {
+          const key = IdemKey.make(data.idem, { disableChecks: true });
+          receipt(key, { kind: "accepted" });
+        }
         return;
       }
+      case "accepted":
+        receipt(action.request, { kind: "accepted" });
+        return;
       case "answered": {
         const { ask_id, as_of, outcome } = action.answered;
         if ("refusal" in outcome) store.refused(outcome.refusal);
@@ -167,6 +196,9 @@ export function openConnection(dial: Dial, lang: Lang): Connection {
         }, action.ms);
         return;
       case "report":
+        if (action.error.request != null) {
+          receipt(action.error.request, { kind: "refused", error: action.error });
+        }
         store.refused(action.error);
         return;
       case "close":
@@ -204,6 +236,7 @@ export function openConnection(dial: Dial, lang: Lang): Connection {
   }
 
   function open(): void {
+    frameNumber = 0;
     const mine = () => line === opened;
     const opened: Line = dial({
       opened: (credential) => {
@@ -222,11 +255,13 @@ export function openConnection(dial: Dial, lang: Lang): Connection {
   }
 
   function heard(text: string): void {
-    const frame = decodeFrame(text);
-    if (frame === null) {
-      step({ kind: "undecodable" });
+    frameNumber += 1;
+    const decoded = inspectFrame(text);
+    if (Result.isFailure(decoded)) {
+      step({ kind: "undecodable", frame: frameNumber, failure: decoded.failure });
       return;
     }
+    const frame = decoded.success;
 
     if ("welcome" in frame || "refusal" in frame) {
       store.batch(() => {
@@ -268,6 +303,7 @@ export function openConnection(dial: Dial, lang: Lang): Connection {
     belief: store.belief,
     asking,
     unsent: unsent.count,
+    receipts,
     live,
     command(command) {
       switch (link.state.kind) {

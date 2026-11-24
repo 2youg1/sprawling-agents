@@ -3,21 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { Snippet } from "svelte";
-
 export type DisclosureLayout = "plan" | "commit" | "change";
 
 export interface DisclosureWire {
   readonly type: "button";
   readonly "aria-expanded": boolean;
   readonly onclick: () => void;
-}
-
-export interface DisclosureLook {
-  readonly layout: DisclosureLayout;
-  readonly open: boolean;
-  readonly wire: DisclosureWire;
-  readonly cells: Snippet;
 }
 
 export function disclosureWire(open: boolean, toggle: () => void): DisclosureWire {

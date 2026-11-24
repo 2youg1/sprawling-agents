@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The web search card's wiring, driven the way its seat drives it and
-// with no look at all: what each press sends as the city's whole
-// `[search]`, and how a service's account editor files its keys and
-// sends its list (client D93, D94).
-
 import { describe, expect, test } from "bun:test";
 
 import { enrol } from "../../../core/enrol";
@@ -103,6 +98,29 @@ describe("the choice of service", () => {
     ]);
   });
 
+  test("checks the city value and accepts an equivalent response regardless of object property order", () => {
+    const { editor, hands } = rig();
+    wiring.choose(editor, hands, "custom");
+    typed(editor, "brave", { count: "count" });
+    wiring.save(editor, hands);
+    wiring.settle(editor, { ...SETTLED, default_url: "https://elsewhere.invalid" });
+    expect(editor.sent).not.toBeNull();
+    const supplier = {
+      remote: "brave_search",
+      url: "https://mcp.brave.invalid/mcp",
+      query_field: "query",
+      id: label("brave"),
+      count_field: "count",
+      objective_field: null,
+      accounts: [],
+    };
+    wiring.settle(editor, {
+      ...SETTLED,
+      city: { custom: { suppliers: [supplier], selected: label("brave") } },
+    });
+    expect(editor.sent).toBeNull();
+  });
+
   test("puts the last custom value back after a turn through off", () => {
     const listed = custom("brave", service("brave"));
     const { editor, hands, values } = rig({
@@ -125,7 +143,12 @@ describe("the list of services", () => {
       accounts: [{ id: label("main"), reference: "secret:search/brave.main", header: "x-key" }],
     }),
   );
-  const settled: SettledSearch = { ...SETTLED, city: listed, configuration: listed, from: "city" };
+  const settled: SettledSearch = {
+    ...SETTLED,
+    city: listed,
+    configuration: listed,
+    from: "city",
+  };
 
   test("selects another service with the list as it stands", () => {
     const { editor, hands, values } = rig(settled);
@@ -244,7 +267,12 @@ describe("the list of services", () => {
 
 describe("a service's account editor", () => {
   const listed = custom("brave", service("tavily"), service("brave"));
-  const settled: SettledSearch = { ...SETTLED, city: listed, configuration: listed, from: "city" };
+  const settled: SettledSearch = {
+    ...SETTLED,
+    city: listed,
+    configuration: listed,
+    from: "city",
+  };
 
   test("files a key under the search realm and sends the whole [search] with only this service's accounts replaced", async () => {
     const { editor: card, hands: cardHands } = rig(settled);

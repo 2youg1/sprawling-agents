@@ -1,0 +1,28 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+import { For } from "solid-js";
+import type { SkeletonLook, Width } from "./skeleton";
+
+export default function SkeletonLookView(look: SkeletonLook) {
+  const WIDTH: Record<Width, string> = {
+    whole: "w-full",
+    "five-sixths": "w-5/6",
+    "two-thirds": "w-2/3",
+    "three-quarters": "w-3/4",
+  };
+  return (
+    <div {...look.block} class="flex w-full flex-col gap-snug">
+      <For each={look.bars} keyed={(bar) => bar.slot}>
+        {(bar) => (
+          <div
+            {...bar().wire}
+            class={["shimmer rounded-control", look.tall ? "h-step" : "h-base", WIDTH[bar().width]]}
+          />
+        )}
+      </For>
+    </div>
+  );
+}

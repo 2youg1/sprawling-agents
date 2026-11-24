@@ -3,8 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import { get } from "svelte/store";
+import { get } from "../../core/store";
 
+import { apcaLc, over, type Rgb, type Rgba } from "../../core/apca";
 import type { PreferenceDoor } from "../../core/prefs";
 import type { Theme } from "../../core/theme_override";
 
@@ -28,8 +29,6 @@ export interface Stage {
   readonly style: Inline;
   readonly sheet: { textContent: string | null };
 }
-
-export type Rgb = readonly [number, number, number];
 
 export interface Claim {
   readonly token: string;
@@ -89,7 +88,20 @@ export function documentStage(document: Document): Stage {
   const found = document.getElementById(SHEET_ID);
   const sheet = found ?? document.head.appendChild(document.createElement("style"));
   sheet.id = SHEET_ID;
-  return { style: document.documentElement.style, sheet };
+  const inline = document.documentElement.style;
+  return {
+    sheet,
+    style: {
+      get length() {
+        return inline.length;
+      },
+      item: (index) => inline.item(index),
+      setProperty: (name, value) => {
+        inline.setProperty(name, cssOklch(value));
+      },
+      removeProperty: (name) => inline.removeProperty(name),
+    },
+  };
 }
 
 export function textClaims(tokens: readonly string[], read: (name: string) => string): Claims {
@@ -108,57 +120,54 @@ export function textClaims(tokens: readonly string[], read: (name: string) => st
   };
 }
 
-export function shortfalls(judged: Claims, resolve: (token: string) => Rgb | null): Shortfall[] {
+export type Reading =
+  | { readonly kind: "unmeasured"; readonly token: string }
+  | ({ readonly kind: "shortfall" } & Shortfall);
+
+export function shortfalls(judged: Claims, resolve: (token: string) => Rgba | null): Reading[] {
   const surface = judged.surface === null ? null : resolve(judged.surface);
-  if (surface === null) return [];
-  return judged.claims.flatMap((claim): Shortfall[] => {
+  const page = resolve("--color-page");
+  const backdrop: Rgb | null = page?.[3] === 1 ? [page[0], page[1], page[2]] : null;
+  const background =
+    surface === null
+      ? null
+      : surface[3] === 1
+        ? ([surface[0], surface[1], surface[2]] as const)
+        : backdrop === null
+          ? null
+          : over(surface, backdrop);
+  return judged.claims.flatMap((claim): Reading[] => {
     const text = resolve(claim.token);
-    if (text === null) return [];
-    const reached = apcaLc(text, surface);
-    return reached + judged.slack < claim.tier
-      ? [{ token: claim.token, claimed: claim.tier, reached }]
+    if (text === null || background === null) {
+      return [{ kind: "unmeasured", token: claim.token }];
+    }
+    const reached = apcaLc(over(text, background), background);
+    return Math.abs(reached) + judged.slack < claim.tier
+      ? [{ kind: "shortfall", token: claim.token, claimed: claim.tier, reached }]
       : [];
   });
 }
 
-export function apcaLc(text: Rgb, surface: Rgb): number {
-  const textY = softClamp(luminance(text));
-  const surfaceY = softClamp(luminance(surface));
-  if (Math.abs(surfaceY - textY) < 0.0005) return 0;
-  if (surfaceY > textY) {
-    const sapc = (surfaceY ** 0.56 - textY ** 0.57) * 1.14;
-    return sapc < 0.001 ? 0 : (sapc - 0.027) * 100;
-  }
-  const sapc = (surfaceY ** 0.65 - textY ** 0.62) * 1.14;
-  return sapc > -0.001 ? 0 : Math.abs(sapc + 0.027) * 100;
-}
-
-function luminance([red, green, blue]: Rgb): number {
-  return (
-    0.2126729 * (red / 255) ** 2.4 +
-    0.7151522 * (green / 255) ** 2.4 +
-    0.072175 * (blue / 255) ** 2.4
-  );
-}
-
-function softClamp(y: number): number {
-  return y > 0.022 ? y : y + (0.022 - y) ** 1.414;
-}
-
-export function drawnRgb(root: HTMLElement): (token: string) => Rgb | null {
+export function drawnRgb(root: HTMLElement): (token: string) => Rgba | null {
   const pen = root.ownerDocument
     .createElement("canvas")
-    .getContext("2d", { willReadFrequently: true });
+    .getContext("2d", { colorSpace: "srgb", willReadFrequently: true });
   const computed = window.getComputedStyle(root);
   return (token) => {
     const value = computed.getPropertyValue(token).trim();
     if (pen === null || value === "" || !CSS.supports("color", value)) return null;
     pen.clearRect(0, 0, 1, 1);
-    pen.fillStyle = value;
+    pen.fillStyle = "transparent";
+    pen.fillStyle = cssOklch(value);
     pen.fillRect(0, 0, 1, 1);
-    const [red, green, blue] = pen.getImageData(0, 0, 1, 1).data;
-    return red === undefined || green === undefined || blue === undefined
+    const [red, green, blue, alpha] = pen.getImageData(0, 0, 1, 1).data;
+    return red === undefined || green === undefined || blue === undefined || alpha === undefined
       ? null
-      : [red, green, blue];
+      : [red, green, blue, alpha / 255];
   };
+}
+
+function cssOklch(value: string): string {
+  const relative = `oklch(from ${value} l c h / alpha)`;
+  return typeof CSS !== "undefined" && CSS.supports("color", relative) ? relative : value;
 }

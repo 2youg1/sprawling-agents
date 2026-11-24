@@ -17,23 +17,25 @@ export interface MadeKey {
 const BASE = "sprawling-local";
 const STORE = "device";
 const ONLY = "this";
+const PENDING = "pairing";
+const STORAGE_TIMEOUT_MS = 4_000;
 
 export async function makeKey(): Promise<MadeKey | null> {
-  const pair = await crypto.subtle
-    .generateKey({ name: "Ed25519" }, false, ["sign"])
-    .catch(() => null);
+  const subtle = globalThis.crypto?.subtle;
+  if (subtle === undefined) return null;
+  const pair = await subtle.generateKey({ name: "Ed25519" }, false, ["sign"]).catch(() => null);
   if (pair === null || !("privateKey" in pair)) return null;
-  const raw = await crypto.subtle.exportKey("raw", pair.publicKey).catch(() => null);
+  const raw = await subtle.exportKey("raw", pair.publicKey).catch(() => null);
   return raw === null ? null : { key: pair.privateKey, public: hex(new Uint8Array(raw)) };
 }
 
 export async function signed(
-  device: LocalDevice,
+  device: Pick<LocalDevice, "key">,
   message: Uint8Array<ArrayBuffer>,
 ): Promise<string | null> {
-  const signature = await crypto.subtle
-    .sign({ name: "Ed25519" }, device.key, message)
-    .catch(() => null);
+  const subtle = globalThis.crypto?.subtle;
+  if (subtle === undefined) return null;
+  const signature = await subtle.sign({ name: "Ed25519" }, device.key, message).catch(() => null);
   return signature === null ? null : hex(new Uint8Array(signature));
 }
 
@@ -49,65 +51,110 @@ function opened(): Promise<IDBDatabase | null> {
   if (typeof indexedDB === "undefined") return Promise.resolve(null);
   return new Promise((settle) => {
     const asked = indexedDB.open(BASE, 1);
+    let active = true;
+    const deadline = setTimeout(() => finish(null), STORAGE_TIMEOUT_MS);
+    function finish(base: IDBDatabase | null): void {
+      if (!active) {
+        base?.close();
+        return;
+      }
+      active = false;
+      clearTimeout(deadline);
+      settle(base);
+    }
     asked.onupgradeneeded = () => {
       asked.result.createObjectStore(STORE);
     };
     asked.onsuccess = () => {
-      settle(asked.result);
+      finish(asked.result);
     };
     asked.onerror = () => {
-      settle(null);
+      finish(null);
     };
     asked.onblocked = () => {
-      settle(null);
+      finish(null);
     };
   });
 }
 
 function done<T>(request: IDBRequest<T>): Promise<T | null> {
   return new Promise((settle) => {
+    const deadline = setTimeout(() => settle(null), STORAGE_TIMEOUT_MS);
     request.onsuccess = () => {
+      clearTimeout(deadline);
       settle(request.result);
     };
     request.onerror = () => {
+      clearTimeout(deadline);
       settle(null);
     };
   });
 }
 
-export async function kept(): Promise<LocalDevice | null> {
+async function heldAt(slot: string): Promise<unknown> {
   const base = await opened();
   if (base === null) return null;
-  const found = await done<unknown>(base.transaction(STORE).objectStore(STORE).get(ONLY));
+  const found = await done<unknown>(base.transaction(STORE).objectStore(STORE).get(slot));
   base.close();
+  return found;
+}
+
+async function writeAt(slot: string, value: LocalDevice | MadeKey | null): Promise<boolean> {
+  const base = await opened();
+  if (base === null) return false;
+  const transaction = base.transaction(STORE, "readwrite");
+  const store = transaction.objectStore(STORE);
+  const written = new Promise<boolean>((settle) => {
+    const deadline = setTimeout(() => {
+      settle(false);
+      void Promise.resolve()
+        .then(() => transaction.abort())
+        .catch(() => undefined);
+    }, STORAGE_TIMEOUT_MS);
+    function finish(result: boolean): void {
+      clearTimeout(deadline);
+      settle(result);
+    }
+    transaction.oncomplete = () => finish(true);
+    transaction.onabort = () => finish(false);
+  });
+  if (value === null) store.delete(slot);
+  else store.put(value, slot);
+  const kept = await written;
+  base.close();
+  return kept;
+}
+
+export async function kept(): Promise<LocalDevice | null> {
+  const found = await heldAt(ONLY);
   return isDevice(found) ? found : null;
 }
 
-export async function keep(device: LocalDevice): Promise<boolean> {
-  const base = await opened();
-  if (base === null) return false;
-  const written = await done(
-    base.transaction(STORE, "readwrite").objectStore(STORE).put(device, ONLY),
-  );
-  base.close();
-  return written !== null;
+export function keep(device: LocalDevice): Promise<boolean> {
+  return writeAt(ONLY, device);
 }
 
-export async function forget(): Promise<boolean> {
-  const base = await opened();
-  if (base === null) return false;
-  const removed = await done(base.transaction(STORE, "readwrite").objectStore(STORE).delete(ONLY));
-  base.close();
-  return removed !== null;
+export function forget(): Promise<boolean> {
+  return writeAt(ONLY, null);
+}
+
+export async function pendingPairing(): Promise<MadeKey | null> {
+  const found = await heldAt(PENDING);
+  return hasKey(found) && "public" in found && typeof found.public === "string"
+    ? { key: found.key, public: found.public }
+    : null;
+}
+
+export function keepPairing(key: MadeKey | null): Promise<boolean> {
+  return writeAt(PENDING, key);
+}
+
+function hasKey(value: unknown): value is { readonly key: CryptoKey } {
+  return (
+    typeof value === "object" && value !== null && "key" in value && value.key instanceof CryptoKey
+  );
 }
 
 function isDevice(value: unknown): value is LocalDevice {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "id" in value &&
-    typeof value.id === "string" &&
-    "key" in value &&
-    value.key instanceof CryptoKey
-  );
+  return hasKey(value) && "id" in value && typeof value.id === "string";
 }

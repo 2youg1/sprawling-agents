@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The monitor's wiring, read without its look: what each toggle says to
-// a screen reader and what pressing it asks of the seat, which keys and
-// gestures in a pane pause following, and which `F` takes it up again.
-
 import { describe, expect, test } from "bun:test";
 
 import { lookOf, resumes } from "./monitor";
@@ -23,7 +19,6 @@ function asked(): Asked {
   const follows: Following[] = [];
   const folds: Pane[] = [];
   const jumps: string[] = [];
-  const hold = (): void => undefined;
   return {
     follows,
     folds,
@@ -32,8 +27,6 @@ function asked(): Asked {
       follow: (next) => follows.push(next),
       fold: (next) => folds.push(next),
       jump: (path) => jumps.push(path),
-      holdCode: hold,
-      holdRecord: hold,
     },
   };
 }

@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import { derived, get, writable } from "svelte/store";
-import type { Readable } from "svelte/store";
+import { derived, get, writable } from "./store";
+import type { Readable } from "./store";
 
 import type { Key } from "./lang";
 import { preferences } from "./prefs";
@@ -23,6 +23,8 @@ export const ACTIONS = [
   "palette",
   "session.switch",
   "tier.cycle",
+  "workspace.navigation",
+  "workspace.subject",
   "mailbox",
   "inspect",
   "help",
@@ -76,6 +78,8 @@ export const DEFAULTS: Readonly<Record<Action, Bound>> = {
   palette: accel("/"),
   "session.switch": accelShift("u"),
   "tier.cycle": accel("\\"),
+  "workspace.navigation": null,
+  "workspace.subject": null,
   mailbox: null,
   inspect: null,
   help: null,
@@ -99,7 +103,9 @@ export const LABELS: Readonly<Record<Action, Key>> = {
   "go.waiting": "wait_title",
   palette: "nav_palette",
   "session.switch": "world_session_switcher",
-  "tier.cycle": "edge_layers",
+  "tier.cycle": "appearance_tier",
+  "workspace.navigation": "shell_navigation",
+  "workspace.subject": "shell_file_mode",
   mailbox: "edge_mailbox",
   inspect: "keys_inspect",
   help: "keys_help",

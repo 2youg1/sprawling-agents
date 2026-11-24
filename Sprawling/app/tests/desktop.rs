@@ -100,6 +100,8 @@ fn a_building_given_the_desktop_is_offered_its_six_tools_from_this_binary() {
         policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: idem(b"dispatch"),
         session: Some(kernel::SessionName::parse("s1").unwrap()),
+        resume: None,
+        images: Vec::new(),
         effort: None,
         model: None,
     });
@@ -113,7 +115,6 @@ fn a_building_given_the_desktop_is_offered_its_six_tools_from_this_binary() {
 }
 
 fn this_binary() -> std::io::Result<PathBuf> {
-    // boundary-ok: the city starts this executable as its own child in production, so the test must hand it a real one; every check still enters through RunWorker
     Ok(PathBuf::from(env!("CARGO_BIN_EXE_sprawling")))
 }
 

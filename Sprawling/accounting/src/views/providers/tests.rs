@@ -229,3 +229,33 @@ fn each_rung_travels_under_the_word_the_ledger_records() {
         sources.map(|source| serde_json::json!(source.as_str()))
     );
 }
+
+#[test]
+fn city_settings_read_back_the_city_values_without_a_building_override() {
+    let dir = tempfile::tempdir().unwrap();
+    let addr = Address::parse("lab/room1").unwrap();
+    let answer = config_answer(dir.path(), &addr, None).unwrap();
+    assert_eq!(answer.city_effort, None);
+    assert_eq!(answer.city_keep_warm, None);
+    city::write_city_setting(dir.path(), city::CitySetting::Effort(kernel::Effort::High)).unwrap();
+    city::write_city_setting(
+        dir.path(),
+        city::CitySetting::KeepWarm(kernel::KeepWarm::FiveMinute),
+    )
+    .unwrap();
+    let building = city::config_path(dir.path(), &addr, city::Layer::Building).unwrap();
+    std::fs::create_dir_all(building.parent().unwrap()).unwrap();
+    std::fs::write(
+        &building,
+        r#"[model]
+effort = "low"
+[cache]
+keep_warm = "off"
+"#,
+    )
+    .unwrap();
+    let answer = config_answer(dir.path(), &addr, None).unwrap();
+    assert_eq!(answer.effort.unwrap().effort, kernel::Effort::Low);
+    assert_eq!(answer.city_effort, Some(kernel::Effort::High));
+    assert_eq!(answer.city_keep_warm, Some(kernel::KeepWarm::FiveMinute));
+}

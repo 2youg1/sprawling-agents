@@ -26,7 +26,7 @@ impl PolicyReader { pub fn now(&self) -> kernel::RunPolicy; }  // 每次写时�
 // runtime::run
 pub struct RunPlan { /* … */ pub run_policy: PolicyCell, /* … */ }  // 开头的策略写进 run_started；驱动循环在 BeforeWave 取用
 // runtime::turn::boundary
-pub enum Interrupt { None, Cancel, Steer { source: String, text: String },
+pub enum Interrupt { None, Cancel, Steer { speaker: Speaker, text: String, pictures: Vec<ImageRef>, request: Option<IdemKey> },
                      Policy { policy: kernel::RunPolicy } }  // 一条 run_policy_changed 到了这个 run 的房间
 ```
 

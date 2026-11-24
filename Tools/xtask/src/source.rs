@@ -61,7 +61,7 @@ pub(crate) fn length_files_in(
     )?;
     let page = root.join("RefRain");
     if page.is_dir() {
-        files.extend(walk::files_with_ext(&page, &["ts", "tsx", "svelte"])?);
+        files.extend(walk::files_with_ext(&page, &["ts", "tsx"])?);
     }
     Ok(selected(root, scope, files))
 }

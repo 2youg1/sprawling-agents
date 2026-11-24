@@ -271,6 +271,8 @@ pub(crate) fn dispatch(worker: &mut accounting::worker::RunWorker, session: &str
         policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: idem(session.as_bytes()),
         session: Some(kernel::SessionName::parse(session).unwrap()),
+        resume: None,
+        images: Vec::new(),
         effort: None,
         model: None,
     });

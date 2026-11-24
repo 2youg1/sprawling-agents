@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The palette's list as the listbox its box controls: sections named
-// by their headings, a verb this place cannot run kept and greyed with
-// its reason (ux 7-8), a page's row ending in its key's chord, and the
-// pointer and the click reported against the flat list the cursor walks.
-
 import { describe, expect, test } from "bun:test";
 
 import { say } from "../../core/lang";
@@ -93,7 +88,7 @@ describe("the palette's list", () => {
     const look = rowsLookOf(
       {
         listing: { kind: "places" },
-        shown: [halt, entry("city", { action: "go.city" })],
+        shown: [halt, entry("city", { keyAction: "go.city" })],
         cursor: 0,
         id: "l",
         lang: "en",

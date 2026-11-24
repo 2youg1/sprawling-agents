@@ -6,7 +6,7 @@
 /-!
 # wire::answer::release
 
-规定 `Sprawling/wire/src/answer/release.rs` 的帧，以及 `RefRain/src/views/release/answer.svelte`
+规定 `Sprawling/wire/src/answer/release.rs` 的帧，以及 `RefRain/src/views/release_view.tsx`
 手动选择更新命令时的性质。帧形状由 Rust 类型、schema hash 和 wire 合约检查守住；
 下面的选择模型证明候选限制在任意操作轨迹上保持，环境中的注册表 HTTP 与进程来源识别
 由 `Sprawling/app/src/release.rs` 的回环回归和真实安装验收检查，不属于该证明。

@@ -7,11 +7,15 @@ import type { Dial, Line } from "../line";
 import type { Credential } from "./entering";
 
 export function renewing(dial: Dial, credential: Credential, forgotten: () => void): Dial {
+  let initial = credential.current();
   return (hearing) => {
     let line: Line | null = null;
     let dropped = false;
     const gone = (): boolean => dropped;
-    void credential.renew().then((renewed) => {
+    const token = initial;
+    initial = null;
+    const ready = token === null ? credential.renew() : Promise.resolve("kept" as const);
+    void ready.then((renewed) => {
       if (gone()) return;
       if (renewed === "forgotten") {
         dropped = true;
@@ -22,7 +26,7 @@ export function renewing(dial: Dial, credential: Credential, forgotten: () => vo
       line = dial({
         ...hearing,
         opened: () => {
-          hearing.opened(credential.current());
+          hearing.opened(token ?? credential.current());
         },
       });
     });

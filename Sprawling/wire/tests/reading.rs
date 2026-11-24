@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a turn's reader makes of a `provider_degraded` line.
-//!
-//! The kind has two writers: a provider refusal the carrier table sends
-//! here, written as the error itself, and the vault's startup fallback to
-//! session memory. Only the first changed what a turn did.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -72,8 +66,10 @@ fn steered(source: &str) -> EventRecord {
             addr: None,
             kind: EventKind::SteerReceived,
             data: Payload::of(&kernel::event::record::SteerReceived {
+                pictures: Vec::new(),
                 source: source.to_owned(),
                 text: "wrap up".to_owned(),
+                idem: None,
             })
             .unwrap(),
             ig: false,
@@ -83,9 +79,6 @@ fn steered(source: &str) -> EventRecord {
     )
 }
 
-/// Who spoke a steer is read from the spellings the kernel defines for
-/// `steer_received.source` (`Sprawling/wire/spec/Reading.lean` D41): the
-/// city's own word is the city's, not a resident called `city`.
 #[test]
 fn a_steer_is_read_as_the_user_the_city_or_a_resident() {
     let spoken = |source: &str| {

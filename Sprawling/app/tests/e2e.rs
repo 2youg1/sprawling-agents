@@ -184,6 +184,8 @@ fn dispatch(worker: &mut RunWorker) -> Result<(), AxError> {
         policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"e2e-dispatch"),
         session: Some(kernel::SessionName::parse(SESSION)?),
+        resume: None,
+        images: Vec::new(),
         effort: None,
         model: None,
     })?;

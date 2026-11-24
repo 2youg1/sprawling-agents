@@ -51,6 +51,8 @@ pub(super) fn verb(read: &Arguments) -> ExitCode {
         policy: wire::RunPolicy::of(wire::Mode::Work),
         idem,
         session: None,
+        resume: None,
+        images: Vec::new(),
         effort: None,
         model: read.value("--model").map(str::to_owned),
     }));

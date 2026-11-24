@@ -1,0 +1,32 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+.refrain-segmented-slider {
+  width: calc(100% / var(--cells));
+  transform: translateX(calc(var(--held) * 100%));
+  transition: transform var(--transition-duration-short) var(--ease-arrive);
+}
+
+.refrain-segmented-cell {
+  transition:
+    color var(--transition-duration-short) var(--ease-leave),
+    scale var(--transition-duration-short) var(--ease-leave);
+}
+.refrain-segmented-cell:hover,
+.refrain-segmented-cell:active,
+.refrain-segmented-cell[data-control-keydown] {
+  transition-timing-function: var(--ease-arrive);
+}
+
+@media (forced-colors: active) {
+  .refrain-segmented-slider {
+    forced-color-adjust: none;
+    background-color: Highlight;
+  }
+  .refrain-segmented-cell[aria-checked="true"] {
+    forced-color-adjust: none;
+    color: HighlightText;
+  }
+}

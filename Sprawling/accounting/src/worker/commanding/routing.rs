@@ -109,27 +109,36 @@ impl RunWorker {
                 goal,
                 policy,
                 session,
+                resume,
+                images,
                 effort,
                 model,
                 ..
-            } => self.dispatch_asked(
-                Assignment {
-                    origin: self.origins.get(&addr),
+            } => {
+                let resume = self.resume_session(&addr, resume, session.as_ref())?;
+                self.dispatch_asked(
+                    Assignment {
+                        origin: resume
+                            .map(|(_, origin)| origin)
+                            .unwrap_or_else(|| self.origins.get(&addr)),
 
-                    policy: self.origins.policy(&addr).unwrap_or(policy),
-                    addr,
-                    session,
-                    effort,
-                    difficulty: None,
-                    model,
-                    parent: None,
-                    succession: None,
-                    taint: kernel::TaintSet::empty(),
-                    dispatched_by: kernel::event::Who::Person,
-                },
-                Asked { task, goal },
-                reply,
-            ),
+                        policy: self.origins.policy(&addr).unwrap_or(policy),
+                        addr,
+                        session,
+                        resume: resume.map(|(began, _)| began),
+                        pictures: super::super::dispatching::images::read_images(&images)?,
+                        effort,
+                        difficulty: None,
+                        model,
+                        parent: None,
+                        succession: None,
+                        taint: kernel::TaintSet::empty(),
+                        dispatched_by: kernel::event::Who::Person,
+                    },
+                    Asked { task, goal },
+                    reply,
+                )
+            }
             wire::Command::Wake {
                 source,
                 subject,

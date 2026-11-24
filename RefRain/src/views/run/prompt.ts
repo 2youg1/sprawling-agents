@@ -28,17 +28,6 @@ export interface FoldWire {
   readonly onclick: () => void;
 }
 
-export interface CopyWire {
-  readonly type: "button";
-  readonly onclick: () => void;
-}
-
-export interface CopyLook {
-  readonly label: string;
-  readonly copied: boolean;
-  readonly wire: CopyWire;
-}
-
 export interface SourceLook {
   readonly key: string;
   readonly path: string;
@@ -53,7 +42,7 @@ export interface SegmentLook {
   readonly gone: string | undefined;
   readonly open: boolean;
   readonly fold: FoldWire;
-  readonly copy: CopyLook | undefined;
+  readonly copyText: string | undefined;
   readonly sourcesLabel: string;
   readonly sources: readonly SourceLook[];
   readonly text: string;
@@ -76,12 +65,10 @@ export interface PromptLook {
 
 export interface Held {
   readonly open: ReadonlySet<string>;
-  readonly receipt: string | null;
 }
 
 export interface Hands {
   readonly toggle: (hash: string) => void;
-  readonly copy: (segment: PrefixSegment) => void;
   readonly visit: (source: Address) => void;
 }
 
@@ -149,7 +136,7 @@ function segmentOf(segment: PrefixSegment, held: Held, lang: Lang, hands: Hands)
         hands.toggle(segment.hash);
       },
     },
-    copy: segment.stored ? copyOf(segment, held.receipt === segment.hash, lang, hands) : undefined,
+    copyText: segment.stored ? segment.text : undefined,
     sourcesLabel: say(lang, "run_prompt_sources"),
     sources: segment.sources.map((source) => ({
       key: source.addr,
@@ -163,18 +150,5 @@ function segmentOf(segment: PrefixSegment, held: Held, lang: Lang, hands: Hands)
           : undefined,
     })),
     text: segment.text,
-  };
-}
-
-function copyOf(segment: PrefixSegment, copied: boolean, lang: Lang, hands: Hands): CopyLook {
-  return {
-    label: say(lang, copied ? "run_prompt_copied" : "run_prompt_copy"),
-    copied,
-    wire: {
-      type: "button",
-      onclick: () => {
-        hands.copy(segment);
-      },
-    },
   };
 }

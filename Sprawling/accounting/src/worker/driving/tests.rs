@@ -10,6 +10,7 @@ mod ledger;
 mod nested_rules;
 mod placing;
 mod rules_account;
+mod selected_images;
 mod sieving;
 mod throughput;
 mod turns;

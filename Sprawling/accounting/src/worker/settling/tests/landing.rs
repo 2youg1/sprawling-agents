@@ -30,9 +30,6 @@ fn speaking_signal(id: &str, room: &Address) -> collab::Signal {
     .unwrap()
 }
 
-/// A landing that settles halfway leaves no torn city: the lines are
-/// all on the ledger, the knocks cut back to the mark, and the queue
-/// holds only what the ledger says landed.
 #[test]
 fn a_half_settled_landing_leaves_no_torn_city() {
     let dir = tempfile::tempdir().unwrap();
@@ -60,8 +57,6 @@ Trades in the market as {who}.
     let (base_url, _provider) = fake_openai(&["m-local"], vec![completion("done", None)]);
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     let room = Address::parse("market/hana").unwrap();
-    // One slot: the second delivery sheds, so the landing settles
-    // halfway by construction rather than by luck.
     worker.collaborating.rooms = crate::worker::RoomQueues::folded(
         std::collections::BTreeMap::from([(room.clone(), collab::Inbox::new(1, 1))]),
     );
@@ -71,6 +66,8 @@ Trades in the market as {who}.
         parent: None,
         succession: None,
         session: None,
+        resume: None,
+        pictures: Vec::new(),
         effort: None,
         difficulty: None,
         model: None,
@@ -102,17 +99,12 @@ Trades in the market as {who}.
     );
 }
 
-/// A shelf that files halfway is unwound: the first filing's path is
-/// gone, and the ledger still carries both lines.
 #[test]
 fn a_half_filed_shelf_is_unwound() {
     let dir = tempfile::tempdir().unwrap();
     crate::worker::fixture::init_city(dir.path()).unwrap();
     let building = Address::parse("lab").unwrap();
     city::create_building(dir.path(), &building, city::BuildingTemplate::Minimal).unwrap();
-    // The second kind's directory is a file: its filing cannot land,
-    // while the first kind's files normally. The failure is
-    // constructed, not lucky.
     let blocked = dir
         .path()
         .join("lab")
@@ -125,6 +117,8 @@ fn a_half_filed_shelf_is_unwound() {
         parent: None,
         succession: None,
         session: None,
+        resume: None,
+        pictures: Vec::new(),
         effort: None,
         difficulty: None,
         model: None,
@@ -158,9 +152,6 @@ fn a_half_filed_shelf_is_unwound() {
         .settle(&at, RunId::CITY, landing, &KnockChain::default())
         .unwrap_err();
     assert_eq!(err.code(), &kernel::AxCode::StorageFatal);
-    // The first filing was unwound: nothing is on the shelf that the
-    // history does not already carry — and the history carries both
-    // lines regardless.
     let shelf = dir.path().join("lab").join(city::ARCHIVE_DIR);
     let mut leftovers = Vec::new();
     let mut dirs = vec![shelf];
@@ -183,10 +174,6 @@ fn a_half_filed_shelf_is_unwound() {
     );
 }
 
-/// A drive that failed must not take the room's queue with it: were
-/// `land` to return at the drive's own outcome, before anything was
-/// given back, the signals the room was holding would vanish exactly
-/// when the disk went wrong. What was borrowed goes back first.
 #[test]
 fn a_drive_that_failed_still_gives_the_room_its_queue_back() {
     let dir = tempfile::tempdir().unwrap();
@@ -208,6 +195,8 @@ fn a_drive_that_failed_still_gives_the_room_its_queue_back() {
             Assignment {
                 addr: room.clone(),
                 session: None,
+                resume: None,
+                pictures: Vec::new(),
                 effort: None,
                 difficulty: None,
                 model: None,

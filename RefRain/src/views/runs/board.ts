@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { Attachment } from "svelte/attachments";
+import type { ElementRef } from "../../core/element_ref";
 
 import { fill, say } from "../../core/lang";
 import type { Lang } from "../../core/lang";
@@ -15,7 +15,7 @@ import { PHASES, PHASE_WORD, phaseSaid } from "./phase";
 export interface TreeHands {
   readonly onkeydown: (event: KeyboardEvent) => void;
   readonly onscroll: (event: Event & { readonly currentTarget: EventTarget & HTMLElement }) => void;
-  readonly [hold: symbol]: Attachment<HTMLElement>;
+  readonly [hold: symbol]: ElementRef<HTMLElement>;
 }
 
 export interface TreeWire extends TreeHands {
@@ -89,6 +89,7 @@ export interface BoardLook {
 }
 
 export interface BoardSeat {
+  readonly id?: string;
   readonly runs: readonly BoardRun[];
   readonly now: number;
   readonly lang: Lang;
@@ -110,6 +111,8 @@ export function lookOf(seat: BoardSeat, hands: BoardHands): BoardLook {
   const { lang, now, rows, cursor } = seat;
   const waiting = seat.runs.filter((run) => phaseOf(run.doing) === "person");
   const held = rows[cursor];
+  const active = cursor >= seat.shown.from && cursor < seat.shown.to;
+  const id = (row: Row) => `runs-row-${seat.id ?? "main"}-${row.key}`;
   return {
     level: seat.level,
     title: say(lang, "runs_title"),
@@ -146,7 +149,7 @@ export function lookOf(seat: BoardSeat, hands: BoardHands): BoardLook {
       role: "tree",
       tabindex: 0,
       "aria-label": say(lang, "runs_tree"),
-      "aria-activedescendant": held === undefined ? undefined : rowId(held),
+      "aria-activedescendant": active && held !== undefined ? id(held) : undefined,
     },
     pad: { above: seat.shown.from * seat.rowPx, below: (rows.length - seat.shown.to) * seat.rowPx },
     rows: rows.slice(seat.shown.from, seat.shown.to).map((row, at) => ({
@@ -155,7 +158,7 @@ export function lookOf(seat: BoardSeat, hands: BoardHands): BoardLook {
       guide: row.guide,
       body: bodyOf(row, lang, now),
       wire: {
-        id: rowId(row),
+        id: id(row),
         role: "treeitem",
         "aria-level": levelOf(row),
         "aria-expanded": row.kind === "run" ? undefined : !seat.folded.has(row.key),
@@ -167,10 +170,6 @@ export function lookOf(seat: BoardSeat, hands: BoardHands): BoardLook {
     })),
     keys: say(lang, "runs_keys"),
   };
-}
-
-function rowId(row: Row): string {
-  return `runs-row-${row.key}`;
 }
 
 function levelOf(row: Row): number {

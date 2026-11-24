@@ -77,8 +77,20 @@ export function customOf(value: SearchConfiguration): CustomSearch | null {
   return typeof value === "string" ? null : value.custom;
 }
 
+function canonicalSearch(value: SearchConfiguration): string {
+  return JSON.stringify(value, (_key, next: unknown) => {
+    if (next === null || typeof next !== "object" || Array.isArray(next)) return next;
+    const entries: [string, unknown][] = Object.entries(next);
+    return Object.fromEntries(entries.sort(([a], [b]) => a.localeCompare(b)));
+  });
+}
+
 export function settle(editor: SearchEditor, settled: SettledSearch): void {
-  if (editor.sent !== null && editor.sent.against !== stampOf(settled)) editor.sent = null;
+  if (
+    editor.sent !== null &&
+    canonicalSearch(editor.sent.value) === canonicalSearch(settled.city ?? "default")
+  )
+    editor.sent = null;
 }
 
 export function refuse(editor: SearchEditor, error: AxError): void {

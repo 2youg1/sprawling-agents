@@ -11,7 +11,6 @@ pub(crate) enum Language {
     Rust,
     TypeScript,
     JavaScript,
-    Svelte,
     Zig,
     Python,
     Css,
@@ -37,7 +36,6 @@ pub(super) struct CodeMode {
     template_expression: bool,
     braces: usize,
     delimiters: usize,
-    embedded: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -51,7 +49,6 @@ pub(super) struct PythonString {
 pub(super) enum Mode {
     Code(CodeMode),
     Template,
-    Markup,
     PythonString(PythonString),
     PythonFormat,
 }
@@ -60,7 +57,7 @@ impl Language {
     fn syntax(self) -> Syntax {
         match self {
             Self::Rust => Syntax::Rust,
-            Self::TypeScript | Self::JavaScript | Self::Svelte => Syntax::JavaScript,
+            Self::TypeScript | Self::JavaScript => Syntax::JavaScript,
             Self::Zig => Syntax::Zig,
             Self::Python => Syntax::Python,
             Self::Css => Syntax::Css,
@@ -70,16 +67,11 @@ impl Language {
 
 pub(crate) fn measure(text: &str, language: Language) -> Reading {
     let body = license::without_license(text, language);
-    let start = if language == Language::Svelte {
-        Mode::Markup
-    } else {
-        code(language.syntax())
-    };
     let mut scanner = Scanner {
         bytes: body.as_bytes(),
         comment: vec![false; body.lines().count()],
         line: 0,
-        modes: vec![start],
+        modes: vec![code(language.syntax())],
     };
     scanner.run();
     let comment_lines = scanner.comment.iter().filter(|line| **line).count();
@@ -92,7 +84,6 @@ fn code(syntax: Syntax) -> Mode {
         template_expression: false,
         braces: 0,
         delimiters: 0,
-        embedded: false,
     })
 }
 
@@ -102,17 +93,6 @@ fn expression(syntax: Syntax) -> Mode {
         template_expression: true,
         braces: 0,
         delimiters: 0,
-        embedded: false,
-    })
-}
-
-fn embedded(syntax: Syntax) -> Mode {
-    Mode::Code(CodeMode {
-        syntax,
-        template_expression: false,
-        braces: 0,
-        delimiters: 0,
-        embedded: true,
     })
 }
 
@@ -128,7 +108,6 @@ impl Scanner<'_> {
         let mut index = 0;
         while index < self.bytes.len() {
             index = match self.modes.last().copied() {
-                Some(Mode::Markup) => self.markup(index),
                 Some(Mode::Template) => self.template(index),
                 Some(Mode::Code(mode)) => self.code(index, mode),
                 Some(Mode::PythonString(string)) => self.python_string(index, string),
@@ -138,101 +117,12 @@ impl Scanner<'_> {
         }
     }
 
-    fn markup(&mut self, index: usize) -> usize {
-        let Some(&byte) = self.bytes.get(index) else {
-            return self.bytes.len();
-        };
-        if byte == b'\n' {
-            return self.advance(index);
-        }
-        if at(self.bytes, index, b"<!--") {
-            return self.html_comment(index);
-        }
-        if byte == b'{' {
-            if self.bytes.get(index.saturating_add(1)) == Some(&b'/') {
-                return self.svelte_close(index);
-            }
-            self.modes.push(expression(Syntax::JavaScript));
-            return self.advance(index);
-        }
-        if byte == b'<'
-            && let Some((syntax, end)) = self.embedded_open(index)
-        {
-            self.modes.push(embedded(syntax));
-            return end;
-        }
-        self.advance(index)
-    }
-
-    fn svelte_close(&mut self, mut index: usize) -> usize {
-        while index < self.bytes.len() {
-            let Some(&byte) = self.bytes.get(index) else {
-                break;
-            };
-            index = self.advance(index);
-            if byte == b'}' {
-                break;
-            }
-        }
-        index
-    }
-
-    fn embedded_open(&self, index: usize) -> Option<(Syntax, usize)> {
-        for (name, syntax) in [
-            (b"script".as_slice(), Syntax::JavaScript),
-            (b"style".as_slice(), Syntax::Css),
-        ] {
-            let start = index.saturating_add(1);
-            if !tag_name_at(self.bytes, start, name) {
-                continue;
-            }
-            let mut cursor = start.saturating_add(name.len());
-            while cursor < self.bytes.len() {
-                match self.bytes.get(cursor) {
-                    Some(b'>') => return Some((syntax, cursor.saturating_add(1))),
-                    None => return None,
-                    _ => cursor = cursor.saturating_add(1),
-                }
-            }
-        }
-        None
-    }
-
-    fn embedded_close(&self, index: usize, syntax: Syntax) -> Option<usize> {
-        let name = match syntax {
-            Syntax::JavaScript => b"script".as_slice(),
-            Syntax::Css => b"style".as_slice(),
-            _ => return None,
-        };
-        if self.bytes.get(index) != Some(&b'<')
-            || self.bytes.get(index.saturating_add(1)) != Some(&b'/')
-        {
-            return None;
-        }
-        let start = index.saturating_add(2);
-        self.bytes.get(start..).and_then(|rest| {
-            (rest.len() >= name.len()
-                && rest
-                    .get(..name.len())
-                    .is_some_and(|found| found.eq_ignore_ascii_case(name))
-                && rest.get(name.len()) == Some(&b'>'))
-            .then_some(start.saturating_add(name.len()).saturating_add(1))
-        })
-    }
-
     fn code(&mut self, index: usize, mode: CodeMode) -> usize {
         let Some(&byte) = self.bytes.get(index) else {
             return self.bytes.len();
         };
         if byte == b'\n' {
             return self.advance(index);
-        }
-        if mode.embedded
-            && !mode.template_expression
-            && let Some(end) = self.embedded_close(index, mode.syntax)
-        {
-            self.modes.pop();
-            return end;
         }
         if matches!(mode.syntax, Syntax::Rust | Syntax::JavaScript | Syntax::Zig)
             && at(self.bytes, index, b"//")
@@ -364,24 +254,6 @@ impl Scanner<'_> {
         index
     }
 
-    fn html_comment(&mut self, mut index: usize) -> usize {
-        index = self.comment_bytes(index, 4);
-        while index < self.bytes.len() {
-            if at(self.bytes, index, b"-->") {
-                return self.comment_bytes(index, 3);
-            }
-            if self
-                .bytes
-                .get(index)
-                .is_some_and(|byte| !byte.is_ascii_whitespace())
-            {
-                self.mark_comment();
-            }
-            index = self.advance(index);
-        }
-        index
-    }
-
     fn comment_bytes(&mut self, mut index: usize, count: usize) -> usize {
         for _ in 0..count {
             if index < self.bytes.len() {
@@ -410,16 +282,4 @@ fn at(bytes: &[u8], index: usize, wanted: &[u8]) -> bool {
     bytes
         .get(index..index.saturating_add(wanted.len()))
         .is_some_and(|found| found == wanted)
-}
-
-fn tag_name_at(bytes: &[u8], index: usize, name: &[u8]) -> bool {
-    bytes.get(index..).is_some_and(|rest| {
-        rest.len() >= name.len()
-            && rest
-                .get(..name.len())
-                .is_some_and(|found| found.eq_ignore_ascii_case(name))
-            && rest
-                .get(name.len())
-                .is_some_and(|next| next.is_ascii_whitespace() || *next == b'>')
-    })
 }

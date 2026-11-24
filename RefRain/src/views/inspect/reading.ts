@@ -7,7 +7,7 @@ import { Option, Schema } from "effect";
 
 import { Locator } from "../../wire";
 import type { Call, RoundsAnswer } from "../../wire";
-import type { RightItem } from "./open.svelte";
+import type { RightItem } from "./open";
 
 export type Reading = "terminal" | "printed" | "diff" | "file" | "shot";
 

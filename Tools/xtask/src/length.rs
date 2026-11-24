@@ -101,7 +101,7 @@ fn source_files(
                 gate: "length",
                 location: walk::rel(root, &file),
                 rule: format!(
-                    "a Rust, TypeScript or Svelte source file has at most {FILE_LINE_LIMIT} lines"
+                    "a Rust or TypeScript source file has at most {FILE_LINE_LIMIT} lines"
                 ),
                 violation: format!("the file has {lines} lines"),
                 alternative: "rethink functional and architectural clarity; delete redundancy or split the file at a responsibility boundary".to_owned(),

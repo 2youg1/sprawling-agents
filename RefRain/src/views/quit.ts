@@ -42,3 +42,12 @@ export function quitOf(asked: QuitAsked): QuitLook {
     ],
   };
 }
+
+export interface QuitSheetProps {
+  readonly look: QuitLook;
+  readonly seat: "modal" | "specimen";
+
+  readonly open: boolean;
+  readonly onCancel: () => void;
+  readonly onClose: (mode: CloseMode) => void;
+}

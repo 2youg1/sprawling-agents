@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What opening a run costs before the model is asked anything.
-
 use kernel::ledger::chain_hash;
 use kernel::{
     Address, B3Hash, Ceiling, ContentBlock, EventDraft, EventKind, EventRef, GENESIS_PREV, Locator,
@@ -18,8 +16,6 @@ use crate::run::Opening;
 use crate::turn::CallShape;
 use kernel::{Retries, RunId, TimeMs};
 
-/// A ledger that records nothing but the kinds it was given and how
-/// often it was asked: each call into it is one disk barrier.
 struct CountingLedger {
     appended: Vec<EventKind>,
     barriers: usize,
@@ -60,7 +56,6 @@ impl Ledger for CountingLedger {
     }
 }
 
-/// A model that answers once with text and asks for no tool.
 struct Answering;
 
 impl Model for Answering {
@@ -79,6 +74,7 @@ fn plan() -> RunPlan {
     let job = Locator::parse(&format!("file:{}/JOB.md@{}", addr.as_str(), "a".repeat(40)))
         .expect("a canonical locator");
     RunPlan {
+        pictures: Vec::new(),
         run: RunId::from_bytes([7; 16]),
         who: "lab/room1".to_owned(),
         addr,
@@ -120,9 +116,6 @@ fn plan() -> RunPlan {
     }
 }
 
-/// The effort a run's requests froze is the one its first line records
-/// (`Sprawling/kernel/Spec.lean` §8-85), so a page can say it before the run
-/// commits anything.
 #[test]
 fn the_charter_carries_the_effort_the_request_froze() {
     let mut frozen = plan();
@@ -135,12 +128,6 @@ fn the_charter_carries_the_effort_the_request_froze() {
     );
 }
 
-/// What a dispatch costs before the model is asked anything, counted
-/// rather than timed: two ledger lines and two clock samples, and the
-/// two lines are a fact about the city and a fact about the run.
-///
-/// The clock is injected, so the reading is the same on every machine
-/// and a third sample appearing here is a defect rather than weather.
 #[test]
 fn a_dispatch_writes_two_lines_and_samples_the_clock_twice() {
     let mut ledger = CountingLedger::new();
@@ -184,11 +171,6 @@ fn a_dispatch_writes_two_lines_and_samples_the_clock_twice() {
     assert_eq!(samples, 2, "one stamp per fact, and no third sample");
 }
 
-/// `tf1_turn_barriers` through the run: the run's own
-/// `prompt_shape_compared` waits among the turn's lines, so a run's first
-/// turn that calls no tool pays one barrier for its model call, which
-/// carries `prompt_assembled` too, and the one a run pays before it
-/// concludes, which carries `model_returned` (runtime D36).
 #[test]
 fn tf1_run_turn_barriers() {
     let mut ledger = CountingLedger::new();

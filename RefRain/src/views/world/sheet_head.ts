@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { Attachment } from "svelte/attachments";
+import type { ElementRef } from "../../core/element_ref";
 
 import type { Pane } from "../../core/workbench";
 import { HOLD } from "./drawn";
@@ -46,7 +46,7 @@ export interface TabWire {
   readonly tabindex: 0 | -1;
   readonly onclick: () => void;
   readonly onkeydown: (event: KeyPress) => void;
-  readonly [hold: symbol]: Attachment<HTMLElement>;
+  readonly [hold: symbol]: ElementRef<HTMLElement>;
 }
 
 export interface TabLook {
@@ -75,7 +75,7 @@ export interface SheetHeadHands {
   readonly leave: () => void;
   readonly show: (pane: Pane) => void;
   readonly focus: (pane: Pane) => void;
-  readonly hold: (pane: Pane) => Attachment<HTMLElement>;
+  readonly hold: (pane: Pane) => ElementRef<HTMLElement>;
 }
 
 export function sheetHeadOf(input: SheetHeadInput, hands: SheetHeadHands): SheetHeadLook {

@@ -171,8 +171,10 @@ export const Command = Schema.Union([
       effort: Schema.optional(Schema.NullOr(Effort)),
       goal: Schema.String,
       idem: IdemKey,
+      images: Schema.optional(Schema.Array(Schema.String)),
       model: Schema.optional(Schema.NullOr(Schema.String)),
       policy: RunPolicy,
+      resume: Schema.optional(Schema.NullOr(Seq)),
       session: Schema.optional(Schema.NullOr(SessionName)),
       task: Schema.String,
     }),
@@ -248,6 +250,7 @@ export const Command = Schema.Union([
   Schema.Struct({
     steer: Schema.Struct({
       idem: IdemKey,
+      images: Schema.optional(Schema.Array(Schema.String)),
       run: RunId,
       text: Schema.String,
     }),

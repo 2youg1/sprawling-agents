@@ -74,11 +74,18 @@ fn a_steer_at_a_safe_point_reaches_the_next_window_and_not_only_the_ledger() {
         waves: vec![vec![call("t-1")]],
     };
     let mut now = counter();
-    // One steer, at the boundary before the second assembly.
+    let picture = kernel::ImageRef {
+        locator: kernel::Locator::parse(&format!("cas:b3-{}", "cd".repeat(32))).unwrap(),
+        media_type: kernel::ImageType::Png,
+        width: 17,
+        height: 5,
+    };
     let mut interrupt = |point: SafePoint| match point {
         SafePoint::BeforeAssemble { turn: 1 } => Interrupt::Steer {
+            pictures: vec![picture.clone()],
             speaker: runtime::conversation::Speaker::Person,
             text: "measure it in metres".to_owned(),
+            request: None,
         },
         _ => Interrupt::None,
     };
@@ -107,6 +114,8 @@ fn a_steer_at_a_safe_point_reaches_the_next_window_and_not_only_the_ledger() {
     );
     let windows = seen.borrow();
     assert_eq!(windows.len(), 2, "two turns, two windows");
+    assert!(!windows[0].contains(&picture.locator.to_string()));
+    assert!(windows[1].contains(&picture.locator.to_string()));
     assert!(
         !windows[0].contains("measure it in metres"),
         "a steer never rewrites a request already assembled"
@@ -119,10 +128,6 @@ fn a_steer_at_a_safe_point_reaches_the_next_window_and_not_only_the_ledger() {
     assert!(windows[1].contains("user"), "attributed to whoever sent it");
 }
 
-/// The fourth boundary. A run whose last turn made no tool call would
-/// otherwise conclude `Done` with nowhere left to stop it, and whatever
-/// that turn handed down would start anyway. `BeforeSpawn` is the point
-/// where a cancel arriving that late still lands.
 #[test]
 fn a_cancel_after_the_wave_stops_the_run_before_anything_it_handed_down_starts() {
     let mut ledger = RecordingLedger::new();
@@ -162,23 +167,9 @@ fn a_cancel_after_the_wave_stops_the_run_before_anything_it_handed_down_starts()
     );
     let kinds = ledger.kinds();
     assert_eq!(kinds[kinds.len() - 3], "cancel_received");
-    // The wave ran before the boundary was consulted: what the tools did
-    // is on the ledger, and the cancel comes after it rather than
-    // pretending the work never happened.
     assert!(kinds.iter().any(|kind| kind == "tool_result"));
 }
 
-/// **The defect this pins shipped and was found by driving a real
-/// provider.** ModelScope's streaming tool calls repeat the tool name as
-/// an empty string in every chunk after the first, so a dispatch died of
-/// `E_WIRE_MISMATCH` on its first tool call. That code's carrier is
-/// `Loadtime`, and the driver's error arm returned it without freezing —
-/// so the run was dropped with only `run_started` behind it, `city_view`
-/// reported it alive after a restart, and the page sent every later
-/// message as a `steer` into a run that was never coming back.
-///
-/// A run always ends. The verdict is written before the diagnosis
-/// travels, and both of them survive.
 #[test]
 fn a_run_that_dies_of_a_loadtime_failure_still_writes_its_verdict() {
     let mut ledger = RecordingLedger::new();
@@ -221,9 +212,6 @@ fn a_run_that_dies_of_a_loadtime_failure_still_writes_its_verdict() {
         "handoff_written",
         "the one exit writes both of its lines: {kinds:?}"
     );
-    // A loadtime code names no carrier event, so nothing stands between
-    // the last turn and the verdict. `Provider` is the other half of the
-    // table and the test below holds that arm.
     assert!(
         !kinds.iter().any(|kind| kind == "provider_degraded"),
         "a loadtime code invents no carrier: {kinds:?}"
@@ -243,8 +231,6 @@ fn a_run_that_dies_of_a_loadtime_failure_still_writes_its_verdict() {
     );
 }
 
-/// A carrier failure that freezes the run names its own error on the
-/// verdict, so the page can show why instead of inventing a carrier row.
 #[test]
 fn a_carrier_failure_writes_its_reason_on_the_verdict() {
     let mut ledger = RecordingLedger::new();
@@ -280,9 +266,6 @@ fn a_carrier_failure_writes_its_reason_on_the_verdict() {
     );
 }
 
-/// The other half of the carrier table, held here so the two arms are
-/// read side by side: a code that names an event writes that event
-/// first, and the run freezes rather than propagating.
 #[test]
 fn a_provider_failure_writes_its_carrier_and_then_the_verdict() {
     let mut ledger = RecordingLedger::new();
@@ -318,11 +301,6 @@ fn a_provider_failure_writes_its_carrier_and_then_the_verdict() {
     assert_eq!(kinds.last().map(String::as_str), Some("run_frozen"));
 }
 
-/// A provider answering 500 in a row is asked again on a backoff that
-/// doubles (plus the run's jitter), each wait is the moment the history records, and a halt that
-/// lands during a wait stops the run there. Before the wait hook the
-/// loop asked again at once, recorded a wait it never took, and a root
-/// run had no safe point inside the retry for a halt to reach.
 #[test]
 fn failures_in_a_row_back_off_and_a_halt_during_the_wait_stops_the_run() {
     let attempts = std::rc::Rc::new(std::cell::RefCell::new(0));
@@ -388,11 +366,6 @@ fn failures_in_a_row_back_off_and_a_halt_during_the_wait_stops_the_run() {
     assert!(matches!(frozen.completion(), Completion::Cancelled));
 }
 
-/// A steer that arrives between two calls of a wave is written down
-/// before the model reads it, the same as a steer at any other safe
-/// point: the window that carries it is the model's, and a window
-/// holding text the ledger never saw is a request nobody can account
-/// for.
 #[test]
 fn a_steer_inside_a_tool_wave_is_recorded_before_the_model_reads_it() {
     let mut ledger = RecordingLedger::new();
@@ -404,8 +377,10 @@ fn a_steer_inside_a_tool_wave_is_recorded_before_the_model_reads_it() {
     let mut now = counter();
     let mut interrupt = |point: SafePoint| match point {
         SafePoint::BeforeToolCall { turn: 0, call: 1 } => Interrupt::Steer {
+            pictures: Vec::new(),
             speaker: runtime::conversation::Speaker::Person,
             text: "measure it in metres".to_owned(),
+            request: None,
         },
         _ => Interrupt::None,
     };

@@ -11,7 +11,7 @@ import type { View } from "../../core/route";
 export interface Entry {
   readonly label: string;
   readonly hint: string;
-  readonly action?: Action | undefined;
+  readonly keyAction?: Action | undefined;
   readonly act: () => void;
   readonly to?: View | undefined;
   readonly why?: Key | undefined;

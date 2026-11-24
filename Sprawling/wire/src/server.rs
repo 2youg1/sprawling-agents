@@ -13,6 +13,7 @@ mod pairing;
 mod seat;
 mod socket;
 mod uploads;
+mod workspace;
 
 pub use bundle::bundle_routes;
 pub use committed::Committed;
@@ -24,3 +25,8 @@ pub use door::{DoorSenses, KeepBrowsers, LocalDoor, OpenCode};
 pub use guard::entered;
 pub use listener::{Bound, bind, serve};
 pub use pairing::{ChallengeAnswer, PairAnswer, PairBody, PairProof, SessionAnswer, SessionBody};
+pub use workspace::{
+    ReadingPosition, WorkspaceChange, WorkspaceEntry, WorkspaceEntryKind, WorkspaceInfo,
+    WorkspaceOperation, WorkspacePage, WorkspaceRecord, WorkspaceReply, WorkspaceRequest,
+    WorkspaceSave, WorkspaceSink, WorkspaceTarget, WorkspaceWatch,
+};

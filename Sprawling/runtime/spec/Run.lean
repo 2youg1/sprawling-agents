@@ -33,6 +33,7 @@ pub struct Active(/* 私有 */);   pub struct Frozen { /* completion、turns、f
 pub struct Verdict<'a> { pub completion: &'a Completion, pub failure: Option<&'a AxError> }  // 一次 run 怎样结束，与结束它的那个错
 
 pub struct RunPlan {                 // 一个 Run 的全部常量，调用方先备齐
+    pub pictures: Vec<ImageRef>,     // 人为开场选定的图像；顺序与原始范围保留到消息、账本和分支重放
     pub run: RunId, pub who: String, pub addr: Address,
     pub task: String, pub goal: String, pub job: Locator,
     pub opening: Opening,                                 // 这一场是接了写下来的活，还是人在场

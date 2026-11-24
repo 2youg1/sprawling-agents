@@ -8,14 +8,7 @@ use std::path::{Path, PathBuf};
 
 use crate::report::XtaskError;
 
-const SKIP_DIRS: [&str; 6] = [
-    "target",
-    "node_modules",
-    ".lake",
-    ".svelte-check",
-    ".zig-cache",
-    "web-dist",
-];
+const SKIP_DIRS: [&str; 5] = ["target", "node_modules", ".lake", ".zig-cache", "web-dist"];
 
 const GIT: &str = ".git";
 

@@ -243,11 +243,11 @@ impl ConfigLayer { pub fn generation(&self) -> Option<&FrozenGeneration>; }
 思考强度放在派活按钮旁边，因为一次会话反正只选一次；而会话选定的模型也写进同一份文件，因为供应的 prompt 缓存对着的正是这两个值。
 
 - **一次写下一个会话冻下的整份形状**：`write_session` 落 `[model] name` 与可选 `endpoint`（共同标识完整模型引用；旧记录缺 endpoint 时保留 ID 兼容路径），Forget 同时清除两者，分支从 `run_started.routing.model.endpoint` 恢复端点。人选了强度时落 `[model] effort`。`generation` 在场时再写 `temperature`、`top_p`、`top_k` 的文本、`max_tokens` 的实发整数与 `overrides` 的字符串对；空值省略，空串不读成零。模型总写下（一个模型总在指某个东西），强度只在人说了时写下：缺席不是一个值，而是「让供应方决定」，写出来就是把一个没人做的选择记成记录。
-settings-control ModelSection.temperature RefRain/src/views/setup/providers/generation.svelte
-settings-control ModelSection.top_p RefRain/src/views/setup/providers/generation.svelte
-settings-control ModelSection.top_k RefRain/src/views/setup/providers/generation.svelte
-settings-control ModelSection.max_tokens RefRain/src/views/setup/providers/generation.svelte
-settings-control ModelSection.overrides RefRain/src/views/setup/providers/generation.svelte
+settings-control ModelSection.temperature RefRain/src/views/setup/providers/generation.solid.tsx
+settings-control ModelSection.top_p RefRain/src/views/setup/providers/generation.solid.tsx
+settings-control ModelSection.top_k RefRain/src/views/setup/providers/generation.solid.tsx
+settings-control ModelSection.max_tokens RefRain/src/views/setup/providers/generation.solid.tsx
+settings-control ModelSection.overrides RefRain/src/views/setup/providers/generation.solid.tsx
 
 - **旧会话没有这些键**：`generation()` 答 `None` 时保持旧比较路径，不凭当前设置补写历史；一旦当前类型化生成配置与旧的空设置不同，dispatch 拒绝并指向 `/new`。新会话总是写下有效值，`/new` 与 `Forget` 同时移除这些键，分支则从母亲 `run_started.generation` 恢复。
 - **写进那一层，而不是另存一份**：选择落到会话自己房间的 `CONFIG.toml`，由已有的 city → building → room 阶梯解析。第二个存处就是第二个答案。
@@ -459,41 +459,41 @@ end City.ConfigLayers.Search
 /-! 设置覆盖：CONFIG.toml 的字段声明是文法 authority，`xtask wiring` 逐字段要求下面一行。
 `settings-control` 指向写这个字段的控件；`settings-reason` 说为什么设置里没有控件。
 一个字段在多层出现时，控件写的是它注明的那一层，其余层由同一文件手写。
-settings-control ConfigFile.cache RefRain/src/views/settings/city_layer.svelte
-settings-control ConfigFile.catalog RefRain/src/views/building/catalog.svelte
-settings-control CatalogSection.tools RefRain/src/views/building/catalog.svelte
-settings-control CatalogSection.namespaces RefRain/src/views/building/catalog.svelte
-settings-control CatalogSection.skills RefRain/src/views/building/catalog.svelte
-settings-control ConfigFile.mcp_ref RefRain/src/views/building/catalog.svelte
-settings-control McpReferenceSection.label RefRain/src/views/building/catalog.svelte
-settings-control McpReferenceSection.definition RefRain/src/views/building/catalog.svelte
-settings-control McpReferenceSection.tools RefRain/src/views/building/catalog.svelte
-settings-control SkillsSection.pins RefRain/src/views/building/catalog.svelte
+settings-control ConfigFile.cache RefRain/src/views/settings/city_layer_view.tsx
+settings-control ConfigFile.catalog RefRain/src/views/building/catalog.solid.tsx
+settings-control CatalogSection.tools RefRain/src/views/building/catalog.solid.tsx
+settings-control CatalogSection.namespaces RefRain/src/views/building/catalog.solid.tsx
+settings-control CatalogSection.skills RefRain/src/views/building/catalog.solid.tsx
+settings-control ConfigFile.mcp_ref RefRain/src/views/building/catalog.solid.tsx
+settings-control McpReferenceSection.label RefRain/src/views/building/catalog.solid.tsx
+settings-control McpReferenceSection.definition RefRain/src/views/building/catalog.solid.tsx
+settings-control McpReferenceSection.tools RefRain/src/views/building/catalog.solid.tsx
+settings-control SkillsSection.pins RefRain/src/views/building/catalog.solid.tsx
 settings-reason McpSection.conflict 楼本地定义与城层同名而不同，需要人在两份 CONFIG.toml 之间手工确认保留哪一个；目录面板只保存引用，不提供第二个定义编辑面。
 settings-reason SessionCatalog.catalog 会话第一次 run 冻结的目录记录，不是 User 另开的一层设置；楼页保存只影响 `/new` 后的会话。
 settings-reason SessionCatalog.mcp_references 会话第一次 run 冻结的 connector 引用与 pin，不是 User 另开的一层设置；楼页保存只影响 `/new` 后的会话。
 settings-reason SessionCatalog.reading_room 会话第一次 run 冻结的 Reading Room 名字，不是 User 另开的一层设置；楼页保存只影响 `/new` 后的会话。
 settings-reason SessionCatalog.skill_pins 会话第一次 run 冻结的 skill pin，不是 User 另开的一层设置；楼页保存只影响 `/new` 后的会话。
-settings-control CacheSection.keep_warm RefRain/src/views/settings/city_layer.svelte
+settings-control CacheSection.keep_warm RefRain/src/views/settings/city_layer_view.tsx
 settings-reason ConfigFile.clock 时钟行多久出一次只改结果里那一行的疏密，不改任何保证；缺省 minute 是 kernel 常量，需要改的人在城或楼的 CONFIG.toml 里写，拼错在解析点拒。
 settings-reason ClockSection.stamp 时钟行多久出一次只改结果里那一行的疏密，不改任何保证；缺省 minute 是 kernel 常量，需要改的人在城或楼的 CONFIG.toml 里写，拼错在解析点拒。
-settings-control ConfigFile.context RefRain/src/views/settings/context_rung.svelte
-settings-control ContextSection.second_threshold RefRain/src/views/settings/context_rung.svelte
+settings-control ConfigFile.context RefRain/src/views/settings/context_rung_view.tsx
+settings-control ContextSection.second_threshold RefRain/src/views/settings/context_rung_view.tsx
 settings-reason ConfigFile.format `format` 说这份文件按哪一版的文法读，由格式阶梯在开城时写（`Sprawling/city/Spec.lean` §8-42），不是人的设定；人改它只会让文件被拒，或被当成另一版的文件读。
 settings-reason ConfigFile.identity 城在会话第一次 run 时写下命名版本，`/new` 拿掉它；这是会话的记录，不是 User 的设定，改它会让会话读到另一套名字。
 settings-reason IdentitySection.version 城在会话第一次 run 时写下命名版本，`/new` 拿掉它；这是会话的记录，不是 User 的设定，改它会让会话读到另一套名字。
-settings-control ConfigFile.mcp RefRain/src/views/mcp.svelte
-settings-control McpSection.label RefRain/src/views/mcp/by_command.svelte
-settings-control McpSection.command RefRain/src/views/mcp/by_command.svelte
-settings-control McpSection.args RefRain/src/views/mcp/by_command.svelte
-settings-control McpSection.env RefRain/src/views/mcp/by_command.svelte
-settings-control McpSection.url RefRain/src/views/mcp/by_url.svelte
-settings-control McpSection.headers RefRain/src/views/mcp/by_url.svelte
-settings-control McpSection.transport RefRain/src/views/mcp/by_url.svelte
+settings-control ConfigFile.mcp RefRain/src/views/mcp.solid.tsx
+settings-control McpSection.label RefRain/src/views/mcp/by_command.solid.tsx
+settings-control McpSection.command RefRain/src/views/mcp/by_command.solid.tsx
+settings-control McpSection.args RefRain/src/views/mcp/by_command.solid.tsx
+settings-control McpSection.env RefRain/src/views/mcp/by_command.solid.tsx
+settings-control McpSection.url RefRain/src/views/mcp/by_url.solid.tsx
+settings-control McpSection.headers RefRain/src/views/mcp/by_url.solid.tsx
+settings-control McpSection.transport RefRain/src/views/mcp/by_url.solid.tsx
 settings-reason ConfigFile.model `[model] name` 是城在会话第一次 run 时写下的会话记录（`write_session`），模型由会话里的模型选择决定，`/new` 拿掉它；改它会让一段会话中途换居民，所以设置里没有控件。
 settings-reason ModelSection.name `[model] name` 是城在会话第一次 run 时写下的会话记录（`write_session`），模型由会话里的模型选择决定，`/new` 拿掉它；改它会让一段会话中途换居民，所以设置里没有控件。
 settings-reason ModelSection.endpoint `[model] endpoint` 与 `name` 一起标识会话冻结的模型引用，由 `write_session` 写入、`Forget` 清除；它是会话记录，设置里没有控件。
-settings-control ModelSection.effort RefRain/src/views/settings/city_layer.svelte
+settings-control ModelSection.effort RefRain/src/views/settings/city_layer_view.tsx
 settings-reason ConfigFile.remote 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在它所在的机器上执行任意程序，所以只在城的 CONFIG.toml 里手写，楼与房间写它即拒。
 settings-reason RemoteRoute.Cloudflare.command 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在它所在的机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
 settings-reason RemoteRoute.Cloudflare.tunnel 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在它所在的机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
@@ -512,27 +512,27 @@ settings-reason AgentSection.version 一行 agent 点名这台电脑以人的身
 settings-reason AgentSection.launch_digest 一行 agent 点名这台电脑以人的身份运行的程序；它由 ACP 页的同意卡片经 `AddAgent` 写下，同意绑定启动命令的摘要，所以设置里没有逐字段编辑的控件。
 settings-reason ConfigFile.resident 选 agent 就是把房间的内容交给它的外部进程（confidential 楼因此拒 harness 派活）；这一步由 User 在 CONFIG.toml 里有意写下，设置页的 harness 组只说明安装与登录。
 settings-reason ResidentSection.harness 选 agent 就是把房间的内容交给它的外部进程（confidential 楼因此拒 harness 派活）；这一步由 User 在 CONFIG.toml 里有意写下，设置页的 harness 组只说明安装与登录。
-settings-control ConfigFile.sandbox RefRain/src/views/building/sandbox.svelte
-settings-control SandboxSection.arm RefRain/src/views/building/sandbox.svelte
-settings-control SandboxSection.container RefRain/src/views/building/sandbox.svelte
-settings-control SandboxSection.env_passthrough RefRain/src/views/building/sandbox.svelte
-settings-control SandboxSection.interpreter RefRain/src/views/building/sandbox.svelte
-settings-control SandboxSection.shell RefRain/src/views/building/sandbox.svelte
-settings-control SandboxSection.trusted RefRain/src/views/building/sandbox.svelte
-settings-control ConfigFile.search RefRain/src/views/setup/search/search.svelte
-settings-control SearchSection.choice RefRain/src/views/setup/search/search.svelte
-settings-control SearchSection.selected RefRain/src/views/setup/search/search.svelte
-settings-control SearchSection.suppliers RefRain/src/views/setup/search/search.svelte
-settings-control SupplierSection.id RefRain/src/views/setup/search/search.svelte
-settings-control SupplierSection.url RefRain/src/views/setup/search/search.svelte
-settings-control SupplierSection.remote RefRain/src/views/setup/search/search.svelte
-settings-control SupplierSection.query RefRain/src/views/setup/search/search.svelte
-settings-control SupplierSection.count RefRain/src/views/setup/search/search.svelte
-settings-control SupplierSection.objective RefRain/src/views/setup/search/search.svelte
-settings-control SupplierSection.accounts RefRain/src/views/setup/providers/accounts.svelte
-settings-control AccountSection.id RefRain/src/views/setup/providers/accounts.svelte
-settings-control AccountSection.reference RefRain/src/views/setup/providers/accounts.svelte
-settings-control AccountSection.header RefRain/src/views/setup/providers/accounts.svelte
+settings-control ConfigFile.sandbox RefRain/src/views/building/sandbox.solid.tsx
+settings-control SandboxSection.arm RefRain/src/views/building/sandbox.solid.tsx
+settings-control SandboxSection.container RefRain/src/views/building/sandbox.solid.tsx
+settings-control SandboxSection.env_passthrough RefRain/src/views/building/sandbox.solid.tsx
+settings-control SandboxSection.interpreter RefRain/src/views/building/sandbox.solid.tsx
+settings-control SandboxSection.shell RefRain/src/views/building/sandbox.solid.tsx
+settings-control SandboxSection.trusted RefRain/src/views/building/sandbox.solid.tsx
+settings-control ConfigFile.search RefRain/src/views/setup/search/search_view.tsx
+settings-control SearchSection.choice RefRain/src/views/setup/search/search_view.tsx
+settings-control SearchSection.selected RefRain/src/views/setup/search/search_view.tsx
+settings-control SearchSection.suppliers RefRain/src/views/setup/search/search_view.tsx
+settings-control SupplierSection.id RefRain/src/views/setup/search/search_view.tsx
+settings-control SupplierSection.url RefRain/src/views/setup/search/search_view.tsx
+settings-control SupplierSection.remote RefRain/src/views/setup/search/search_view.tsx
+settings-control SupplierSection.query RefRain/src/views/setup/search/search_view.tsx
+settings-control SupplierSection.count RefRain/src/views/setup/search/search_view.tsx
+settings-control SupplierSection.objective RefRain/src/views/setup/search/search_view.tsx
+settings-control SupplierSection.accounts RefRain/src/views/setup/providers/accounts.solid.tsx
+settings-control AccountSection.id RefRain/src/views/setup/providers/accounts.solid.tsx
+settings-control AccountSection.reference RefRain/src/views/setup/providers/accounts.solid.tsx
+settings-control AccountSection.header RefRain/src/views/setup/providers/accounts.solid.tsx
 settings-reason ConfigFile.skills `[skills]` 不是单独一个控件写的整节：`shelves` 由技能页写入城层，`pins` 由目录页写入楼层。楼与房间写下 `shelves` 即拒。
-settings-control SkillsSection.shelves RefRain/src/views/setup/shelves.svelte
+settings-control SkillsSection.shelves RefRain/src/views/setup/shelves_view.tsx
 -/

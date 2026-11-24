@@ -28,14 +28,18 @@ test("a picker row quotes the family and keeps a generic behind it", () => {
 });
 
 test("the stacks read the token where a family stands, with the comma of their own for an unnamed chain", () => {
-  const stacks = theme("tokens-type.css");
+  const stacks = theme("tokens-type.css").replace(/\s+/g, " ");
   for (const [role, face] of [
     ["--font-sans", "--face-sans"],
     ["--font-mono", "--face-mono"],
   ] as const) {
     expect(stacks, `${role} carries the chain`).toContain(
-      `${role}:\n    var(${face}), var(--face-fallback,)`,
+      `${role}: var(${face}), var(--face-fallback,)`,
     );
   }
-  expect(theme("preference.css")).toContain('"Libron", var(--face-fallback,) serif');
+  expect(theme("preference.css")).toContain(
+    '"Libron", var(--face-fallback,) var(--face-cjk), var(--face-math), serif',
+  );
+  expect(stacks).toContain('"Sarasa Gothic SC", "Noto Sans CJK SC"');
+  expect(stacks).toContain('"Noto Sans Math", "DejaVu Math TeX Gyre"');
 });

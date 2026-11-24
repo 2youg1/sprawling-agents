@@ -123,6 +123,8 @@ impl Rig {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem,
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         });

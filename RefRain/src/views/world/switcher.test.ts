@@ -66,7 +66,6 @@ describe("the switcher reads the shared tree", () => {
       runs: [],
     };
     const rows = switchItems([stretch], "", new Set(), "en", 61_000);
-    expect(rows[0]?.origin).toEqual(stretch.line.tail);
     expect(rows[0]?.to).toEqual({ kind: "talk", address: room, session: Seq.make(3) });
   });
 });

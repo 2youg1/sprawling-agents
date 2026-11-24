@@ -130,6 +130,7 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
             }
 
             let interrupt_desk = Arc::clone(&worker_desk);
+            let pictures = worker.attachment_store();
             let keeping = Arc::clone(&kept);
             worker.serve(Serving {
                 deltas: std::sync::Arc::new(move |delta: wire::Delta| {
@@ -140,7 +141,9 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
                     drop(to_readers.send(piece));
                 }),
                 machine,
-                interrupts: Arc::new(move |run: RunId| interrupt_desk.interrupt_for(run)),
+                interrupts: Arc::new(move |run: RunId| {
+                    interrupt_desk.interrupt_for(run, Some(&pictures))
+                }),
             });
 
             match worker.hand_off_session_slices() {
@@ -157,7 +160,9 @@ pub(super) fn spawn_worker(opening: Opening, outward: Outward) -> Result<Started
                     }
                 };
             let mut folding = observer;
+            let receives = Arc::clone(&worker_desk);
             worker.observe(Box::new(move |record: &EventRecord| {
+                receives.observe(record);
                 if matches!(
                     record.kind(),
                     kernel::EventKind::SkillShelved | kernel::EventKind::RunStarted

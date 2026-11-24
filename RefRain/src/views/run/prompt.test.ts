@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The prompt lens's wiring, driven the way its seat drives it and with
-// no look at all: whichever look draws the lens, these are the presses
-// it hands on and the states it says each segment is in.
-
 import { describe, expect, test } from "bun:test";
 
 import { Address, B3Hash } from "../../wire";
@@ -31,7 +27,6 @@ function recorder(): { readonly hands: Hands; readonly pressed: string[] } {
     pressed,
     hands: {
       toggle: (hash) => pressed.push(`toggle ${hash.slice(0, 1)}`),
-      copy: (copied) => pressed.push(`copy ${copied.text}`),
       visit: (source) => pressed.push(`visit ${source}`),
     },
   };
@@ -40,12 +35,12 @@ function recorder(): { readonly hands: Hands; readonly pressed: string[] } {
 describe("the prompt lens", () => {
   test("is still asking until the city answers, and says so when it answers with nothing", () => {
     const { hands } = recorder();
-    expect(
-      lookOf(undefined, { open: new Set(), receipt: null }, "en", hands).segments,
-    ).toBeUndefined();
-    expect(
-      lookOf({ segments: [], tools: null }, { open: new Set(), receipt: null }, "en", hands),
-    ).toEqual({ tools: undefined, segments: [], none: "this run has no prompt on record" });
+    expect(lookOf(undefined, { open: new Set() }, "en", hands).segments).toBeUndefined();
+    expect(lookOf({ segments: [], tools: null }, { open: new Set() }, "en", hands)).toEqual({
+      tools: undefined,
+      segments: [],
+      none: "this run has no prompt on record",
+    });
   });
 
   test("a segment's row opens and closes only itself, and its expanded state is the open set's", () => {
@@ -54,7 +49,7 @@ describe("the prompt lens", () => {
     const two = segment(2, true);
     const look = lookOf(
       { segments: [one, two], tools: null },
-      { open: new Set([two.hash]), receipt: null },
+      { open: new Set([two.hash]) },
       "en",
       hands,
     );
@@ -68,34 +63,31 @@ describe("the prompt lens", () => {
     expect(pressed).toEqual(["toggle 1"]);
   });
 
-  test("the copy key copies the text the model saw and wears the receipt only on the segment pressed", () => {
-    const { hands, pressed } = recorder();
+  test("copy uses the exact text held for each segment", () => {
+    const { hands } = recorder();
     const one = segment(1, true);
     const two = segment(2, true);
     const look = lookOf(
-      { segments: [one, two], tools: null },
-      { open: new Set(), receipt: one.hash },
+      {
+        segments: [one, two],
+        tools: null,
+      },
+      { open: new Set() },
       "en",
       hands,
     );
-    expect(look.segments?.map((each) => [each.copy?.copied, each.copy?.label])).toEqual([
-      [true, "copied"],
-      [false, "copy"],
-    ]);
-    look.segments?.[1]?.copy?.wire.onclick();
-    expect(pressed).toEqual(["copy segment 2"]);
+    expect(look.segments?.map((row) => row.copyText)).toEqual([one.text, two.text]);
   });
 
   test("a segment the store no longer holds says so and offers nothing to copy", () => {
     const { hands } = recorder();
     const [gone] =
-      lookOf(
-        { segments: [segment(3, false)], tools: null },
-        { open: new Set(), receipt: null },
-        "en",
-        hands,
-      ).segments ?? [];
-    expect([gone?.gone, gone?.copy]).toEqual(["the store no longer holds these bytes", undefined]);
+      lookOf({ segments: [segment(3, false)], tools: null }, { open: new Set() }, "en", hands)
+        .segments ?? [];
+    expect([gone?.gone, gone?.copyText]).toEqual([
+      "the store no longer holds these bytes",
+      undefined,
+    ]);
   });
 
   test("a source names what the budget cut only when it cut something, and opens its building", () => {
@@ -103,7 +95,7 @@ describe("the prompt lens", () => {
     const [kept, cut] = (
       lookOf(
         { segments: [segment(1, true), segment(2, true, 1_840)], tools: null },
-        { open: new Set(), receipt: null },
+        { open: new Set() },
         "en",
         hands,
       ).segments ?? []

@@ -1,0 +1,39 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+.inspect-resize {
+  height: calc(var(--spacing-baseline) + 1px);
+}
+
+.inspect-resize::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: var(--spacing-section);
+  height: var(--spacing-hair);
+  border-radius: var(--radius-pill);
+  background-color: var(--color-edge-panel);
+  transition: background-color var(--transition-duration-short) var(--ease-leave);
+}
+
+.inspect-resize:hover::after {
+  background-color: var(--color-edge-input);
+  transition-timing-function: var(--ease-arrive);
+}
+
+.inspect-resize:focus-visible::after {
+  background-color: var(--color-accent);
+  transition-timing-function: var(--ease-arrive);
+}
+
+@media (forced-colors: active) {
+  .inspect-resize::after {
+    background-color: CanvasText;
+  }
+  .inspect-resize:focus-visible::after {
+    background-color: Highlight;
+  }
+}

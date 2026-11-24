@@ -3,18 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The conventions of the rooms between a building's root and a run's
-//! room: carried in the resident slot, so the building slot stays one
-//! string for every room of the building.
-
 use std::sync::{Arc, Mutex, PoisonError};
 
 use super::super::*;
 use crate::worker::fixture::*;
 use crate::worker::*;
 
-/// One recorded segment: its slot, its hash, and the addresses of the
-/// documents it names.
 type Segment = (String, String, Vec<String>);
 
 fn watch(worker: &mut RunWorker) -> Arc<Mutex<Vec<Vec<Segment>>>> {
@@ -57,6 +51,8 @@ fn dispatch(worker: &mut RunWorker, room: &str) {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, room.as_bytes()),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -67,9 +63,6 @@ fn slot<'a>(segments: &'a [Segment], name: &str) -> &'a Segment {
     segments.iter().find(|(slot, _, _)| slot == name).unwrap()
 }
 
-/// A package two levels down works under its parent's conventions and
-/// its own, read after the building's; a sibling room is told neither,
-/// and both rooms carry the same building slot byte for byte.
 #[test]
 fn a_rooms_conventions_ride_in_the_resident_slot_after_the_buildings() {
     let dir = tempfile::tempdir().unwrap();
@@ -124,10 +117,6 @@ fn a_rooms_conventions_ride_in_the_resident_slot_after_the_buildings() {
     assert_eq!(slot(&seen[0], "building"), slot(&seen[1], "building"));
 }
 
-/// A directory that happens to be named `AGENTS.md` is not a
-/// convention: the run in that room starts, and its prefix names no such
-/// document. Reading it as a file refused every run of the room, on
-/// Windows with a permission error.
 #[test]
 fn a_directory_named_agents_md_does_not_stop_the_room() {
     let dir = tempfile::tempdir().unwrap();
@@ -153,6 +142,8 @@ fn a_directory_named_agents_md_does_not_stop_the_room() {
         policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"pkg"),
         session: None,
+        resume: None,
+        images: Vec::new(),
         effort: None,
         model: None,
     });

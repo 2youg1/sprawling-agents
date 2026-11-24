@@ -3,15 +3,15 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { Snippet } from "svelte";
+import type { Snippet } from "../../core/snippet";
 
-export interface RowProps {
+export interface RowProps<Content = Snippet> {
   readonly primary: string;
   readonly secondary?: string;
 
-  readonly status?: Snippet;
+  readonly status?: Content;
 
-  readonly actions?: Snippet;
+  readonly actions?: Content;
 
   readonly onOpen?: () => void;
 
@@ -33,17 +33,17 @@ export interface OpenWire {
   readonly onclick: () => void;
 }
 
-export interface RowLook {
+export interface RowLook<Content = Snippet> {
   readonly item: ItemWire;
   readonly chosen: boolean;
   readonly primary: string;
   readonly secondary: string | undefined;
-  readonly status: Snippet | undefined;
-  readonly actions: Snippet | undefined;
+  readonly status: Content | undefined;
+  readonly actions: Content | undefined;
   readonly open: OpenWire | undefined;
 }
 
-export function lookOf(props: RowProps): RowLook {
+export function lookOf<Content>(props: RowProps<Content>): RowLook<Content> {
   const chosen = props.chosen === true;
   const onOpen = props.onOpen;
   return {
@@ -121,4 +121,43 @@ export function landing<T>(
     }
   }
   return undefined;
+}
+
+const REACHABLE = 'a[href], button:not([disabled]), [tabindex="0"]';
+
+function targetOf(target: EventTarget | null): Target {
+  if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+    return "text";
+  }
+  if (target instanceof HTMLSelectElement) {
+    return "select";
+  }
+  return target instanceof HTMLElement && target.isContentEditable ? "editable" : "row";
+}
+
+export function walk(
+  event: KeyboardEvent & { readonly currentTarget: EventTarget & HTMLUListElement },
+): void {
+  const step = taken(targetOf(event.target), event.key);
+  if (step === null) {
+    return;
+  }
+  const rows = [...event.currentTarget.children];
+  const from = rows.findIndex((row) => event.target instanceof Node && row.contains(event.target));
+  if (from < 0) {
+    return;
+  }
+  const next = landing(
+    rows.map((row) => {
+      const reach = row.querySelector(REACHABLE);
+      return reach instanceof HTMLElement ? reach : undefined;
+    }),
+    step,
+    from,
+  );
+  if (next === undefined) {
+    return;
+  }
+  event.preventDefault();
+  next.focus();
 }

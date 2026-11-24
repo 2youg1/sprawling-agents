@@ -185,6 +185,8 @@ fn a_run_is_offered_the_browser_the_worker_was_handed() {
         policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: idem(b"dispatch"),
         session: Some(kernel::SessionName::parse("s1").unwrap()),
+        resume: None,
+        images: Vec::new(),
         effort: None,
         model: None,
     });

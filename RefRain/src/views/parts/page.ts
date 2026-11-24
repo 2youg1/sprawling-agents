@@ -3,28 +3,28 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { Snippet } from "svelte";
+import type { Snippet } from "../../core/snippet";
 
 export type Rank = "page" | "section";
 
-export interface PageProps {
+export interface PageProps<Content = Snippet> {
   readonly title: string;
   readonly rank?: Rank | undefined;
   readonly note?: string | undefined;
-  readonly aside?: Snippet | undefined;
-  readonly children: Snippet;
+  readonly aside?: Content | undefined;
+  readonly children: Content;
 }
 
-export interface PageLook {
+export interface PageLook<Content = Snippet> {
   readonly title: string;
   readonly rank: Rank;
   readonly heading: { readonly tabindex: -1 } | Record<string, never>;
   readonly note: string | undefined;
-  readonly aside: Snippet | undefined;
-  readonly children: Snippet;
+  readonly aside: Content | undefined;
+  readonly children: Content;
 }
 
-export function pageOf(props: PageProps): PageLook {
+export function pageOf<Content>(props: PageProps<Content>): PageLook<Content> {
   const rank = props.rank ?? "page";
   return {
     title: props.title,

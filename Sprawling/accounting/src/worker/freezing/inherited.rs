@@ -37,6 +37,7 @@ impl RunWorker {
                 run: origin.run,
                 at_seq: rebuilt.at,
             },
+            at.resume,
         )?;
         for warning in rebuilt.rule_warnings {
             self.note(

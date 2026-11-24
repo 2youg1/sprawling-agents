@@ -19,10 +19,6 @@ import {
   type TreeLook,
 } from "./tree";
 
-// The address bar may name any group (`core/route.ts`), and the tree is
-// the only way to one by hand, so a group the tree leaves out is a
-// group nobody reaches, and one it offers twice is two places that
-// claim to be it.
 describe("the settings tree", () => {
   test("offers every group the address bar reads, each once, folded or not", () => {
     const offered = TREE.flatMap((branch) =>
@@ -82,8 +78,6 @@ describe("the settings tree", () => {
     expect(standingOf("about", talk)).toEqual({ branch: diagnosis, more: false });
   });
 
-  // The advanced group's door to privacy is a cross-branch jump: the seat
-  // must open preferences, not leave diagnosis (and its more) open.
   test("a cross-branch jump opens the destination's folds", () => {
     const talk = { kind: "talk", address: Address.make("hall/mayor") } as const;
     const preferences = TREE.findIndex((branch) => branch.word === "settings_branch_preferences");
@@ -100,9 +94,6 @@ describe("the settings tree", () => {
     });
   });
 
-  // Settings opened from the city page keep that page beneath the panel.
-  // Picking a group in another branch must open that branch, not snap
-  // back onto city because foldsOf prefers the page beneath.
   test("a group pick over the city page opens the group's branch", () => {
     const city = { kind: "city" } as const;
     const access = TREE.findIndex((branch) => branch.word === "settings_branch_access");
@@ -138,7 +129,6 @@ describe("the settings tree's branch marks", () => {
         pick: () => undefined,
         toggle: () => undefined,
         walk: () => undefined,
-        hold: () => undefined,
       },
     );
     expect(Object.fromEntries(look.branches.map((branch) => [branch.key, branch.mark]))).toEqual({
@@ -152,8 +142,6 @@ describe("the settings tree's branch marks", () => {
   });
 });
 
-// The look is handed every role, state and handler of RefRain/Spec.lean
-// §7-11 in its wire bags, so these hold for whatever look draws the tree.
 describe("the settings tree's wiring", () => {
   const talk = { kind: "talk", address: Address.make("hall/mayor") } as const;
   const leaves = { buildings: buildingPages([Address.make("hall")]), record: [] };
@@ -166,7 +154,6 @@ describe("the settings tree's wiring", () => {
       pick: (named) => picked.push(named),
       toggle: (fold) => pressed.push(fold),
       walk: () => undefined,
-      hold: () => undefined,
     });
     return { look, picked, pressed };
   }
@@ -203,8 +190,6 @@ describe("the settings tree's wiring", () => {
     expect(open).toHaveLength(1);
     const [branch] = open;
     expect(branch?.fold.wire["aria-controls"]).toBe(branch?.fold.list);
-    // Automation sits in the branch's first list; the diagnosis branch
-    // is the one that still keeps a "more" fold.
     expect(branch?.more).toBeNull();
     const diagnosis = drawn("advanced", talk).look.branches.find(
       (each) => each.fold.wire["aria-expanded"],

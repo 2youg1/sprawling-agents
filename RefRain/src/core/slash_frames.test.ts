@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What every `/` verb does, driven through the doors a typed line goes
-// through - `parse`, `find`, `run` - and judged as the city would meet
-// it: each frame the verb sends is written the way the socket writes
-// it and read back through the wire's own `ClientFrame` schema, then
-// compared whole. The table is keyed by the verbs `SLASH`
-// holds, so a verb added there without a case here turns this file red.
-// The finer behaviour of the verbs with a seam of their own - `/new`
-// and `/fork`, `/halt` and `/release`, `/stop` - is `slash.test.ts`'s.
-
 import { describe, expect, test } from "bun:test";
 import { Schema } from "effect";
 
@@ -48,14 +39,11 @@ const BUILDINGS: readonly BuildingProgress[] = [
     ready: 0,
   },
 ];
-// Each frame is minted a fresh key; on the way back it is given this
-// one, so a whole frame can be compared.
 const IDEM = IdemKey.make(`idem1-${"0".repeat(32)}`);
 const IDEM_RE = /"idem":"idem1-[0-9a-f]{32}"/gu;
 
 const readFrame = Schema.decodeUnknownSync(ClientFrame);
 
-// Everything a verb did through its hands.
 interface Done {
   readonly sent: readonly ClientFrame[];
   readonly went: readonly View[];
@@ -66,8 +54,6 @@ interface Done {
 
 const NOTHING: Done = { sent: [], went: [], written: [], efforts: [], policies: [] };
 
-// What the person chose beside the box: a create-only experiment that
-// must show its tests, so a verb that drops a value is seen dropping it.
 const CHOSEN: RunPolicy = { mode: "work", write: "create", admit: "tested", landing: "experiment" };
 
 interface Case {
@@ -104,8 +90,6 @@ function ran(line: string, buildings: SlashHands["buildings"]): Done {
     tagged: null,
     retag: () => false,
     whenFrozen: () => undefined,
-    // The page's branch door sends the frame and moves main only once
-    // the city opens the session (`slash_session.test.ts`).
     openSession: (room, carry) => command(openSession(room, carry, null)),
     opening: () => false,
   };
@@ -115,7 +99,6 @@ function ran(line: string, buildings: SlashHands["buildings"]): Done {
   return { sent, went, written, efforts, policies };
 }
 
-// A verb that did its one thing and emptied the line.
 const sending = (...sent: ClientFrame[]): Done => ({ ...NOTHING, sent, written: [""] });
 const going = (view: View): Done => ({ ...NOTHING, went: [view], written: [""] });
 const setting = (effort: Effort | null): Done => ({ ...NOTHING, efforts: [effort], written: [""] });
@@ -124,7 +107,6 @@ const admitting = (admit: RunPolicy["admit"]): Done => ({
   policies: [{ ...CHOSEN, admit }],
   written: [""],
 });
-// A new session here; main follows once the city has opened it.
 const opening = (carry: "nothing" | "handoff"): Done =>
   sending({ command: { open_session: { addr: ROOM, carry, from: null, idem: IDEM } } });
 
@@ -198,13 +180,9 @@ const CASES: Readonly<Record<string, readonly Case[]>> = {
     { line: "/raise lab palace", done: NOTHING },
   ],
   "/new": [{ line: "/new", done: opening("nothing") }],
-  // The run in hand is stopped first; the session opens once it froze,
-  // which `slash_session.test.ts` follows.
   "/compact": [
     { line: "/compact", done: sending({ command: { cancel: { run: LIVE, idem: IDEM } } }) },
   ],
-  // A tag is a preference, not a frame of its own; with no session in
-  // main the line stays.
   "/tag": [{ line: "/tag later", done: NOTHING }],
   "/untag": [{ line: "/untag later", done: NOTHING }],
   "/fork": [
@@ -285,8 +263,6 @@ const CASES: Readonly<Record<string, readonly Case[]>> = {
   "/doctor": [{ line: "/doctor", done: going({ kind: "welcome" }) }],
   "/help": [{ line: "/help", done: { ...NOTHING, written: ["/"] } }],
   "/acp": [{ line: "/acp", done: going({ kind: "setup", group: "agents" }) }],
-  // The question is the shell's (`views/quit.svelte`); the verb sends no
-  // frame and only empties the line.
   "/quit": [{ line: "/quit", done: { ...NOTHING, written: [""] } }],
   "/diff": [{ line: "/diff", done: going({ kind: "run", run: LIVE, lens: "changes" }) }],
 };

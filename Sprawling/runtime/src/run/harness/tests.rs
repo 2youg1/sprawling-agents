@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The lines a harness run writes, and what its answer freezes as, as
-//! `Sprawling/agent_protocols/spec/Harness/Session.lean` states them.
-
 use kernel::event::Who;
 use kernel::event::record::CheckpointFinding;
 use kernel::ledger::chain_hash;
@@ -13,8 +10,6 @@ use kernel::{Address, B3Hash, EventDraft, GENESIS_PREV, Locator, RunId, Seq};
 
 use super::*;
 
-/// A ledger that keeps every line it was handed, and hands back the
-/// pointer a real one would.
 struct Kept {
     lines: Vec<EventDraft>,
     refs: Vec<EventRef>,
@@ -66,6 +61,7 @@ fn owned() -> Owned {
 
 fn charter(owned: &Owned) -> Charter<'_> {
     Charter {
+        pictures: &[],
         run: RunId::from_bytes([7; 16]),
         who: "lab/room1",
         addr: &owned.addr,
@@ -97,8 +93,6 @@ fn handoff(owned: &Owned) -> Handoff {
     .unwrap()
 }
 
-/// One run from its opening to the answer, cut or not; what it froze as,
-/// and the pointer to the answer it wrote.
 fn answered(stop: HarnessStop, text: &str, cut: Option<Cut>) -> (Completion, EventRef) {
     let owned = owned();
     let mut ledger = Kept::new();
@@ -133,9 +127,6 @@ fn answered(stop: HarnessStop, text: &str, cut: Option<Cut>) -> (Completion, Eve
     (completion, cited.unwrap())
 }
 
-/// The ending table of `Sprawling/runtime/spec/Run.lean` §8-52, row by row: done needs an end
-/// of turn that said something, the ceiling reads as limit, and only a
-/// halt reads as cancelled.
 #[test]
 fn an_answer_freezes_as_its_stop_and_the_first_cut_say() {
     let done = |text: &str, cut| {
@@ -182,9 +173,6 @@ fn an_answer_freezes_as_its_stop_and_the_first_cut_say() {
     }
 }
 
-/// The order Session.lean proves: the opening, the reports, one cancel
-/// however often the turn is cut, then the tree, the answer and the
-/// freeze.
 #[test]
 fn a_concluded_run_cancels_once_and_commits_before_it_answers() {
     let owned = owned();
@@ -237,8 +225,6 @@ fn a_concluded_run_cancels_once_and_commits_before_it_answers() {
     );
 }
 
-/// A session that ended without a stop reason records no answer the
-/// harness never gave, and freezes cancelled.
 #[test]
 fn a_lost_session_freezes_cancelled_with_no_answer() {
     let owned = owned();
@@ -265,10 +251,6 @@ fn a_lost_session_freezes_cancelled_with_no_answer() {
     );
 }
 
-/// A harness's own tree can be refused by a known key shape after the
-/// driver has finished. The report reaches the same event a wave
-/// checkpoint writes, before the freeze that ends the run, so
-/// `sprawling secrets` reads it back afterwards.
 #[test]
 fn a_refused_tree_is_booked_before_the_run_freezes() {
     let owned = owned();

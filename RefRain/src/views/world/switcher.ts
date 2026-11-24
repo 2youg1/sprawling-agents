@@ -3,21 +3,14 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The zen session switcher's keyboard contract and the whole value its
-// look draws. The tree itself is core/session_tree.ts; opening a row is
-// talk/branching.ts. This file owns neither of those rules.
-
 import { say } from "../../core/lang";
-import type { Key, Lang } from "../../core/lang";
+import type { Lang } from "../../core/lang";
 import type { WorkspaceView } from "../../core/route";
 import { ago } from "../../core/time";
 import type { SessionNode } from "../../core/session_tree";
 import { sessionTree } from "../../core/session_tree";
-import { tailOf } from "../../core/stretches";
 import type { Stretch } from "../../core/stretches";
-import type { Origin } from "../../wire";
 import { titleOf } from "./sessions";
-import type { BranchNote } from "../talk/branch_note";
 
 export type SwitchKey = "up" | "down" | "left" | "right" | "enter" | "composing" | "other";
 
@@ -26,8 +19,6 @@ export interface SwitchState {
   readonly collapsed: ReadonlySet<string>;
 }
 
-// Mirrors RefRain/spec/Views/SessionSwitch.lean. The boolean says whether
-// this key asks to open the row under the cursor.
 export function answer(
   nodes: readonly Pick<SessionNode, "key" | "children">[],
   state: SwitchState,
@@ -67,10 +58,7 @@ export interface SwitchItem {
   readonly hint: string;
   readonly depth: number;
   readonly children: boolean;
-  readonly origin: Origin | null;
   readonly to: WorkspaceView;
-  readonly note: BranchNote | null;
-  readonly refused: Key | undefined;
 }
 
 export function switchItems(
@@ -95,12 +83,9 @@ export function switchItems(
       hint: `${stretch.current ? "" : `${ago(lang, stretch.line.at, now)} · `}#${String(stretch.line.began)}`,
       depth,
       children: node.children,
-      origin: stretch.current ? null : tailOf(stretch),
       to: stretch.current
         ? { kind: "talk", address: stretch.room }
         : { kind: "talk", address: stretch.room, session: stretch.line.began },
-      note: null,
-      refused: undefined,
     };
   });
 }
@@ -216,7 +201,7 @@ export function switcherLookOf(state: LookState, hands: LookHands): SwitcherLook
     rows: rows.map((row, at) => ({
       key: row.key,
       label: row.label,
-      hint: row.note?.said ?? row.hint,
+      hint: row.hint,
       depth: row.depth,
       wire: {
         id: `${list}-${String(at)}`,
@@ -224,7 +209,7 @@ export function switcherLookOf(state: LookState, hands: LookHands): SwitcherLook
         "aria-level": row.depth + 1,
         "aria-selected": at === cursor,
         "aria-expanded": row.children ? !collapsed.has(row.key) : undefined,
-        "aria-disabled": row.refused !== undefined,
+        "aria-disabled": false,
         onmouseenter: () => {
           hands.hover(at);
         },

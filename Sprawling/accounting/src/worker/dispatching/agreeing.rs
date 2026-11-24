@@ -55,6 +55,8 @@ pub fn acp_dispatch(
             idem,
 
             session: None,
+            resume: None,
+            images: Vec::new(),
 
             effort: None,
             model: None,

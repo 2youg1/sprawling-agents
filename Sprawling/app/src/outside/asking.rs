@@ -5,9 +5,9 @@
 
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 
-use kernel::{AxCode, AxError, TimeMs};
+use kernel::{AxCode, AxError, IdemKey, TimeMs};
 use remote_access::confirm::{CONFIRM_BYTES, Confirm, Miss};
-use wire::{Command, Delivered, Reply, WireCommand};
+use wire::{Command, Reply, WireCommand};
 
 use super::console::{Lasting, Remote, RemoteLine, perform};
 
@@ -22,7 +22,7 @@ pub(crate) struct Front(Arc<OnceLock<Asking>>);
 
 struct Asking {
     remote: Result<Remote, AxError>,
-    waiting: Mutex<Confirm<Asked>>,
+    waiting: Mutex<Confirm<Requested>>,
 
     carrying: Arc<Mutex<Carrying>>,
     show: Show,
@@ -39,11 +39,16 @@ enum Asked {
     ReplaceKey,
 }
 
+struct Requested {
+    action: Asked,
+    key: IdemKey,
+}
+
 enum Verb {
-    Open(u64),
-    ReplaceKey,
-    Confirm(String),
-    Close,
+    Open(u64, IdemKey),
+    ReplaceKey(IdemKey),
+    Confirm(String, Option<IdemKey>, IdemKey),
+    Close(IdemKey),
 }
 
 impl Front {
@@ -53,7 +58,21 @@ impl Front {
     ) -> Commands {
         let front = self.clone();
         Arc::new(move |command, reply| match door_verb(command) {
-            Ok(verb) => front.answer(verb, reply),
+            Ok(verb) => {
+                let key = match &verb {
+                    Verb::Open(_, key)
+                    | Verb::ReplaceKey(key)
+                    | Verb::Confirm(_, _, key)
+                    | Verb::Close(key) => *key,
+                };
+                let result = front.answer(verb, reply);
+                if let (Some(asking), Err(refused)) = (front.0.get(), &result)
+                    && refused.code() != &AxCode::ApprovalPending
+                {
+                    (asking.show)(&failed_at(refused, key));
+                }
+                result
+            }
             Err(command) => desk(*command, reply),
         })
     }
@@ -69,22 +88,26 @@ impl Front {
 
     fn answer(&self, verb: Verb, reply: Reply) -> Result<(), AxError> {
         match (self.0.get(), verb) {
-            (None, Verb::Close) => Ok(()),
-            (None, Verb::Open(_) | Verb::ReplaceKey | Verb::Confirm(_)) => Err(no_console()),
-            (Some(asking), Verb::Open(ms)) => asking.ask(Asked::Open(
-                Lasting::of_ms(ms).ok_or_else(|| unlasting(ms))?,
-            )),
-            (Some(asking), Verb::ReplaceKey) => asking.ask(Asked::ReplaceKey),
-            (Some(asking), Verb::Confirm(code)) => {
-                let line = match asking.confirmed(&code)? {
+            (None, Verb::Close(idem)) => {
+                let _delivered = reply.accept(idem);
+                Ok(())
+            }
+            (None, Verb::Open(..) | Verb::ReplaceKey(_) | Verb::Confirm(..)) => Err(no_console()),
+            (Some(asking), Verb::Open(ms, idem)) => asking.ask(
+                Asked::Open(Lasting::of_ms(ms).ok_or_else(|| unlasting(ms))?),
+                idem,
+            ),
+            (Some(asking), Verb::ReplaceKey(idem)) => asking.ask(Asked::ReplaceKey, idem),
+            (Some(asking), Verb::Confirm(code, approval, idem)) => {
+                let line = match asking.confirmed(&code, approval)? {
                     Asked::Open(lasting) => RemoteLine::Open(lasting),
                     Asked::ReplaceKey => RemoteLine::ReplaceKey,
                 };
-                asking.later(line, reply);
+                asking.later(line, idem, reply);
                 Ok(())
             }
-            (Some(asking), Verb::Close) => {
-                asking.later(RemoteLine::Close, reply);
+            (Some(asking), Verb::Close(idem)) => {
+                asking.later(RemoteLine::Close, idem, reply);
                 Ok(())
             }
         }
@@ -92,14 +115,16 @@ impl Front {
 }
 
 impl Asking {
-    fn ask(&self, asked: Asked) -> Result<(), AxError> {
+    fn ask(&self, asked: Asked, key: IdemKey) -> Result<(), AxError> {
         let senses = self.remote.as_ref().map_err(Clone::clone)?.doorway.senses();
         let mut entropy = [0u8; CONFIRM_BYTES];
         (senses.entropy)(&mut entropy)?;
         let expires = TimeMs::new((senses.clock)()?.value().saturating_add(CONFIRM_MS));
-        let code = self.waiting()?.request(asked, entropy, expires)?;
+        let code = self
+            .waiting()?
+            .request(Requested { action: asked, key }, entropy, expires)?;
         (self.show)(&format!(
-            "  a page asks to {}; to allow it, type {code} into that page within two minutes",
+            "  a page asks to {}; to allow it, type {code} into that page within two minutes\n  remote operation {key}",
             asked.what()
         ));
         Err(AxError::failure(
@@ -113,7 +138,7 @@ impl Asking {
         ))
     }
 
-    fn confirmed(&self, code: &str) -> Result<Asked, AxError> {
+    fn confirmed(&self, code: &str, approval: Option<IdemKey>) -> Result<Asked, AxError> {
         let senses = self.remote.as_ref().map_err(Clone::clone)?.doorway.senses();
         let now = (senses.clock)()?;
         let mut waiting = self.waiting()?;
@@ -123,7 +148,18 @@ impl Asking {
         if locked_now {
             self.lock_out();
         }
-        answered.map_err(Miss::refusal)
+        let approved = answered.map_err(Miss::refusal)?;
+        if approval.is_some_and(|key| key != approved.key) {
+            return Err(AxError::failure(
+                AxCode::GateDenied,
+                "confirm a remote door verb",
+                "the console code belongs to a different request",
+            )
+            .with_recovery(
+                "start again from the intended control and type the matching console code",
+            ));
+        }
+        Ok(approved.action)
     }
 
     fn lock_out(&self) {
@@ -147,7 +183,7 @@ impl Asking {
         });
     }
 
-    fn later(&self, line: RemoteLine, reply: Reply) {
+    fn later(&self, line: RemoteLine, idem: IdemKey, reply: Reply) {
         let remote = self.remote.clone();
         let show = Arc::clone(&self.show);
         let carrying = Arc::clone(&self.carrying);
@@ -160,18 +196,19 @@ impl Asking {
             };
             drop(turn);
             match done {
-                Ok(said) => show(&said),
-                Err(refused) => match reply.refuse(refused.clone()) {
-                    Delivered::ToThePeer => {}
-                    Delivered::NobodyAsked | Delivered::PeerGone => {
-                        show(&format!("  {refused}\n  {}", refused.recovery()));
-                    }
-                },
+                Ok(said) => {
+                    show(&format!("{said}\n  remote operation {idem}"));
+                    let _delivered = reply.accept(idem);
+                }
+                Err(refused) => {
+                    show(&failed_at(&refused, idem));
+                    let _delivered = reply.refuse(refused);
+                }
             }
         });
     }
 
-    fn waiting(&self) -> Result<std::sync::MutexGuard<'_, Confirm<Asked>>, AxError> {
+    fn waiting(&self) -> Result<std::sync::MutexGuard<'_, Confirm<Requested>>, AxError> {
         self.waiting.lock().map_err(|_| {
             AxError::failure(
                 AxCode::Busy,
@@ -204,6 +241,13 @@ impl Asked {
     }
 }
 
+fn failed_at(refused: &AxError, key: IdemKey) -> String {
+    format!(
+        "  {refused}\n  {}\n  remote operation {key}",
+        refused.recovery()
+    )
+}
+
 fn no_console() -> AxError {
     AxError::failure(
         AxCode::ToolUnavailable,
@@ -227,10 +271,12 @@ fn unlasting(ms: u64) -> AxError {
 
 fn door_verb(command: WireCommand) -> Result<Verb, Box<WireCommand>> {
     match command {
-        Command::OpenRemoteDoor(opening) => Ok(Verb::Open(opening.lasting_ms)),
-        Command::ReplaceCityKey(_) => Ok(Verb::ReplaceKey),
-        Command::ConfirmRemoteDoor(answer) => Ok(Verb::Confirm(answer.code)),
-        Command::CloseRemoteDoor(_) => Ok(Verb::Close),
+        Command::OpenRemoteDoor(opening) => Ok(Verb::Open(opening.lasting_ms, opening.idem)),
+        Command::ReplaceCityKey(step) => Ok(Verb::ReplaceKey(step.idem)),
+        Command::ConfirmRemoteDoor(answer) => {
+            Ok(Verb::Confirm(answer.code, answer.approval, answer.idem))
+        }
+        Command::CloseRemoteDoor(step) => Ok(Verb::Close(step.idem)),
         Command::Dispatch { .. }
         | Command::ProbeEndpoint { .. }
         | Command::ConfigureBuilding(_)

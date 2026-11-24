@@ -3,20 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The model picker as the settings row draws it: the three-segment
-// token, the popover's sections with their rows, the room each keeps,
-// and what a pick does. `picker.ts` decides the rules and
-// `picker_scene.ts` what one drawing reads; this builds the whole value
-// `picker.look.svelte` is given, every role, key handler and `aria-*`
-// value inside a wire bag (client D95). The seat (`settings_row.svelte`)
-// holds what is open, typed and pointed at.
-
-import type { Attachment } from "svelte/attachments";
-
 import type { Lang } from "../../core/lang";
 import { fill, say } from "../../core/lang";
 import type { PopoverBinding, PopoverColumn, PopoverRow } from "../parts/popover";
-import { HOLD } from "./fact";
+import { HOLD, type Reference } from "./fact";
 import type { Combination, Entry, Offer, Section, Segment } from "./picker";
 import {
   SECTION,
@@ -43,10 +33,8 @@ import {
   sceneOf,
 } from "./picker_scene";
 
-// The row that opens a list in full. No entry id holds a NUL.
 export const MORE = "\u0000more";
 
-// What only the seat can do.
 export interface PickerHands {
   readonly open: (segment: Segment | null) => void;
   readonly close: (focus: "token" | "stay") => void;
@@ -55,48 +43,35 @@ export interface PickerHands {
   readonly bound: (binding: PopoverBinding) => void;
   readonly cursor: (id: string | null) => void;
   readonly focusFilter: () => void;
-  readonly holdToken: Attachment<HTMLElement>;
-  readonly holdFilter: Attachment<HTMLElement>;
-  readonly holdFrame: Attachment<HTMLElement>;
+  readonly holdToken: Reference;
+  readonly holdFilter: Reference;
+  readonly holdFrame: Reference;
 }
 
-// One segment of the token, as drawn.
 export interface TokenSegment {
   readonly segment: Segment;
   readonly label: string;
-  // The picker is open on this segment's section.
   readonly open: boolean;
 }
 
-// The bag spread on the token. A press reads which segment was under
-// the pointer from the drawn `data-segment`; a key press has none.
 export interface TokenWire {
   readonly "aria-label": string;
   readonly "aria-haspopup": "dialog";
   readonly "aria-expanded": boolean;
   readonly onclick: (event: { readonly target: EventTarget | null }) => void;
-  readonly [hold: symbol]: Attachment<HTMLElement>;
+  readonly [hold: symbol]: Reference;
 }
 
-// How one section of the open picker is drawn beside the popover's own
-// list value: its heading, the room it keeps, and the names its rows
-// are heard by where those differ from their words.
 export interface SectionLook {
   readonly heading: string;
   readonly aside: string | undefined;
-  // Rows of room the list keeps below its rows, so its height is the
-  // largest any reachable state draws.
   readonly spare: number;
-  // The rows are laid across, as one band.
   readonly band: boolean;
-  // The list is opened in full and scrolls inside its room.
   readonly scrolls: boolean;
   readonly empty: string;
   readonly heard: Readonly<Record<string, string>>;
 }
 
-// The bag spread on the filter box, which holds the focus while the
-// picker is open and hands every menu key but its own to the popover.
 export interface FilterWire {
   readonly type: "search";
   readonly "aria-label": string;
@@ -106,35 +81,28 @@ export interface FilterWire {
   readonly value: string;
   readonly oninput: (event: { readonly currentTarget: { readonly value: string } }) => void;
   readonly onkeydown: (event: KeyboardEvent) => void;
-  readonly [hold: symbol]: Attachment<HTMLElement>;
+  readonly [hold: symbol]: Reference;
 }
 
 export interface PickerMenu {
   readonly columns: readonly PopoverColumn[];
   readonly sections: Readonly<Record<string, SectionLook>>;
-  // The thinking band's room, kept while the selection has no band.
   readonly bandRoom: boolean;
   readonly filter: FilterWire;
   readonly onApply: (column: PopoverColumn, row: PopoverRow) => void;
-  // Escape: closes onto the token.
   readonly onClose: () => void;
-  // A press outside the token and the popover: closes where it landed.
   readonly onOutside: () => void;
   readonly bind: (binding: PopoverBinding) => void;
   readonly onCursorChange: (id: string | null) => void;
 }
 
 export interface PickerLook {
-  // Spread on the box holding the token and the popover, whose edge an
-  // outside press is measured against.
-  readonly frame: Readonly<Record<symbol, Attachment<HTMLElement>>>;
+  readonly frame: Readonly<Record<symbol, Reference>>;
   readonly token: TokenWire;
   readonly segments: readonly TokenSegment[];
   readonly menu: PickerMenu | undefined;
 }
 
-// The picker, or nothing when the city serves no model: an entry with
-// no options is hidden rather than drawn empty.
 export function pickerOf(
   lang: Lang,
   facts: PickerFacts,
@@ -349,9 +317,6 @@ interface Pressed {
   readonly recent: readonly Combination[];
 }
 
-// What a row does. A "more…" row opens its list in full; a model or a
-// provider changes the selection and leaves the picker open on the band
-// under it; a level or a recent combination applies and closes.
 function apply(
   scene: Scene,
   facts: PickerFacts,
@@ -396,9 +361,6 @@ function apply(
   else hands.focusFilter();
 }
 
-// A first-level row expands its second level. Under models first it is
-// also a choice: the model at the provider in force when that provider
-// serves it, else at its first provider.
 function chooseFirst(scene: Scene, facts: PickerFacts, hands: PickerHands, id: string): void {
   hands.hold({ parent: id });
   if (scene.order === "providers_first") return;
@@ -441,7 +403,6 @@ function filterOf(scene: Scene, held: PickerHeld, hands: PickerHands): FilterWir
   };
 }
 
-// The section a segment opens on, for the seat to point the cursor at.
 export function startOf(facts: PickerFacts, segment: Segment | null): Section {
   return sectionOf(orderOf(offersOf(facts.endpoints)), segment);
 }

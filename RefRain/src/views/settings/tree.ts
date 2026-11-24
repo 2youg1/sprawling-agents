@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import { createAttachmentKey, type Attachment } from "svelte/attachments";
-
 import type { Key } from "../../core/lang";
 import { initialOf, type LineMove } from "../../core/lines";
 import { toFragment, type SetupGroup, type View } from "../../core/route";
@@ -190,7 +188,6 @@ export function byInitial<T>(
 export interface NavWire {
   readonly "aria-label": string;
   readonly onkeydown: (event: KeyboardEvent) => void;
-  readonly [hold: symbol]: Attachment<HTMLElement>;
 }
 
 export interface FoldWire {
@@ -282,10 +279,7 @@ export interface TreeHands {
   readonly pick: (group: SetupGroup) => void;
   readonly toggle: (fold: Fold) => void;
   readonly walk: (event: KeyboardEvent) => void;
-  readonly hold: Attachment<HTMLElement>;
 }
-
-const HOLD = createAttachmentKey();
 
 export function lookOf(state: TreeState, uid: string, hands: TreeHands): TreeLook {
   const foldOf = (label: Key, open: boolean, list: string, fold: Fold): FoldLook => ({
@@ -313,7 +307,7 @@ export function lookOf(state: TreeState, uid: string, hands: TreeHands): TreeLoo
     pages: state.leaves[nest].map((page) => pageOf(page, state, hands.words)),
   });
   return {
-    nav: { "aria-label": hands.words("settings_tree"), onkeydown: hands.walk, [HOLD]: hands.hold },
+    nav: { "aria-label": hands.words("settings_tree"), onkeydown: hands.walk },
     branches: TREE.map((branch, at) => {
       const list = `${uid}-${String(at)}`;
       return {

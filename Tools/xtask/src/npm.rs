@@ -23,8 +23,10 @@ const MODULES: &str = "RefRain/node_modules";
 
 const PERMITTED: &str = "deny.toml";
 
-const RUNTIME: [&str; 22] = [
+const RUNTIME: [&str; 27] = [
     "@codemirror/commands",
+    "@codemirror/lang-markdown",
+    "@codemirror/language",
     "@codemirror/merge",
     "@codemirror/search",
     "@codemirror/state",
@@ -36,16 +38,19 @@ const RUNTIME: [&str; 22] = [
     "@lezer/java",
     "@lezer/javascript",
     "@lezer/json",
+    "@lezer/markdown",
     "@lezer/python",
     "@lezer/rust",
     "@lezer/yaml",
-    "@lucide/svelte",
+    "@lucide/solid",
     "@noble/post-quantum",
+    "@solidjs/web",
     "docx-preview",
     "effect",
     "katex",
+    "mermaid",
     "pdfjs-dist",
-    "svelte",
+    "solid-js",
 ];
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
@@ -192,6 +197,13 @@ fn judge_licences(
             .get("license")
             .and_then(serde_json::Value::as_str)
             .unwrap_or_default();
+        let shipped = stated.is_empty()
+            && name == "khroma"
+            && document.get("version").and_then(serde_json::Value::as_str) == Some("2.1.0")
+            && manifest.with_file_name("license").is_file()
+            && walk::read_text(&manifest.with_file_name("license"))?
+                == walk::read_text(&root.join("RefRain/licenses/khroma-2.1.0-MIT.txt"))?;
+        let stated = if shipped { "MIT" } else { stated };
         if lockfile::allowed(stated, permitted) {
             continue;
         }

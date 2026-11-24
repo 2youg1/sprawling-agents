@@ -17,7 +17,7 @@ use crate::reception::{
     BindFace, BrowserDoor, DeviceKey, Guess, Keys, LABEL_MAX, PairedBrowser, Sessions, decode_hex,
 };
 
-use super::pairing::{PairProof, SessionBody};
+use super::pairing::{PairProof, RecoverySessionBody, SessionBody};
 use super::seat::Seat;
 
 const SIGNED_LABEL: &str = "sprawling local session v1";
@@ -252,6 +252,26 @@ impl LocalDoor {
 
         self.0.ended.send_replace(());
         Ok(token)
+    }
+
+    pub(super) fn recover_session(
+        &self,
+        body: RecoverySessionBody,
+        origin: &str,
+    ) -> Result<(DeviceId, String), AxError> {
+        let key = DeviceKey::parse(&body.public_key).ok_or_else(|| {
+            invalid(
+                "public_key",
+                "send the 32 bytes of the Ed25519 public key as 64 hex characters",
+            )
+        })?;
+        let request = SessionBody {
+            device: key.id(),
+            nonce: body.nonce,
+            signature: body.signature,
+        };
+        let token = self.open_session(&request, origin)?;
+        Ok((request.device, token))
     }
 
     fn held(&self) -> MutexGuard<'_, Held> {

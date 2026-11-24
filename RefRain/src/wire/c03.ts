@@ -34,10 +34,16 @@ import {
   ChosenSummary,
   DialectKind,
   GenerationSettings,
-  GenerationSupport,
   HeaderPair,
   ParameterSupport,
 } from "./c02";
+
+export const GenerationSupport = Schema.Struct({
+  temperature: Schema.optional(Schema.NullOr(ParameterSupport)),
+  top_k: Schema.optional(Schema.NullOr(ParameterSupport)),
+  top_p: Schema.optional(Schema.NullOr(ParameterSupport)),
+}).annotate({ identifier: "GenerationSupport" });
+export type GenerationSupport = typeof GenerationSupport.Type;
 
 export const ModelGeneration = Schema.Struct({
   model: Schema.String,
@@ -430,7 +436,4 @@ export const Inline: Schema.Codec<Inline, InlineEncoded> = Schema.Union([
     }),
   }),
 ]).annotate({ identifier: "Inline" });
-
-export const Check = Schema.Literals(["not_a_task", "open", "done"]).annotate({ identifier: "Check" });
-export type Check = typeof Check.Type;
 

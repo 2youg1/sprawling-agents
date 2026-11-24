@@ -38,6 +38,7 @@ const TAGGED: &str = "--tagged";
 const ROUTE: &str = "--route";
 
 const BUNDLE: &str = "--bundle";
+const SERVED_ENTRY: &str = "--served-entry";
 
 enum Errand {
     Gate,
@@ -96,7 +97,12 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         bundle: &bundle,
         route: &route,
     };
-    for (pass, measured) in measure_every(&opening, pass::wanted()?)? {
+    let passes = pass::wanted()?;
+    let measurements = match asked_for(SERVED_ENTRY) {
+        Some(entry) => engine::served::measure(&opening, &root.join(entry), passes)?,
+        None => measure_every(&opening, passes)?,
+    };
+    for (pass, measured) in measurements {
         let at = format!("{route} {}", pass.called());
         if let Some(refused) = unusable(pass, &measured, &at) {
             violations.push(refused);

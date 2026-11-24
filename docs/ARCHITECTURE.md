@@ -27,7 +27,7 @@
 One process serves one page, and the page is inside the binary rather than
 beside it: `Sprawling/app/build.rs` compresses `Sprawling/app/web-dist` and emits
 an `include_bytes!` entry per file, so a server that started has no asset
-directory left to lose. The page is `RefRain/`: Svelte and Effect, bundled by
+directory left to lose. The page is `RefRain/`: Solid 2 and Effect, bundled by
 Vite and driven by bun (§2).
 
 **The wire is the seam, not the language.** A second client written against
@@ -95,7 +95,7 @@ every week.
 | Inbound WebSocket | `axum` with its `ws` feature (`Sprawling/wire/Cargo.toml`; `Sprawling/app/Cargo.toml` for the remote listener) | It carries the WebSocket implementation itself, so the served protocol has one version authority rather than two. |
 | Outbound WebSocket | `tokio-tungstenite`, no default features | A client rather than a server: it drives the browser over WebDriver BiDi and is what an integration test speaks the wire with. TLS termination is deliberately not here — a face reachable beyond this machine refuses to serve without a credential, so certificates stay the proxy's (`Sprawling/wire/Spec.lean` §8-41). |
 | HTTP client | `reqwest`, blocking, `rustls`, no default features | One client for the whole workspace: providers and HTTP-reached MCP servers. Two clients would mean two TLS stacks in one binary. The TLS backend is aws-lc-rs, installed once by `gateway::reach::tls`. |
-| Client | Svelte and Effect, bundled by Vite, driven by bun | Its runtime dependencies are exactly the list `RUNTIME` in `Tools/xtask/src/npm.rs`, each admitted under `RefRain/Spec.lean` §7-9, and no framework runtime beyond Svelte. Svelte compiles its templates away; Effect decodes the wire with `Schema` and carries the client's few effectful steps. Cost: a JavaScript toolchain has to be present to build the page the binary embeds. |
+| Client | Solid 2 and Effect, bundled by Vite 8 and driven by Bun | Its runtime dependencies are exactly the list `RUNTIME` in `Tools/xtask/src/npm.rs`, each admitted under `RefRain/Spec.lean` §7-9, with Solid as the rendering runtime. Solid compiles the JSX views; Effect decodes the wire with `Schema` and carries the client's few effectful steps. Cost: a JavaScript toolchain has to be present to build the page the binary embeds. |
 | History | JSONL segments, appended, chain-verified | A history a person can read with `tail` and a machine can verify byte by byte. Cost: the Ledger's throughput is the city's throughput (§11). |
 | Content store | BLAKE3 | One hash for the whole library: content addressing and `IdemKey` derivation. Identical content is stored once. |
 | Restoration | `git2`, vendored libgit2 | Each project owns a private Git object database, and each run owns its working files, index and checkpoint references. A discarded file points at the private commit containing its bytes. Cost: a C library in the tree, vendored so there is no system dependency. |
@@ -105,7 +105,7 @@ every week.
 | Serialisation | `serde`, `serde_json`, `toml` | JSON on the wire and in the Ledger because the receiver may be a browser and a person still has to read it. TOML for configuration a person edits. |
 | Errors | `thiserror` | One error shape, `AxError`, defined in `kernel::error` and mapped at every crate boundary. |
 | Release profile | `opt-level = 3`, `lto = "fat"`, one codegen unit, symbols stripped, `panic = "abort"` | Crash-only delivery: there is no unwinding path to maintain, because there is nothing to catch. `3` rather than `"z"` or `"s"` because it is the fastest of the three on the product's common operations, and runtime speed comes before size; the criterion and the readings sit beside the setting in `Cargo.toml`. |
-| Dependency count | <!-- xtask:begin dependency_count -->414<!-- xtask:end --> packages in `Cargo.lock` | The one number in this table that is a fact about the whole graph rather than about one choice. Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
+| Dependency count | <!-- xtask:begin dependency_count -->431<!-- xtask:end --> packages in `Cargo.lock` | The one number in this table that is a fact about the whole graph rather than about one choice. Listed by `sprawling status --deps`, licence-checked one by one by `cargo deny` against `deny.toml`. |
 
 **Verification tools**, kept out of the shipped binary: `proptest`
 (properties before examples), `insta` (golden output), `trybuild` (proof
@@ -660,7 +660,7 @@ branch's work is its children.
 
 One WebSocket, three kinds of frame, and a schema hash that both ends check
 on connect: a page from a different build refuses rather than misreads.
-`WIRE_V` is <!-- xtask:begin wire_v -->81<!-- xtask:end -->.
+`WIRE_V` is <!-- xtask:begin wire_v -->82<!-- xtask:end -->.
 
 | Frame | Count | What it is |
 |---|---|---|
@@ -879,6 +879,7 @@ needs its own row and reason in the same change.
 
 | Door | Handling and scope | Authority |
 |---|---|---|
+| `bin::assembly::workspace::disk` | Uses directory capabilities inside a registered root. Refuses links, reparse points, hard-linked files and volume crossings. | `Sprawling/app/spec/Assembly/Workspace.lean` §8-160 |
 | `storage::alias::WriteTarget` | Refuses symlinks, junctions and hard-linked regular files. `at` checks the name and ancestors; `within` checks below its root. The value records the check at that instant; landing owns the later effect. | `Sprawling/storage/spec/Alias.lean` §8-25, §8-32 |
 | `city::library::install::precheck` | Refuses symbolic links throughout a package and opens its items through directory handles without following links; Windows also refuses every reparse point. Regular hard-linked source files are read into the snapshot. | `Sprawling/city/spec/Library/Install.lean` §8-28 |
 | `runtime::tools::chosen_path` | For model-chosen read/search paths, resolves symlinks and junctions and judges the real address; read and BoundReader check the opened file again. Search skips linked directories. Hard links have no unique original path to resolve. | `Sprawling/runtime/spec/Tools/ChosenPath.lean` §8-30-1 |

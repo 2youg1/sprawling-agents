@@ -3,16 +3,15 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { Snippet } from "svelte";
-
-export { default as Table } from "./table.svelte";
-
 export type Min = "12ch" | "24ch" | "figure";
 
-export interface Column<T> {
+type DrawRow<T> = (row: T) => unknown;
+type DrawEmpty = () => unknown;
+
+export interface Column<T, Render = DrawRow<T>> {
   readonly key: string;
   readonly header: string;
-  readonly render: Snippet<[T]>;
+  readonly render: Render;
   readonly compare?: (a: T, b: T) => number;
   readonly summary?: true;
   readonly min?: Min;
@@ -30,13 +29,13 @@ export interface Selection<T> {
   readonly allPicked: () => boolean;
 }
 
-export interface TableProps<T> {
+export interface TableProps<T, Render = DrawRow<T>, Empty = DrawEmpty> {
   readonly caption: string;
-  readonly columns: readonly Column<T>[];
+  readonly columns: readonly Column<T, Render>[];
   readonly rows: readonly T[];
   readonly keyOf: (row: T) => string;
   readonly selection?: Selection<T>;
-  readonly empty?: Snippet;
+  readonly empty?: Empty;
 }
 
 export type Order = "up" | "down";
@@ -55,9 +54,9 @@ export function turned(sorted: Sorted, key: string): Sorted {
   return { by: key, order: "up" };
 }
 
-export function ordered<T>(
+export function ordered<T, Render>(
   rows: readonly T[],
-  columns: readonly Column<T>[],
+  columns: readonly Column<T, Render>[],
   sorted: Sorted,
 ): readonly T[] {
   const compare = columns.find((each) => each.key === sorted.by)?.compare;
@@ -102,36 +101,36 @@ export interface HeadLook {
   readonly sort: SortWire | undefined;
 }
 
-export type HeldLook<T> =
-  | { readonly kind: "drawn"; readonly render: Snippet<[T]>; readonly row: T }
+export type HeldLook<T, Render = DrawRow<T>> =
+  | { readonly kind: "drawn"; readonly render: Render; readonly row: T }
   | { readonly kind: "field"; readonly field: FieldWire };
 
-export interface CellLook<T> {
+export interface CellLook<T, Render = DrawRow<T>> {
   readonly key: string;
   readonly min: Min | undefined;
   readonly summary: boolean;
-  readonly held: HeldLook<T>;
+  readonly held: HeldLook<T, Render>;
 }
 
-export interface LineLook<T> {
+export interface LineLook<T, Render = DrawRow<T>> {
   readonly key: string;
   readonly tick: TickWire | undefined;
-  readonly cells: readonly CellLook<T>[];
+  readonly cells: readonly CellLook<T, Render>[];
 }
 
-export interface TableLook<T> {
+export interface TableLook<T, Render = DrawRow<T>, Empty = DrawEmpty> {
   readonly caption: string;
   readonly heads: readonly HeadLook[];
   readonly all: TickWire | undefined;
-  readonly lines: readonly LineLook<T>[];
-  readonly empty: Snippet | undefined;
+  readonly lines: readonly LineLook<T, Render>[];
+  readonly empty: Empty | undefined;
 }
 
-export function lookOf<T>(
-  props: TableProps<T>,
+export function lookOf<T, Render, Empty>(
+  props: TableProps<T, Render, Empty>,
   sorted: Sorted,
   turn: (key: string) => void,
-): TableLook<T> {
+): TableLook<T, Render, Empty> {
   const { caption, columns, keyOf, selection, empty } = props;
   const rows = ordered(props.rows, columns, sorted);
   return {
@@ -174,7 +173,11 @@ export function lookOf<T>(
   };
 }
 
-function headOf<T>(column: Column<T>, sorted: Sorted, turn: (key: string) => void): HeadLook {
+function headOf<T, Render>(
+  column: Column<T, Render>,
+  sorted: Sorted,
+  turn: (key: string) => void,
+): HeadLook {
   const base = {
     key: column.key,
     header: column.header,
@@ -201,7 +204,11 @@ function sortSaid(sorted: Sorted, key: string): "ascending" | "descending" | "no
   return sorted.order === "up" ? "ascending" : "descending";
 }
 
-function heldOf<T>(column: Column<T>, row: T, keyOf: (row: T) => string): HeldLook<T> {
+function heldOf<T, Render>(
+  column: Column<T, Render>,
+  row: T,
+  keyOf: (row: T) => string,
+): HeldLook<T, Render> {
   const editable = column.editable;
   if (editable === undefined) {
     return { kind: "drawn", render: column.render, row };

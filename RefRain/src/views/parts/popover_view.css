@@ -1,0 +1,17 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+.popover-cursor::before {
+  content: "";
+  position: absolute;
+  inset-block: var(--spacing-tight);
+  inset-inline-start: 0;
+  border-inline-start: var(--spacing-hair) solid var(--color-accent);
+}
+
+.popover-applied {
+  outline: 1px solid transparent;
+  outline-offset: -1px;
+}

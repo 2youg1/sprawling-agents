@@ -3,10 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { Snippet } from "svelte";
-import { createAttachmentKey } from "svelte/attachments";
-import type { Attachment } from "svelte/attachments";
-import type { HTMLAttributes } from "svelte/elements";
+import type { Snippet } from "../../core/snippet";
+import type { ElementRef } from "../../core/element_ref";
+import type { JSX } from "@solidjs/web";
 
 export type TipSide = "above" | "right";
 
@@ -14,8 +13,8 @@ export type Placing = "by-engine" | "against-wrapper";
 
 export type Showing = "wanted" | "dismissed" | "standing";
 
-export type HolderWire = HTMLAttributes<HTMLSpanElement>;
-export type HintWire = HTMLAttributes<HTMLSpanElement>;
+export type HolderWire = Readonly<Record<symbol, ElementRef<HTMLSpanElement>>>;
+export type HintWire = JSX.HTMLAttributes<HTMLSpanElement>;
 
 export interface TipWiring {
   readonly holder: HolderWire;
@@ -48,10 +47,10 @@ export interface TipProps {
 export interface TipState {
   readonly uid: string;
   readonly dismissed: boolean;
-  readonly reengage: Attachment<HTMLSpanElement>;
+  readonly reengage: ElementRef<HTMLSpanElement>;
 }
 
-const REENGAGE = createAttachmentKey();
+const REENGAGE = Symbol();
 
 export function dismisses(key: string): boolean {
   return key === "Escape";

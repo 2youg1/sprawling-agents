@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { Snippet } from "svelte";
+import type { Snippet } from "../../core/snippet";
 
 import { say } from "../../core/lang";
 import type { Key, Lang } from "../../core/lang";

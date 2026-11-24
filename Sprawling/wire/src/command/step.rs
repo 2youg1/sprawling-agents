@@ -44,6 +44,8 @@ pub struct DoorOpening {
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DoorAnswer {
     pub code: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approval: Option<IdemKey>,
     pub idem: IdemKey,
 }
 

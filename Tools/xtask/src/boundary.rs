@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Product-raised crossings only (ARCHITECTURE.md V10). Test code only;
-//! `boundary-ok` covers its line and the following; spent `predating` rows
-//! must be removed.
-
 use std::path::Path;
 
 use syn::spanned::Spanned;
@@ -16,9 +12,16 @@ use crate::members::{self, Member, Role};
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Reviewed {
+    file: String,
+    statement: String,
+    reason: String,
+}
+
 const EXEMPT_MARK: &str = "boundary-ok:";
 
-/// Product-raised surfaces; generic socket/process APIs are absent.
 const CROSSINGS: [(&str, &str); 5] = [
     (
         "CARGO_BIN_EXE",
@@ -45,7 +48,6 @@ const CROSSINGS: [(&str, &str); 5] = [
 const FUZZ: &str = "Tools/fuzz/";
 const GATES: &str = env!("CARGO_PKG_NAME");
 
-/// Test-code extent by address (xtask Spec §8-39).
 #[derive(Debug, PartialEq, Eq)]
 enum Reading {
     Whole,
@@ -67,7 +69,6 @@ fn reading(rel: &str, found: &[Member]) -> Reading {
     }
 }
 
-/// Line spans of `#[cfg(test)]` items, from the parse tree.
 fn test_spans(text: &str, rel: &str) -> Result<Vec<(usize, usize)>, XtaskError> {
     let parsed = syn::parse_file(text).map_err(|err| XtaskError::Doc {
         file: rel.to_owned(),
@@ -123,7 +124,18 @@ const ROW: &str = "boundary";
 const PREDATING: &str = "predating";
 
 pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
-    let excused = excused(root)?;
+    let register = crate::budget::register(root)?;
+    let excused = excused(&register)?;
+    let mut reviewed: Vec<Reviewed> = match register.get(ROW).and_then(|row| row.get("reviewed")) {
+        None => Vec::new(),
+        Some(rows) => rows
+            .clone()
+            .try_into()
+            .map_err(|err: toml::de::Error| XtaskError::Doc {
+                file: REGISTER.to_owned(),
+                msg: err.to_string(),
+            })?,
+    };
     let found = members::members(root)?;
     let mut crossing = std::collections::BTreeSet::new();
     let mut violations = Vec::new();
@@ -153,7 +165,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
             whole,
             spans: &spans,
         }
-        .scan(&mut found);
+        .scan(&mut found, &mut reviewed);
         if found.is_empty() {
             continue;
         }
@@ -161,6 +173,15 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         if !excused.contains(&rel) {
             violations.extend(found);
         }
+    }
+    for row in reviewed {
+        violations.push(Violation {
+            gate: "boundary",
+            location: row.file,
+            rule: "a reviewed statement must correspond to exactly one observed crossing with a reason".to_owned(),
+            violation: row.statement,
+            alternative: format!("remove or correct the reviewed statement in {REGISTER}"),
+        });
     }
     for spent in excused.difference(&crossing) {
         violations.push(Violation {
@@ -176,8 +197,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     Ok(violations)
 }
 
-fn excused(root: &Path) -> Result<std::collections::BTreeSet<String>, XtaskError> {
-    let register = crate::budget::register(root)?;
+fn excused(register: &toml::Value) -> Result<std::collections::BTreeSet<String>, XtaskError> {
     let Some(listed) = register
         .get(ROW)
         .and_then(|row| row.get(PREDATING))
@@ -205,7 +225,7 @@ struct Sweep<'a> {
 }
 
 impl Sweep<'_> {
-    fn scan(&self, out: &mut Vec<Violation>) {
+    fn scan(&self, out: &mut Vec<Violation>, reviewed: &mut Vec<Reviewed>) {
         let mut previous_exempts = false;
         for (index, line) in self.text.lines().enumerate() {
             let number = index.saturating_add(1);
@@ -217,7 +237,15 @@ impl Sweep<'_> {
             }
             for (token, what) in CROSSINGS {
                 if line.contains(token) {
-                    out.push(crossed(self.rel, number, token, what));
+                    if let Some(index) = reviewed.iter().position(|row| {
+                        row.file == self.rel
+                            && row.statement == line.trim()
+                            && !row.reason.trim().is_empty()
+                    }) {
+                        reviewed.swap_remove(index);
+                    } else {
+                        out.push(crossed(self.rel, number, token, what));
+                    }
                     break;
                 }
             }
@@ -279,7 +307,7 @@ mod tests {
             whole: reading(rel, &[owner(rel)]) == Reading::Whole,
             spans: &spans,
         }
-        .scan(&mut out);
+        .scan(&mut out, &mut Vec::new());
         out
     }
 
@@ -317,6 +345,45 @@ mod tests {
         let source = "fn helper() {\n    let _ = axum::serve(listener, app);\n}\n";
         assert_eq!(found("Sprawling/wire/tests/enrolment.rs", source).len(), 1);
         assert!(found("Sprawling/wire/src/server.rs", source).is_empty());
+    }
+
+    #[test]
+    fn each_review_matches_one_statement_in_one_file_with_a_reason() {
+        let path = "Sprawling/wire/tests/sample.rs";
+        let line = "let _ = axum::serve(listener, app);";
+        let repeated = format!("{line}\n{line}\n");
+        for (file, statement, reason, consumed) in [
+            (path, line, "a loopback listener", true),
+            (
+                "Sprawling/wire/tests/other.rs",
+                line,
+                "a loopback listener",
+                false,
+            ),
+            (
+                path,
+                "let _ = axum::serve(other, app);",
+                "a loopback listener",
+                false,
+            ),
+            (path, line, " ", false),
+        ] {
+            let mut reviewed = vec![Reviewed {
+                file: file.into(),
+                statement: statement.into(),
+                reason: reason.into(),
+            }];
+            let mut violations = Vec::new();
+            Sweep {
+                rel: path,
+                text: &repeated,
+                whole: true,
+                spans: &[],
+            }
+            .scan(&mut violations, &mut reviewed);
+            assert_eq!(violations.len(), if consumed { 1 } else { 2 });
+            assert_eq!(reviewed.is_empty(), consumed);
+        }
     }
 
     #[test]

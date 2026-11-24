@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The waiting send in a running city (collab D9): the sender stops at
-//! its safe point, makes no model call, and goes on with the reply.
-
 use kernel::{Address, RunId};
 
 use crate::worker::fixture::*;
@@ -22,9 +19,6 @@ fn move_in(city: &std::path::Path, addr: &str) {
     .unwrap();
 }
 
-/// ito asks hana with `wait`; hana, woken by the signal, replies; ito's
-/// wait ends with that reply before ito's run freezes, and the history
-/// pairs the start with one reply end.
 #[test]
 fn a_waiting_sender_goes_on_with_the_reply() {
     let dir = tempfile::tempdir().unwrap();
@@ -74,6 +68,8 @@ fn a_waiting_sender_goes_on_with_the_reply() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })

@@ -1,0 +1,14 @@
+.text-key[data-rf-80faae5d8c60] {
+  transition:
+    color var(--transition-duration-short) var(--ease-leave),
+    background-color var(--transition-duration-short) var(--ease-leave);
+}
+.text-key[data-rf-80faae5d8c60]:hover {
+  transition-timing-function: var(--ease-arrive);
+}
+
+@media (forced-colors: active) {
+  .text-key[aria-pressed="true"][data-rf-80faae5d8c60] {
+    outline: 1px solid CanvasText;
+  }
+}

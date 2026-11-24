@@ -21,6 +21,8 @@ fn a_mother_ran(city_root: &std::path::Path) -> (RunWorker, kernel::Origin, impl
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"mother"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
         })
         .unwrap();

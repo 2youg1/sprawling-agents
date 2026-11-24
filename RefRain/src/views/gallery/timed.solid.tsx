@@ -1,0 +1,116 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+import {
+  Address,
+  Seq,
+  TimeMs,
+  Tokens,
+  UsdMicros,
+  type Call,
+  type Note,
+  type Turn,
+} from "../../wire";
+
+const START = 1_790_000_000_000;
+
+function seeded(): () => number {
+  let state = 7;
+  return () => {
+    state = (state * 1_103_515_245 + 12_345) >>> 0;
+    return (state >>> 8) / 16_777_216;
+  };
+}
+
+function turnsOf(count: number, callsEach: number): readonly Turn[] {
+  const next = seeded();
+  let at = START;
+  return Array.from({ length: count }, (_, n) => {
+    const span = n === 17 ? 140_000 : 4_000 + Math.floor(next() * 30_000);
+    const calls: Call[] = Array.from({ length: n % 4 === 3 ? 0 : callsEach }, (_, c) => ({
+      tool: ["read", "search", "edit", "exec"][c % 4] ?? "read",
+      subject: `Sprawling/city/src/part_${String((n * 7 + c) % 97)}.rs`,
+      arguments: null,
+      outcome: (n + c) % 23 === 0 ? "failed" : "answered",
+      at: Seq.make(n * 100 + c),
+      output: null,
+      called: TimeMs.make(at + 1_000 + c * 600),
+      answered: TimeMs.make(at + 1_400 + c * 600),
+      timing: "measured",
+    }));
+    const notes: Note[] =
+      n === 17
+        ? [
+            {
+              waiting: {
+                at: Seq.make(n * 100 + 99),
+                t: TimeMs.make(at + 4_000),
+                answered: TimeMs.make(at + 9_000),
+              },
+            },
+          ]
+        : [];
+    const turn: Turn = {
+      calls,
+      notes,
+      number: n + 1,
+      opened: Seq.make(n * 100),
+      t: TimeMs.make(at),
+      timing: "measured",
+      model: n < 30 ? "large-1" : "small-2",
+      used: {
+        input: Tokens.make(12_000 + n * 400),
+        output: Tokens.make(900 + n * 20),
+        cached: Tokens.make(n * 300),
+      },
+      spent: UsdMicros.make(40_000 + n * 1_000),
+    };
+    at += span;
+    return turn;
+  });
+}
+
+export const LIVE = turnsOf(40, 3);
+export const LONG = turnsOf(2_500, 4);
+export const ROOM = Address.make("shop/checkout");
+
+import Head from "../run/head.solid";
+import River from "../run/river.solid";
+import { GalleryCase } from "./case";
+
+function endOf(turns: readonly Turn[]): number {
+  return (turns.at(-1)?.t ?? START) + 20_000;
+}
+
+export default function TimedCases() {
+  return (
+    <>
+      <GalleryCase label="run · the summary bar over the time lens, live and calling a tool">
+        <Head
+          turns={LIVE}
+          doing={{ kind: "calling", tool: "exec", subject: "just check" }}
+          closing={null}
+          room={ROOM}
+          dispatchedBy="person"
+          from={START}
+          to={endOf(LIVE)}
+        />
+        <River turns={LIVE} from={START} to={endOf(LIVE)} tail="tool" />
+      </GalleryCase>
+      <GalleryCase label="run · ten thousand tool calls, drawn per column and per view">
+        <Head
+          turns={LONG}
+          doing={{ kind: "frozen", completion: "done" }}
+          closing={{ at: TimeMs.make(endOf(LONG)), completion: "done" }}
+          room={ROOM}
+          dispatchedBy="shop/planner"
+          from={START}
+          to={endOf(LONG)}
+        />
+        <River turns={LONG} from={START} to={endOf(LONG)} tail={null} />
+      </GalleryCase>
+    </>
+  );
+}

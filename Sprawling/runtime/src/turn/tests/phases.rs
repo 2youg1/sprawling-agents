@@ -23,7 +23,12 @@ fn a_full_turn_appends_the_canonical_event_sequence() {
         calls: vec![probe_call()],
     };
     let mut conversation = Conversation::new();
-    conversation.push_task_lines("probe the city", "one probe", Opening::FromJob, "the User");
+    conversation.push_task_lines(
+        ("probe the city", "one probe"),
+        Opening::FromJob,
+        "the User",
+        &[],
+    );
     let mut lines = lines();
     let turn = opened_on::<1>(&mut lines);
     let turn = advance(
@@ -81,7 +86,6 @@ fn a_full_turn_appends_the_canonical_event_sequence() {
     );
     assert_eq!(lines.refs().len(), 5);
     assert_eq!(lines.durable(report.model_returned()), Ok(lines.refs()[2]));
-    // Conversation-folding material mirrors the ledger content.
     assert_eq!(report.assistant().len(), 1);
     assert_eq!(report.wave_results().len(), 1);
     match &report.wave_results()[0] {
@@ -95,7 +99,6 @@ fn a_full_turn_appends_the_canonical_event_sequence() {
         }
         other => panic!("expected a tool_result block, got {other:?}"),
     }
-    // model_called carries the duty name; tool events carry ids.
     let called: serde_json::Value = serde_json::from_slice(&ledger.lines[1]).unwrap();
     assert_eq!(called["data"]["model"], "script");
     let tool_called: serde_json::Value = serde_json::from_slice(&ledger.lines[3]).unwrap();
@@ -150,8 +153,10 @@ fn steer_at_a_boundary_records_and_advances() {
     let turn = advance(
         turn.assemble(
             Interrupt::Steer {
+                pictures: Vec::new(),
                 speaker: crate::conversation::Speaker::Person,
                 text: "prefer the short route".to_owned(),
+                request: None,
             },
             &mut ledger,
             RunPrompt::new(&prefix(), &mut PromptRecord::default()),
@@ -289,10 +294,6 @@ fn the_ledger_chain_stays_verifiable_after_a_turn() {
     crate::replay::verify_lines(ledger.lines.clone()).unwrap();
 }
 
-/// A halt that arrives during a wave stops the wave where it stands.
-///
-/// One question per turn would make the person who stopped the city
-/// wait for every effect the model asked for in that one reply.
 #[test]
 fn a_wave_halted_between_two_calls_does_not_make_the_second() {
     let mut ledger = TestLedger::new();
@@ -365,14 +366,16 @@ fn a_wave_halted_between_two_calls_does_not_make_the_second() {
     );
 }
 
-/// A request lives for one call, so assembling it borrows the
-/// conversation and the tool table instead of copying either: a long
-/// conversation would otherwise be copied once per turn.
 #[test]
 fn assembling_borrows_the_conversation_and_the_tools() {
     let mut ledger = TestLedger::new();
     let mut conversation = Conversation::new();
-    conversation.push_task_lines("probe the city", "one probe", Opening::FromJob, "the User");
+    conversation.push_task_lines(
+        ("probe the city", "one probe"),
+        Opening::FromJob,
+        "the User",
+        &[],
+    );
     let tools = [kernel::ToolDef {
         name: kernel::ToolName::parse("exec").unwrap(),
         description: "run a command".to_owned(),

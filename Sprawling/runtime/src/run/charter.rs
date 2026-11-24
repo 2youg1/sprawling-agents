@@ -23,6 +23,7 @@ pub(crate) struct Verdict<'a> {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Charter<'a> {
+    pub pictures: &'a [kernel::ImageRef],
     pub run: RunId,
 
     pub who: &'a str,
@@ -53,6 +54,7 @@ pub struct Charter<'a> {
 impl RunPlan {
     pub fn charter(&self) -> Charter<'_> {
         Charter {
+            pictures: &self.pictures,
             run: self.run,
             who: &self.who,
             addr: &self.addr,
@@ -93,6 +95,7 @@ impl Charter<'_> {
             ig: false,
         })?;
         let started = RunStarted {
+            pictures: self.pictures.to_vec(),
             task: self.task.to_owned(),
             goal: self.goal.to_owned(),
             job: Some(self.job.clone()),

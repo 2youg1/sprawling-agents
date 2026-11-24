@@ -1,0 +1,55 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+.refrain-combobox-layer {
+  display: none;
+  opacity: 0;
+  translate: 0 calc(-1 * var(--spacing-snug));
+  transition:
+    opacity var(--transition-duration-short) var(--ease-leave),
+    translate var(--transition-duration-short) var(--ease-leave),
+    display var(--transition-duration-short) allow-discrete;
+}
+.refrain-combobox-layer[data-side="above"] {
+  translate: 0 var(--spacing-snug);
+}
+.refrain-combobox-layer.open {
+  display: flex;
+  opacity: 1;
+  translate: 0 0;
+  transition-duration: var(--transition-duration-panel);
+  transition-timing-function: var(--ease-arrive);
+}
+@starting-style {
+  .refrain-combobox-layer.open {
+    opacity: 0;
+    translate: 0 calc(-1 * var(--spacing-snug));
+  }
+  .refrain-combobox-layer.open[data-side="above"] {
+    translate: 0 var(--spacing-snug);
+  }
+}
+.refrain-combobox-cursor::before {
+  content: "";
+  position: absolute;
+  inset-block: var(--spacing-tight);
+  inset-inline-start: 0;
+  border-inline-start: var(--spacing-hair) solid var(--color-accent);
+}
+
+.refrain-combobox-applied {
+  outline: 1px solid transparent;
+  outline-offset: -1px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="on"]) .refrain-combobox-layer {
+    transition: none;
+  }
+}
+
+[data-motion="off"] .refrain-combobox-layer {
+  transition: none;
+}

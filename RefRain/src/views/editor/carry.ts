@@ -14,7 +14,7 @@ export type Carried =
   | { readonly kind: "editor_at"; readonly byte: number }
   | { readonly kind: "nothing" };
 
-const EDITOR: ReadonlySet<Reading> = new Set(["source", "diff"]);
+const EDITOR: ReadonlySet<Reading> = new Set(["source", "live", "diff"]);
 
 export function carried(
   from: Reading,

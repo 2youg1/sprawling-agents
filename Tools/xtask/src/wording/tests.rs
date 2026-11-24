@@ -77,6 +77,24 @@ fn both_seats_are_read() {
 }
 
 #[test]
+fn template_data_comparisons_and_rendered_text_are_distinct() {
+    let source = r#"
+      const example = `<p>store this document sample verbatim</p>`;
+      const outside = x < bounds.left || x > bounds.right || y < bounds.top;
+      const view = <section
+        aria-label="reader title"
+      >reader text</section>;
+    "#;
+    assert_eq!(
+        found(source),
+        [
+            "a spoken attribute: reader title",
+            "a text node: reader text",
+        ],
+    );
+}
+
+#[test]
 fn a_waiver_holds_across_the_lines_a_formatter_adds() {
     let lines = [
         r#"    <!-- wording-ok: the placeholder is an address -->"#,

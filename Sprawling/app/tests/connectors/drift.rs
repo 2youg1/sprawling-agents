@@ -88,6 +88,8 @@ fn a_legacy_room_keeps_the_first_listing_it_adopted() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: idem(b"continue-s1"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -154,7 +156,6 @@ fn a_failed_listing_is_not_a_removal() {
 
 const CALL: &str = "{\"jsonrpc\":\"2.0\",\"id\":0,\"method\":\"tools/call\",\"params\":{\"name\":\"ping\",\"arguments\":{}}}";
 
-/// A server whose one tool answers with a long converted document.
 struct Answering(String);
 
 impl accounting::Connectors for Answering {
@@ -192,19 +193,15 @@ impl accounting::Connectors for Answering {
         Ok((tools, accounting::Reached::Connected(opened)))
     }
 
-    /// Keeps no connection, so there is nothing a new key makes stale.
     fn invalidate(&self, _reference: &kernel::SecretRef) {}
 }
 
-/// What a calling model saw: the dormant index of its first request,
-/// and every tool result it read back.
 #[derive(Default)]
 pub(crate) struct Seen {
     pub(crate) index: Vec<String>,
     pub(crate) read: Vec<String>,
 }
 
-/// Makes one tool call, then records what it read back.
 #[derive(Clone)]
 pub(crate) struct Calling {
     pub(crate) seen: Arc<Mutex<Seen>>,
@@ -267,8 +264,6 @@ impl accounting::ModelFactory for Callers {
     }
 }
 
-/// A converted document longer than the window reaches the model as
-/// the pipeline's window over it, not whole (`Sprawling/runtime/Spec.lean` §8-27-10).
 #[test]
 fn a_long_connector_answer_reaches_the_model_packaged() {
     let document = "The quarter closed with every account reconciled. ".repeat(1_000);

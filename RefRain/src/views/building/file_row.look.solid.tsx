@@ -1,0 +1,40 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+// Copyright (c) 2026 2youg1 and the sprawling contributors
+
+import type { FileRowLook } from "./file_row";
+
+export type PortProps = FileRowLook;
+
+export default function BuildingFileRowLook(look: FileRowLook) {
+  return (
+    <>
+      <div class={"relative flex min-w-0 flex-1"}>
+        {look.current ? (
+          <>
+            <span
+              class={"absolute inset-y-snug left-0 w-hair rounded-pill bg-accent"}
+              aria-hidden={"true"}
+            />
+          </>
+        ) : undefined}
+        <button
+          data-control=""
+          {...(() => {
+            const { onclick: __rrArg0, ...__rrWire } = look.wire;
+            return { ...__rrWire, onClick: __rrArg0 };
+          })()}
+          class={[
+            "grid h-control min-w-0 flex-1 grid-cols-[16ch_minmax(0,1fr)_auto] items-center gap-x-base rounded-control pr-snug pl-base text-left narrow:grid-cols-[8ch_minmax(0,1fr)_auto]",
+            look.current ? "wash-strong" : "hover:wash",
+          ]}
+        >
+          <span class={"truncate text-text-faint"}>{look.how}</span>
+          <span class={"truncate font-mono text-text"}>{look.path}</span>
+          <span class={"figure text-text-faint"}>{look.lines}</span>
+        </button>
+      </div>
+    </>
+  );
+}

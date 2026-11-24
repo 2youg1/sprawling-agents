@@ -32,9 +32,6 @@ const call = { kind: "call", run: seven, at: Seq.make(42) } as const;
 const file = { kind: "document", building: lab, path: "docs/a plan?.md", version } as const;
 const worktree = { kind: "document", building: lab, path: "README.md", version: null } as const;
 
-// Every view this client has, so the round trip is exhaustive by
-// construction: the lint's exhaustiveness check on `toFragment` refuses a
-// variant this list does not spell.
 const EVERY_VIEW: readonly View[] = [
   { kind: "talk", address: MAYOR },
   { kind: "talk", address: parser },
@@ -58,6 +55,11 @@ const EVERY_VIEW: readonly View[] = [
   { kind: "talk", address: parser, item: call },
   { kind: "talk", address: parser, item: file },
   { kind: "talk", address: MAYOR, item: worktree },
+  {
+    kind: "talk",
+    address: MAYOR,
+    item: { kind: "workspace-file", workspace: "register/7", file: "record & 1" },
+  },
   { kind: "run", run: seven, lens: "changes" },
   { kind: "welcome", step: "skills" },
 ];

@@ -187,38 +187,38 @@ none、soft、soft_shares、pinned；配置读者与客户端 schema 共用此�
 -/
 
 /-! 设置覆盖：记录的是声明字段；TOML 拼写仍由 serde 类型决定。
-settings-control PreferencesAnswer.lang RefRain/src/views/setup.svelte
-settings-control PreferencesAnswer.core RefRain/src/views/settings/performance.svelte
-settings-control PreferencesAnswer.panel RefRain/src/views/right.svelte
-settings-control PreferencesAnswer.appearance RefRain/src/views/setup/appearance.svelte
-settings-control PreferencesAnswer.proxying RefRain/src/views/setup.svelte
-settings-control PreferencesAnswer.chords RefRain/src/views/setup/keys.svelte
-settings-control PreferencesAnswer.tags RefRain/src/views/world/session_menu.svelte
-settings-control PreferencesAnswer.theme RefRain/src/views/setup/colours.svelte
-settings-control CorePreferences.placement RefRain/src/views/settings/performance.svelte
-settings-control CorePreferences.priority RefRain/src/views/settings/performance.svelte
-settings-control CorePreferences.memory_bytes RefRain/src/views/settings/performance.svelte
-settings-control ThemeOverride.tokens RefRain/src/views/setup/colours.svelte
-settings-control ThemeOverride.css RefRain/src/views/setup/colours.svelte
-settings-control Chord.action RefRain/src/views/setup/keys.svelte
-settings-control Chord.spelled RefRain/src/views/setup/keys.svelte
-settings-control Appearance.lighting RefRain/src/views/setup/appearance.svelte
-settings-control Appearance.sans RefRain/src/views/setup/appearance_type.svelte
-settings-control Appearance.mono RefRain/src/views/setup/appearance_type.svelte
-settings-control Appearance.sans_stack RefRain/src/views/setup/appearance_type.svelte
-settings-control Appearance.mono_stack RefRain/src/views/setup/appearance_type.svelte
-settings-control Appearance.body_px RefRain/src/views/setup/appearance_type.svelte
-settings-control Appearance.reading RefRain/src/views/setup/appearance_type.svelte
-settings-control Appearance.fallbacks RefRain/src/views/setup/appearance_type.svelte
-settings-control Appearance.features RefRain/src/views/setup/appearance_type.svelte
-settings-control Appearance.line_height RefRain/src/views/setup/appearance_type.svelte
-settings-control Appearance.letter_spacing RefRain/src/views/setup/appearance_type.svelte
-settings-control Appearance.weight RefRain/src/views/setup/appearance_type.svelte
-settings-control Appearance.density RefRain/src/views/setup/appearance.svelte
-settings-control Appearance.chroma RefRain/src/views/setup/appearance.svelte
-settings-control Appearance.motion RefRain/src/views/setup/appearance.svelte
-settings-control Appearance.glass RefRain/src/views/setup/appearance.svelte
-settings-control Appearance.blend_percent RefRain/src/views/setup/appearance.svelte
+settings-control PreferencesAnswer.lang RefRain/src/views/setup_view.tsx
+settings-control PreferencesAnswer.core RefRain/src/views/settings/performance_view.tsx
+settings-control PreferencesAnswer.panel RefRain/src/views/right.tsx
+settings-control PreferencesAnswer.appearance RefRain/src/views/setup/appearance_view.tsx
+settings-control PreferencesAnswer.proxying RefRain/src/views/setup_view.tsx
+settings-control PreferencesAnswer.chords RefRain/src/views/setup/keys_view.tsx
+settings-control PreferencesAnswer.tags RefRain/src/views/world/session_menu_view.tsx
+settings-control PreferencesAnswer.theme RefRain/src/views/setup/colours_view.tsx
+settings-control CorePreferences.placement RefRain/src/views/settings/performance_view.tsx
+settings-control CorePreferences.priority RefRain/src/views/settings/performance_view.tsx
+settings-control CorePreferences.memory_bytes RefRain/src/views/settings/performance_view.tsx
+settings-control ThemeOverride.tokens RefRain/src/views/setup/colours_view.tsx
+settings-control ThemeOverride.css RefRain/src/views/setup/colours_view.tsx
+settings-control Chord.action RefRain/src/views/setup/keys_view.tsx
+settings-control Chord.spelled RefRain/src/views/setup/keys_view.tsx
+settings-control Appearance.lighting RefRain/src/views/setup/appearance_view.tsx
+settings-control Appearance.sans RefRain/src/views/setup/appearance_type_view.tsx
+settings-control Appearance.mono RefRain/src/views/setup/appearance_type_view.tsx
+settings-control Appearance.sans_stack RefRain/src/views/setup/appearance_type_view.tsx
+settings-control Appearance.mono_stack RefRain/src/views/setup/appearance_type_view.tsx
+settings-control Appearance.body_px RefRain/src/views/setup/appearance_type_view.tsx
+settings-control Appearance.reading RefRain/src/views/setup/appearance_type_view.tsx
+settings-control Appearance.fallbacks RefRain/src/views/setup/appearance_type_view.tsx
+settings-control Appearance.features RefRain/src/views/setup/appearance_type_view.tsx
+settings-control Appearance.line_height RefRain/src/views/setup/appearance_type_view.tsx
+settings-control Appearance.letter_spacing RefRain/src/views/setup/appearance_type_view.tsx
+settings-control Appearance.weight RefRain/src/views/setup/appearance_type_view.tsx
+settings-control Appearance.density RefRain/src/views/setup/appearance_view.tsx
+settings-control Appearance.chroma RefRain/src/views/setup/appearance_view.tsx
+settings-control Appearance.motion RefRain/src/views/setup/appearance_view.tsx
+settings-control Appearance.glass RefRain/src/views/setup/appearance_view.tsx
+settings-control Appearance.blend_percent RefRain/src/views/setup/appearance_view.tsx
 settings-reason PreferencesAnswer.welcomed 由 welcome 流程记录是否已走过，不提供任意改写历史的开关；设置中的 welcome 入口可再次打开。
 settings-reason PreferencesAnswer.tier tier 只属于当前 tab；持久文件字段仍可读但不覆盖每次启动的 zen，层键提供当前 tab 控制。
 settings-reason SessionTags.city 标签通过 session 控件整体设置，定位字段来自 session 的身份，不另提供原始字段编辑。

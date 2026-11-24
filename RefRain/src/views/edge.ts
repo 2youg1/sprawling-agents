@@ -3,8 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { Attachment } from "svelte/attachments";
-import type { HTMLAnchorAttributes, HTMLButtonAttributes } from "svelte/elements";
+import type { ElementRef } from "../core/element_ref";
 
 import type { Lang, Key } from "../core/lang";
 import { say } from "../core/lang";
@@ -39,20 +38,22 @@ export type KeyWire =
   | { readonly as: "button"; readonly wire: ButtonWire }
   | { readonly as: "link"; readonly wire: LinkWire };
 
-export type ButtonWire = Pick<
-  HTMLButtonAttributes,
-  | "type"
-  | "aria-label"
-  | "aria-expanded"
-  | "aria-controls"
-  | "onclick"
-  | "onpointerdown"
-  | "onpointerup"
-  | "onpointerleave"
-> &
-  Readonly<Record<symbol, Attachment<HTMLElement>>>;
+export interface ButtonWire {
+  readonly type?: "button" | "submit" | "reset";
+  readonly "aria-label"?: string;
+  readonly "aria-expanded"?: boolean | "true" | "false";
+  readonly "aria-controls"?: string;
+  readonly onclick?: (event: MouseEvent) => void;
+  readonly onpointerdown?: (event: PointerEvent) => void;
+  readonly onpointerup?: (event: PointerEvent) => void;
+  readonly onpointerleave?: (event: PointerEvent) => void;
+  readonly [binding: symbol]: ElementRef<HTMLElement>;
+}
 
-export type LinkWire = Pick<HTMLAnchorAttributes, "href" | "aria-label">;
+export interface LinkWire {
+  readonly href?: string;
+  readonly "aria-label"?: string;
+}
 
 export const NO_FOOT: Foot = { kind: "none" };
 export const NO_CORNER: Corner = { kind: "none" };

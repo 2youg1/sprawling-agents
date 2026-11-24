@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The context reminder, driven through the run loop: what the provider
-//! reports as `input_tokens` is what the gauge reads, each threshold
-//! sounds once, and the line lands where a steer lands.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -39,9 +35,6 @@ impl Ledger for SinkLedger {
     }
 }
 
-/// A model that reports one `input_tokens` figure per turn and makes a
-/// tool call on every turn but the last, so the run takes as many turns
-/// as there are figures.
 struct MeteredModel {
     reported: Vec<u64>,
     seen: std::rc::Rc<std::cell::RefCell<Vec<String>>>,
@@ -80,6 +73,7 @@ impl Model for MeteredModel {
 fn plan(window: u64) -> RunPlan {
     let addr = Address::parse("lab/room1").unwrap();
     RunPlan {
+        pictures: Vec::new(),
         run: RunId::from_bytes([9; 16]),
         who: "resident".to_owned(),
         addr: addr.clone(),
@@ -132,8 +126,6 @@ fn handoff() -> Handoff {
     .unwrap()
 }
 
-/// Every window the model saw, given one `input_tokens` figure per turn
-/// against a window of one thousand.
 fn windows_for(reported: Vec<u64>) -> Vec<String> {
     let seen = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
     let mut model = MeteredModel {
@@ -237,9 +229,6 @@ fn a_model_with_no_stated_window_is_never_reminded() {
     );
 }
 
-/// `status` froze its context reading at dispatch, before any call, so a
-/// model that asked how full its window was heard zero for the whole run.
-/// It now hears the count the provider gave for the call that asked.
 #[test]
 fn status_reports_the_count_of_the_call_that_asked() {
     let seen = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));

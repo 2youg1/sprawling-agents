@@ -208,6 +208,8 @@ impl RunWorker {
                     Assignment {
                         addr: knock.addr.clone(),
                         session: None,
+                        resume: None,
+                        pictures: Vec::new(),
                         effort: None,
                         difficulty: None,
                         model: None,

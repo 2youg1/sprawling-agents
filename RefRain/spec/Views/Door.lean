@@ -6,13 +6,9 @@
 /-!
 # door：设置 → 远程里的门开关、「更换城钥匙」与确认码输入框
 
-规定 `RefRain/src/views/settings/remote_door.ts` 的 `step`，以及 `RefRain/src/views/settings/remote_state.svelte` 据它放焦点的方式（`RefRain/Spec.lean` §4-57，`Sprawling/remote_access/Spec.lean` D4）。TypeScript 是「怎样守住」的权威，本模型是「必须守住哪些性质」的权威；`remote.test.ts` 判 `step` 与这里的定义读出同样的答案。
+设置里的远程控制发送带独立操作标识的命令。请求开门或更换城钥匙时，只有同一操作的 `E_APPROVAL_PENDING` 让确认框出现。确认保持原有控制台批准，并带上原批准请求的标识，避免接着另一个页面的请求执行。关门不需确认码，其结果独立于确认框。没有离开页面的命令可以重试。
 
-按下「开门」发 `OpenRemoteDoor{lasting_ms}`，按下「更换城钥匙」发 `ReplaceCityKey`。城答 `E_APPROVAL_PENDING` 时页面显示一个确认码输入框，焦点进框，说明码印在城的控制台上；Escape 取消，焦点回到按下的那个控件；提交发 `ConfirmRemoteDoor{code}`；城答一个拒绝（`E_GATE_DENIED` 或别的码）时清空输入框，焦点回到那个控件，状态行说再按一次。关门发 `CloseRemoteDoor`，不要码，不经这台状态机（D4：关门在线上不设防）。
-
-按下或提交时链路不在、命令根本没离开页面，是 `unsent`：请求或确认在途时它把状态机放回 `idle`、清空输入框、焦点回到那个控件，状态行说链路断了；它不进 `refused`，因为城什么也没说，页面不替城编一个拒绝码（`an_unsent_command_returns_to_the_opener`、`unsent_invents_no_refusal`）。
-
-拒绝在页面上只有一条全局的 `refusal`，不带是哪条命令招来的；所以只在请求或确认在途时，一条拒绝才算这个状态机的回答，别的时候来的拒绝什么也不改（`a_stray_refusal_changes_nothing`）。确认在途时，城没有拒绝、页面的耐心（`RECEIPT_MS`）到了，算作做成（`settled`），因为门的状态今天没有一个可问的回答。
+操作层先按标识筛选回执，其他通知归其原操作。只有主机报告该次执行成功才显示完成。计时结束与连接中断都把仍在途的结果标为待核对，清除显示的确认码。匹配的迟到回执仍能完成状态变化。若无回执，操作者先按状态区的操作标识核对控制台，再解除待核对状态并决定是否重新发起；解除不记作完成。成功、拒绝与失联状态都用常驻状态区域宣布。若输入焦点随确认框消失，交还启动控件；操作外的已有焦点保留。
 
 性质：
 
@@ -40,6 +36,8 @@ inductive Phase where
   | awaiting (o : Opener)
   | confirming (o : Opener)
   | refused (o : Opener)
+  | unknownRequest (o : Opener)
+  | unknownConfirm (o : Opener)
   deriving DecidableEq, Repr
 
 /-- 焦点在哪：这个状态机之外、某个控件上、输入框里。 -/
@@ -75,6 +73,8 @@ inductive Event where
   | refusal
   | unsent
   | settled
+  | timedOut
+  | checked
   | type (text : String)
   | submit
   | escape
@@ -83,35 +83,60 @@ def step (d : Door) : Event → Door × Option Sent
   | .press o =>
     match d.phase with
     | .idle | .refused _ => (⟨.requesting o, "", .opener o⟩, some (asked o))
-    | .requesting _ | .awaiting _ | .confirming _ => (d, none)
+    | .requesting _ | .awaiting _ | .confirming _ | .unknownRequest _ | .unknownConfirm _ => (d, none)
   | .pending =>
     match d.phase with
-    | .requesting o => (⟨.awaiting o, "", .input⟩, none)
-    | .idle | .awaiting _ | .confirming _ | .refused _ => (d, none)
+    | .requesting o | .unknownRequest o => (⟨.awaiting o, "", .input⟩, none)
+    | .idle | .awaiting _ | .confirming _ | .refused _ | .unknownConfirm _ => (d, none)
   | .type text =>
     match d.phase with
     | .awaiting _ => ({ d with typed := text }, none)
-    | .idle | .requesting _ | .confirming _ | .refused _ => (d, none)
+    | .idle | .requesting _ | .confirming _ | .refused _ | .unknownRequest _ | .unknownConfirm _ => (d, none)
   | .submit =>
     match d.phase with
     | .awaiting o => if d.typed = "" then (d, none) else (⟨.confirming o, d.typed, .input⟩, some (.confirm d.typed))
-    | .idle | .requesting _ | .confirming _ | .refused _ => (d, none)
+    | .idle | .requesting _ | .confirming _ | .refused _ | .unknownRequest _ | .unknownConfirm _ => (d, none)
   | .escape =>
     match d.phase with
     | .awaiting o => (⟨.idle, "", .opener o⟩, none)
-    | .idle | .requesting _ | .confirming _ | .refused _ => (d, none)
+    | .idle | .requesting _ | .confirming _ | .refused _ | .unknownRequest _ | .unknownConfirm _ => (d, none)
   | .refusal =>
     match d.phase with
-    | .requesting o | .confirming o => (⟨.refused o, "", .opener o⟩, none)
+    | .requesting o | .confirming o | .unknownRequest o | .unknownConfirm o => (⟨.refused o, "", .opener o⟩, none)
     | .idle | .awaiting _ | .refused _ => (d, none)
   | .unsent =>
     match d.phase with
     | .requesting o | .confirming o => (⟨.idle, "", .opener o⟩, none)
-    | .idle | .awaiting _ | .refused _ => (d, none)
+    | .idle | .awaiting _ | .refused _ | .unknownRequest _ | .unknownConfirm _ => (d, none)
   | .settled =>
     match d.phase with
-    | .confirming o => (⟨.idle, "", .opener o⟩, none)
-    | .idle | .requesting _ | .awaiting _ | .refused _ => (d, none)
+    | .confirming o | .unknownConfirm o => (⟨.idle, "", .opener o⟩, none)
+    | .idle | .requesting _ | .awaiting _ | .refused _ | .unknownRequest _ => (d, none)
+  | .timedOut =>
+    match d.phase with
+    | .requesting o => (⟨.unknownRequest o, "", .opener o⟩, none)
+    | .confirming o => (⟨.unknownConfirm o, "", .opener o⟩, none)
+    | .idle | .awaiting _ | .refused _ | .unknownRequest _ | .unknownConfirm _ => (d, none)
+  | .checked =>
+    match d.phase with
+    | .unknownRequest o | .unknownConfirm o => (⟨.idle, "", .opener o⟩, none)
+    | .idle | .requesting _ | .awaiting _ | .confirming _ | .refused _ => (d, none)
+
+def matched (request receipt : Nat) (d : Door) (event : Event) : Door × Option Sent :=
+  if request = receipt then step d event else (d, none)
+
+theorem a_foreign_receipt_changes_nothing (request receipt : Nat) (d : Door) (event : Event)
+    (foreignReceipt : request ≠ receipt) :
+    matched request receipt d event = (d, none) := by simp [matched, foreignReceipt]
+
+theorem a_timeout_never_reports_completion (d : Door) (o : Opener)
+    (h : d.phase = .requesting o ∨ d.phase = .confirming o) :
+    (step d .timedOut).1.phase = .unknownRequest o ∨
+      (step d .timedOut).1.phase = .unknownConfirm o := by
+  rcases h with h | h <;> simp [step, h]
+
+theorem checking_never_sends (d : Door) : (step d .checked).2 = none := by
+  cases hp : d.phase <;> simp [step, hp]
 
 def run (d : Door) (es : List Event) : Door := es.foldl (fun d e => (step d e).1) d
 
@@ -136,9 +161,9 @@ theorem a_code_leaves_only_from_awaiting (d : Door) (e : Event) (c : String)
       · simp [step, hp, ht] at h
       · simp [step, hp, ht] at h
         exact ⟨o, rfl, rfl, h.symm, h ▸ ht⟩
-    | idle | requesting _ | confirming _ | refused _ => simp [step, hp] at h
+    | idle | requesting _ | confirming _ | refused _ | unknownRequest _ | unknownConfirm _ => simp [step, hp] at h
   | press o => cases o <;> cases hp : d.phase <;> simp [step, hp, asked] at h
-  | pending | refusal | unsent | settled | type _ | escape => cases hp : d.phase <;> simp [step, hp] at h
+  | pending | refusal | unsent | settled | timedOut | checked | type _ | escape => cases hp : d.phase <;> simp [step, hp] at h
 
 theorem every_sent_code_was_typed :
     ∀ (es : List Event) (d : Door) (c : String), Sent.confirm c ∈ sends d es → c ≠ "" := by
@@ -205,7 +230,7 @@ def stepLoose (d : Door) : Event → Door × Option Sent
   | .escape =>
     match d.phase with
     | .awaiting _ => (⟨.idle, "", .elsewhere⟩, none)
-    | .idle | .requesting _ | .confirming _ | .refused _ => (d, none)
+    | .idle | .requesting _ | .confirming _ | .refused _ | .unknownRequest _ | .unknownConfirm _ => (d, none)
   | e => step d e
 
 theorem a_loose_escape_loses_the_opener :

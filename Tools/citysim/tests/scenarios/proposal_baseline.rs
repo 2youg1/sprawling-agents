@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A proposal made on a version its document has since left is refused
-//! when the person decides it, and the document keeps the bytes it
-//! moved to (citysim D22; documents D17, D35; `Sprawling/accounting/Spec.lean` §8-30).
-//!
-//! The city is the product's: a worker built from scripted hands - a
-//! counted clock, a vault in memory - and a scripted model. The run's
-//! `proposal` tool, the relay it writes through, the governance fold and
-//! the person's decision are the ones a served city runs.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -36,16 +27,13 @@ use kernel::{
 };
 use serde_json::json;
 
-/// The room the run works in, and the document it proposes a change to.
 const ROOM: &str = "hall/mayor";
 const DOC: &str = "hall/mayor/draft.md";
 
 const DRAFT: &str = "# Draft\n\nThe kiln is fired at noon. It cools overnight.\n";
 
-/// What the person's own editor makes of the draft while the card waits.
 const MOVED: &str = "# Draft\n\nThe kiln is fired at night. It cools overnight.\n";
 
-/// A clock that counts the times it is read, from a fixed start.
 struct Counted(AtomicU64);
 
 impl accounting::Clock for Counted {
@@ -56,7 +44,6 @@ impl accounting::Clock for Counted {
     }
 }
 
-/// The product's hands, with the clock counted and the vault in memory.
 fn hands(clock: &Arc<dyn accounting::Clock + Send + Sync>) -> Hands {
     Hands {
         clock: Arc::clone(clock),
@@ -64,8 +51,6 @@ fn hands(clock: &Arc<dyn accounting::Clock + Send + Sync>) -> Hands {
     }
 }
 
-/// Hands the script to the first model the worker asks for, and an
-/// empty one to any later ask.
 struct Scripted(Mutex<Option<ScriptModel>>);
 
 impl accounting::ModelFactory for Scripted {
@@ -84,7 +69,6 @@ impl accounting::ModelFactory for Scripted {
     }
 }
 
-/// One turn that offers the change, then one that says it is done.
 fn script() -> ScriptModel {
     let call = ToolCall {
         id: "call-1".to_owned(),
@@ -118,8 +102,6 @@ fn idem(what: &[u8]) -> IdemKey {
     IdemKey::derive(&RunId::CITY, Seq::FIRST, what)
 }
 
-/// A founded city whose main model sits behind a loopback port nothing
-/// listens on, so only the script answers.
 fn city(dir: &Path) -> RunWorker {
     let clock: Arc<dyn accounting::Clock + Send + Sync> = Arc::new(Counted(AtomicU64::new(0)));
     accounting::worker::genesis::form(
@@ -171,7 +153,6 @@ fn path_of(dir: &Path, addr: &str) -> PathBuf {
         .fold(dir.to_path_buf(), |at, part| at.join(part))
 }
 
-/// The cards open on the draft.
 fn open_cards(dir: &Path) -> Vec<wire::ProposalCard> {
     match accounting::views::ask(dir, &wire::Query::Proposals(Address::parse(DOC).unwrap())) {
         Ok(wire::Answer::Proposals(cards)) => cards.open,
@@ -179,7 +160,6 @@ fn open_cards(dir: &Path) -> Vec<wire::ProposalCard> {
     }
 }
 
-/// Every changed sentence of `card` accepted.
 fn accept_all(card: &wire::ProposalCard) -> Vec<SliceVerdict> {
     (0_u32..)
         .zip(&card.slices)
@@ -209,6 +189,8 @@ fn a_proposal_made_on_a_version_the_document_left_is_refused_when_decided() {
         policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: idem(b"dispatch"),
         session: None,
+        resume: None,
+        images: Vec::new(),
         effort: None,
         model: None,
     });
@@ -219,7 +201,6 @@ fn a_proposal_made_on_a_version_the_document_left_is_refused_when_decided() {
         "one card is open after the run; the dispatch answered {dispatched:?}"
     );
 
-    // The person's own editor moves the draft while the card waits.
     std::fs::write(&draft, MOVED).unwrap();
     let decided = worker.handle(wire::Command::DecideProposals(wire::ProposalDecisions {
         doc: Address::parse(DOC).unwrap(),

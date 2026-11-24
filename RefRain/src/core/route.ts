@@ -53,6 +53,7 @@ export type RunLens = (typeof RUN_LENSES)[number];
 
 export type ItemLink =
   | { readonly kind: "call"; readonly run: RunId; readonly at: Seq }
+  | { readonly kind: "workspace-file"; readonly workspace: string; readonly file: string }
   | {
       readonly kind: "document";
       readonly building: Address;
@@ -124,6 +125,8 @@ export function toFragment(view: View): string {
 
 function itemQuery(item: ItemLink): string {
   switch (item.kind) {
+    case "workspace-file":
+      return new URLSearchParams({ workspace: item.workspace, file: item.file }).toString();
     case "call":
       return new URLSearchParams({ call: item.run, at: String(item.at) }).toString();
     case "document":
@@ -140,6 +143,13 @@ function readItem(query: string): Option.Option<ItemLink> {
   const keys = [...asked.keys()].sort().join(" ");
   const value = (key: string): string => asked.get(key) ?? "";
   switch (keys) {
+    case "file workspace": {
+      const workspace = value("workspace");
+      const file = value("file");
+      return workspace === "" || file === ""
+        ? Option.none()
+        : Option.some({ kind: "workspace-file", workspace, file });
+    }
     case "at call":
       return Option.map(
         Option.all([readRunId(value("call")), readSeq(value("at"))]),

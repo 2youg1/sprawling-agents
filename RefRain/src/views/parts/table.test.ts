@@ -3,13 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What a table decides and hands its look, against the table paragraph
-// of `RefRain/spec/Views/Parts.lean` §7-6: `aria-sort` only on a column
-// that can be ordered by, the names of the boxes and the corrected
-// cells, and the header box's third state while some rows are ticked.
-
 import { describe, expect, test } from "bun:test";
-import { createRawSnippet } from "svelte";
 
 import {
   UNSORTED,
@@ -31,12 +25,11 @@ const FIRST: Model = { id: "b", context: 200 };
 
 const MODELS: readonly Model[] = [FIRST, { id: "a", context: 8 }, { id: "c", context: 32 }];
 
-// A cell's drawing is never called here: what the look does with it is
-// measured in the gallery.
-const drawn = createRawSnippet<[Model]>(() => ({ render: () => "<span></span>" }));
+const drawn = (_row: Model) => undefined;
+type ModelColumn = Column<Model, typeof drawn>;
 
-const ID: Column<Model> = { key: "id", header: "Model", render: drawn };
-const CONTEXT: Column<Model> = {
+const ID: ModelColumn = { key: "id", header: "Model", render: drawn };
+const CONTEXT: ModelColumn = {
   key: "context",
   header: "Context",
   render: drawn,
@@ -156,7 +149,7 @@ describe("the boxes", () => {
 describe("the cells", () => {
   test("a corrected column is a named input that hands back what was typed", () => {
     const edits: string[] = [];
-    const column: Column<Model> = {
+    const column: ModelColumn = {
       ...CONTEXT,
       editable: {
         text: (row) => String(row.context),

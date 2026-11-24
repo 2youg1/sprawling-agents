@@ -3,8 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import { derived, get, readable, writable } from "svelte/store";
-import type { Readable, Writable } from "svelte/store";
+import { createContext, getOwner, useContext } from "solid-js";
+import { derived, get, readable, writable } from "./core/store";
+import type { Readable, Writable } from "./core/store";
 
 import { QUERIES } from "./core/asking";
 import { FIRST_POLICY } from "./core/commands";
@@ -55,7 +56,7 @@ export interface Opening {
   readonly now: () => number;
 }
 
-function readied(value: Opening): Ui {
+export function readied(value: Opening): Ui {
   const effort = writable<Effort | null>(null);
   const policy = writable<RunPolicy>(FIRST_POLICY);
   const hearing = value.conn.asking.ask(QUERIES.endpoints);
@@ -94,11 +95,14 @@ export function setUi(value: Opening): void {
   opened = readied(value);
 }
 
-export function ui(): Ui {
-  if (opened !== null) {
-    return opened;
-  }
-  return readied({
+export const UiScope = createContext<Ui | null>(null);
+
+export function scopedUi(): Ui | undefined {
+  return getOwner() === null ? undefined : (useContext(UiScope) ?? undefined);
+}
+
+function disconnected(): Opening {
+  return {
     conn: {
       state: readable<LinkState>({ kind: "idle" }),
       belief: createBelief(() => 0).belief,
@@ -112,6 +116,7 @@ export function ui(): Ui {
         resumed: () => undefined,
       },
       unsent: readable(0),
+      receipts: readable(new Map()),
       command: () => false,
       retry: () => undefined,
       closeCity: () => false,
@@ -130,5 +135,15 @@ export function ui(): Ui {
     origin: "",
     credential: () => null,
     now: () => 0,
-  });
+  };
+}
+
+export function galleryUi(outer: Ui): Ui {
+  const fixture = disconnected();
+  fixture.prefs.adopt(get(outer.prefs.held), []);
+  return readied({ ...fixture, now: outer.now });
+}
+
+export function ui(): Ui {
+  return scopedUi() ?? opened ?? readied(disconnected());
 }

@@ -1,0 +1,79 @@
+{
+  "plugins": ["typescript"],
+  "jsPlugins": ["eslint-plugin-solid", "./scripts/lint-rules.mjs"],
+  "settings": {
+    "solid": {
+      "version": 2
+    }
+  },
+  "rules": {
+    "refrain/wording": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-non-null-assertion": "error",
+    "typescript/no-floating-promises": "error",
+    "typescript/consistent-type-imports": "error",
+    "solid/removed-api": "error",
+    "solid/no-single-arg-create-effect": "error",
+    "solid/no-destructure": "error",
+    "solid/no-store-mutation-outside-setter": "error",
+    "solid/no-write-in-pure-computation": "error",
+    "solid/jsx-no-duplicate-props": "error",
+    "solid/jsx-no-script-url": "error",
+    "typescript/consistent-type-assertions": [
+      "error",
+      {
+        "assertionStyle": "never"
+      }
+    ],
+    "typescript/switch-exhaustiveness-check": [
+      "error",
+      {
+        "considerDefaultExhaustiveForUnions": false,
+        "requireDefaultForNonUnion": true
+      }
+    ],
+    "eslint/no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_"
+      }
+    ],
+    "refrain/effect-failure": "error"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.look.tsx", "**/*.look.solid.tsx", "swap/**/*.tsx", "swap/**/*.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "(^|/)(core|ui|wire)(/|$)",
+                "allowTypeImports": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/*.test.ts", "**/*.test.tsx"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "\\.look(?:\\.solid)?(?:\\.tsx)?$"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "ignorePatterns": ["**/*.html", "**/*.json", "**/*.css"],
+  "$schema": "./node_modules/oxlint/configuration_schema.json"
+}

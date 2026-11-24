@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { Attachment } from "svelte/attachments";
+import type { ElementRef } from "../../core/element_ref";
 
 import type { Pane, Side, Workbench } from "../../core/workbench";
 import { HOLD } from "./drawn";
@@ -41,7 +41,7 @@ export interface PaneMenuState {
 export interface PaneMenuHands extends MenuHands {
   readonly move: (side: Side) => void;
 
-  readonly hold: (key: string) => Attachment<HTMLElement>;
+  readonly hold: (key: string) => ElementRef<HTMLElement>;
 }
 
 const SIDES: readonly Side[] = ["left", "right"];

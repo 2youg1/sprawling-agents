@@ -235,7 +235,7 @@ fn judge_tokens(source: &str, mode: Mode) -> Vec<Violation> {
         ));
     }
 
-    violations.extend(judge_readability(source, &greys, mode));
+    violations.extend(judge_readability(source, mode));
     violations
 }
 

@@ -73,10 +73,10 @@ import {
   PreferencesAnswer,
   PrefixAnswer,
   PreviewAnswer,
-  PrivacyAnswer,
 } from "./c05";
 
 import {
+  PrivacyAnswer,
   PromptShapeAnswer,
   ProposalsAnswer,
   RangeAnswer,

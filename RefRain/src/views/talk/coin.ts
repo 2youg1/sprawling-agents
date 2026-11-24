@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { HTMLButtonAttributes } from "svelte/elements";
-
 import type { Sending } from "../../core/doing";
 import type { Lang } from "../../core/lang";
 import { say } from "../../core/lang";
@@ -19,10 +17,12 @@ export interface CoinLook {
   readonly wire: CoinWire;
 }
 
-export type CoinWire = Pick<
-  HTMLButtonAttributes,
-  "type" | "aria-label" | "aria-disabled" | "onclick"
->;
+export interface CoinWire {
+  readonly type: "button" | "submit";
+  readonly "aria-label": string;
+  readonly "aria-disabled": "true" | undefined;
+  readonly onclick: (event: MouseEvent) => void;
+}
 
 export function lookOf(face: Face, sending: Sending, lang: Lang, onStop: () => void): CoinLook {
   const command =

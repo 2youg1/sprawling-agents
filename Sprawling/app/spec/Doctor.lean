@@ -248,7 +248,7 @@ pub(crate) struct Asked { install: bool, city: Option<PathBuf>, explain: Option<
 - **`Views.registry: Option<fn() -> wire::ReleaseAnswer>`**，由 `views::served` 的 `ask_the_registry_through` 从外面放进来，与 `machine`、`vault` 同形：serve 一座城时装配根交 `bin::release::answer`，`twin` 把它带到另一份。`NewestRelease` 在快照放开之后调它（它要出网）；`None` 是一份没人 serve 的 views（重建、测试），答 `Unavailable` 而不去问注册表。views 因此不直接碰 `bin::release`，搬进 `accounting` 时 `release` 留在 `sprawling`（`Sprawling/accounting/Spec.lean` §7）。钉住它的测试是 `a_newest_release_is_asked_of_the_registry_the_views_were_handed`。
 - **`Views.places: Option<fn(&SetUpDir) -> Option<PathBuf>>`**，由 `look_for_agents_through` 从外面放进来，与 `registry` 同形：serve 一座城时装配根交 `bin::doctor::host::place_set_up`（读这家厂商文档写的变量与家目录，`Sprawling/agent_protocols/Spec.lean` D19）。`Query::AgentCatalog` 在快照放开之后调它找这台电脑上的 agent；`None` 答空的 `detected`（`Sprawling/accounting/spec/Views.lean` D13）。
 - **探测只由 `DoctorRefresh` 触发，服务一座城时一次也不跑**：表从 12 行长到 32 行，其中大半是起一个进程问它的版本（六件 cargo 子命令各起一次 cargo），windows-x86_64 暖缓存四核一档机器上量得 3.3–4.1 s。先前的决定把它放在开门之前，给出的参数是「12 项约 2 秒」，**两个数都已经移动**：项数翻了一倍有余，而问它的那一屏不再是第一屏（`#/` 是对话，机器那一屏在设置页的「依赖项安装」组里）。它当时否决后台探测的理由是「要多一条『还没答上来』的状态」，而那条状态今天已经存在、有夹具、也有它的动作（`MachineSkeleton` 与 `MachineUnchecked`）——那笔代价早已付过。服务因此不再为一个没人问的答案把套接字关着几秒。
-- **客户端**：`RefRain/src/views/machine.svelte` 画一份答案（`MachineReport`）与问一次（`Machine`）；首跑屏第一步换成它。**那一屏每次打开都发一次 `DoctorRefresh`**（与「重新检查」同一条命令，不是第二条路），每次打开至多一次；城里已有的答案先画出来，探完的那一份到了再换上（§8-120）。每一行是「状态词 + 名字 + 版本或装它的命令」，状态词取自 `lang.json`，版本与命令是城给的值——页面上没有句子。`#/gallery` 有一份夹具，三行各处于人会采取不同行动的三种状态。
+- **客户端**：`RefRain/src/views/machine.solid.tsx` 画一份答案（`MachineReport`）与问一次（`Machine`）；首跑屏第一步换成它。**那一屏每次打开都发一次 `DoctorRefresh`**（与「重新检查」同一条命令，不是第二条路），每次打开至多一次；城里已有的答案先画出来，探完的那一份到了再换上（§8-120）。每一行是「状态词 + 名字 + 版本或装它的命令」，状态词取自 `lang.json`，版本与命令是城给的值——页面上没有句子。`#/gallery` 有一份夹具，三行各处于人会采取不同行动的三种状态。
 - **不因事件失效**：这份答案说的是城启动时看到的那一眼，账本上没有任何记录能改变它，所以 `asking` 的 `staleBy` 对它落在 `default`（不失效）。
 - **验收**：`doctor::report::tests`——没有任何浏览器引擎的假机器答出 `Absent { NotOnSearchPath }`、`use` 档 `missing == ["a browser engine"]` 而 `develop` 档为空；平台不明时每一项的 `install` 都是 `UnknownPlatform`。
 -/
@@ -670,7 +670,7 @@ pub(super) fn look(family, platform, search_path) -> Presence;
 
 ### 8-81 空着的密钥框不是删除（`accounting::worker::credentials::endpoints::kept_credential`）
 
-**原因**：供应方表单把 vault 答复的引用只存在组件实例里（`setup/providers/form.svelte` 的 `held`），页面一卸载就没了；`EndpointSummary` 上线只带 `has_credential: bool`，不带引用，所以表单也无从向城要回来。于是第二次打开设置页按「看看」或「接上」时，帧里 `secret: None`：城读成「没有凭据」，探测不带任何 `Authorization` 发出（人读到的是 401「密钥无效」，而那把密钥是好的），接上则把已归档的引用覆盖成空——**静默丢 key**。
+**原因**：供应方表单把 vault 答复的引用只存在组件实例里（`setup/providers/form_view.tsx` 的 `held`），页面一卸载就没了；`EndpointSummary` 上线只带 `has_credential: bool`，不带引用，所以表单也无从向城要回来。于是第二次打开设置页按「看看」或「接上」时，帧里 `secret: None`：城读成「没有凭据」，探测不带任何 `Authorization` 发出（人读到的是 401「密钥无效」，而那把密钥是好的），接上则把已归档的引用覆盖成空——**静默丢 key**。
 
 ```rust
 // accounting::worker::credentials（形状 2 value）

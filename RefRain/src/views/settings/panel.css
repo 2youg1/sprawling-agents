@@ -1,0 +1,62 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+.settings-panel {
+  transition: translate var(--transition-duration-panel) var(--ease-arrive);
+}
+
+@starting-style {
+  .settings-panel[open] {
+    translate: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="on"]) .settings-panel {
+    transition: none;
+  }
+}
+
+[data-motion="off"] .settings-panel {
+  transition: none;
+}
+
+.settings-sheet {
+  --settings-back-inset: var(--refrain-rail-inset, var(--spacing-pane));
+  position: relative;
+}
+
+.settings-sheet-layout {
+  padding-block-end: calc(
+    var(--spacing-control) + var(--settings-back-inset) + var(--spacing-tight)
+  );
+}
+
+.settings-index[hidden],
+.settings-detail[hidden] {
+  display: none;
+}
+
+.settings-back {
+  position: absolute;
+  inset-inline-start: calc(var(--settings-back-inset) + env(safe-area-inset-left, 0px));
+  inset-block-end: calc(var(--settings-back-inset) + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-tight);
+  min-inline-size: var(--refrain-rail-size, var(--spacing-control));
+  min-block-size: var(--refrain-rail-size, var(--spacing-control));
+  padding-inline: var(--spacing-snug);
+}
+
+.settings-sheet[data-settings-presentation="index"] .settings-index {
+  inline-size: 100%;
+  min-block-size: 0;
+  border-inline-end: 0;
+}
+
+.settings-sheet[data-settings-presentation="index"] [data-entry] {
+  min-block-size: var(--refrain-rail-size, var(--spacing-control));
+}

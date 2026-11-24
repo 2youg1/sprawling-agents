@@ -16,8 +16,8 @@ export interface Place {
   readonly column: number;
 }
 
-export interface Positions {
-  readonly version: B3Hash;
+export interface Positions<Version extends string = B3Hash> {
+  readonly version: Version;
   readonly encoding: Encoding;
 
   readonly editor: string;
@@ -51,7 +51,11 @@ interface Step {
   readonly bytes: number;
 }
 
-export function positionsOf(version: B3Hash, encoding: Encoding, text: string): Positions {
+export function positionsOf<Version extends string>(
+  version: Version,
+  encoding: Encoding,
+  text: string,
+): Positions<Version> {
   const marked = text.codePointAt(0) === MARK && encoding !== "utf8";
   const wide = encoding === "utf16_le" || encoding === "utf16_be";
   const width = (code: number): number => (wide ? (code > 0xffff ? 4 : 2) : utf8Width(code));
@@ -125,7 +129,10 @@ export function positionsOf(version: B3Hash, encoding: Encoding, text: string): 
   };
 }
 
-export function textEdits(positions: Positions, changes: readonly EditorChange[]): TextEdit[] {
+export function textEdits(
+  positions: Pick<Positions, "bytes" | "lineBreak">,
+  changes: readonly EditorChange[],
+): TextEdit[] {
   return changes.map((change) => ({
     span: { start: positions.bytes(change.from), end: positions.bytes(change.to) },
     text:

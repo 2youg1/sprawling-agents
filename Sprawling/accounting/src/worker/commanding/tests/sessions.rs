@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A session's name and a room's run policy, through the worker's own
-//! door (`Sprawling/wire/spec/Answer/Sessions.lean` D27).
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -40,7 +37,6 @@ fn city() -> (tempfile::TempDir, RunWorker) {
     (dir, worker)
 }
 
-/// Every line of one kind, as the room it was written at and its payload.
 fn lines<T: serde::de::DeserializeOwned>(root: &Path, kind: &str) -> Vec<(String, T)> {
     let ledger = kernel::layout::CityLayout::new(root).ledger();
     runtime::replay::verify_ledger_dir(&ledger)
@@ -67,8 +63,6 @@ fn name(began: kernel::Seq, name: &str, idem: &[u8]) -> wire::Command {
     })
 }
 
-/// A name lands as one `session_named` line at the room, and a name that
-/// cannot sit on one line is refused before anything is written.
 #[test]
 fn naming_a_session_records_the_name_at_its_room() {
     let (dir, mut worker) = city();
@@ -90,8 +84,6 @@ fn naming_a_session_records_the_name_at_its_room() {
     );
 }
 
-/// A new run policy lands as one `run_policy_changed` line at the room,
-/// written by the person.
 #[test]
 fn changing_a_run_policy_records_the_policy_the_person_chose() {
     let (dir, mut worker) = city();
@@ -115,9 +107,6 @@ fn changing_a_run_policy_records_the_policy_the_person_chose() {
     );
 }
 
-/// A new run policy for a room a run is working in reaches that run: it
-/// waits in the slot the run's safe points read, and only the last
-/// change waits (`Sprawling/runtime/spec/PolicyTake.lean` §8-62).
 #[test]
 fn changing_the_policy_of_a_worked_room_reaches_the_run_working_there() {
     let (_dir, mut worker) = city();
@@ -143,8 +132,6 @@ fn changing_the_policy_of_a_worked_room_reaches_the_run_working_there() {
     );
 }
 
-/// The policy every run started in `lab` ran under, after `before` was
-/// handled and one dispatch that carried the Work policy landed.
 fn started_after(before: Vec<wire::Command>) -> Vec<RunPolicy> {
     use crate::worker::Posted;
     use crate::worker::fixture::{
@@ -167,6 +154,8 @@ fn started_after(before: Vec<wire::Command>) -> Vec<RunPolicy> {
             policy: RunPolicy::of(Mode::Work),
             idem: key(b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         },
@@ -191,10 +180,6 @@ fn to_chat() -> wire::Command {
     })
 }
 
-/// The defect: a policy the User changed while nobody worked in the room
-/// stayed on the ledger alone, and the next dispatch started under the
-/// policy the page sent with it (`Sprawling/app/spec/Accounting/Worker.lean`
-/// §8-133).
 #[test]
 fn a_policy_changed_while_the_room_is_idle_rules_the_next_dispatch() {
     assert_eq!(
@@ -203,8 +188,6 @@ fn a_policy_changed_while_the_room_is_idle_rules_the_next_dispatch() {
     );
 }
 
-/// A change belongs to the session it was made in: after a new session
-/// opens, the dispatch's own policy rules again.
 #[test]
 fn a_new_session_drops_the_policy_the_last_one_was_changed_to() {
     let opened = wire::Command::OpenSession {

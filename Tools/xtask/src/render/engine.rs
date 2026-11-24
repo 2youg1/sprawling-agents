@@ -4,6 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 pub(crate) mod launch;
+pub(super) mod served;
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -188,31 +189,42 @@ pub(super) fn measure(opening: &Opening, pass: &Pass) -> Result<Measured, XtaskE
             msg: "the probe wrote nothing; the engine rendered no page or ran no script".to_owned(),
         });
     };
-    let vocabulary = declared(words);
+    read_measured(
+        Read {
+            sink: records.to_owned(),
+            declared: words.to_owned(),
+            conditions: conditions.to_owned(),
+        },
+        pass,
+        &format!("{} --dump-dom {route}", browser.display()),
+    )
+}
+
+pub(super) fn read_measured(
+    read: Read,
+    pass: &Pass,
+    command: &str,
+) -> Result<Measured, XtaskError> {
+    let vocabulary = declared(&read.declared);
     if vocabulary.is_empty() {
         return Err(XtaskError::Cmd {
-            cmd: format!("{} --dump-dom {route}", browser.display()),
+            cmd: command.to_owned(),
             msg: "the probe read no declared words off the root element; the engine does not \
                   enumerate custom properties, so nothing can be judged against them"
                 .to_owned(),
         });
     }
-    let mut said = conditions.split_whitespace();
-    let (Some(forced), Some(scheme)) = (said.next(), said.next()) else {
+    let Some((forced, scheme)) = read.conditions() else {
         return Err(XtaskError::Cmd {
-            cmd: format!("{} --dump-dom {route}", browser.display()),
+            cmd: command.to_owned(),
             msg: format!(
-                "the probe wrote `{conditions}`, which names neither a forced-colour \
-                 mode nor a colour scheme"
+                "the probe wrote `{}`, which names neither a forced-colour \
+                 mode nor a colour scheme",
+                read.conditions,
             ),
         });
     };
 
-    let read = Read {
-        sink: records.to_owned(),
-        declared: words.to_owned(),
-        conditions: conditions.to_owned(),
-    };
     Ok(Measured {
         page: read.page(if pass.draws_forced_colours() {
             PaintSource::TheSystem

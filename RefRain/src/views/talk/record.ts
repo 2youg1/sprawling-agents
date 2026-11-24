@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { HTMLButtonAttributes } from "svelte/elements";
-
 import type { Lang } from "../../core/lang";
 import { say } from "../../core/lang";
 
@@ -23,7 +21,7 @@ export interface RecordWire {
   readonly "aria-label": string;
 
   readonly "aria-disabled": boolean;
-  readonly onclick: HTMLButtonAttributes["onclick"];
+  readonly onclick: () => void;
 }
 
 export interface Heard {

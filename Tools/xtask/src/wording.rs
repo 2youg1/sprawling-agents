@@ -3,26 +3,16 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Reader-facing words come from `lang.json`. `markup` reads Svelte
-//! text nodes and spoken attributes; `refusal` reads the corresponding
-//! TypeScript positions. Generated files are judged at their generator.
-//! Interpolations are removed before checking for adjacent letters.
-//! `wording-ok` covers an indentation block so formatting cannot move
-//! its scope to a different line.
-
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
-/// The only client source root; wire values and error codes are not reader prose.
 use crate::walk::CLIENT_SRC as CLIENT;
 
-/// The waiver, spelled as `lexicon`'s is.
 const EXEMPT_MARK: &str = "wording-ok:";
 
-/// HTML and ARIA attributes that carry author-supplied reader text.
 const SPOKEN: [&str; 8] = [
     "placeholder",
     "title",
@@ -45,7 +35,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         read: markup::handed_to_a_reader,
         phrases: &phrases,
     };
-    for path in walk::files_with_ext(&dir, &["svelte"])? {
+    for path in walk::files_with_ext(&dir, &["tsx"])? {
         judge(root, &path, &markup, &mut violations)?;
     }
     let modules = Rule {
@@ -58,7 +48,6 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
     Ok(violations)
 }
 
-/// Every phrase key defined by `lang.json`.
 fn keys(root: &Path) -> Result<BTreeSet<String>, XtaskError> {
     let path = root.join(CLIENT).join("lang.json");
     let text = walk::read_text(&path)?;
@@ -70,13 +59,11 @@ fn keys(root: &Path) -> Result<BTreeSet<String>, XtaskError> {
     Ok(table.into_keys().collect())
 }
 
-/// One language reader and the phrase keys shared by every file in a run.
 struct Rule<'a> {
     read: fn(&str) -> Vec<Said>,
     phrases: &'a BTreeSet<String>,
 }
 
-/// Holds one file to the rule, through the reader its language needs.
 fn judge(
     root: &Path,
     path: &Path,
@@ -113,7 +100,6 @@ fn judge(
     Ok(())
 }
 
-/// The production portion preceding a module's test items.
 fn drawn(body: &str) -> &str {
     match body.find("#[cfg(test)]") {
         Some(at) => body.get(..at).unwrap_or(body),
@@ -121,7 +107,6 @@ fn drawn(body: &str) -> &str {
     }
 }
 
-/// Whether an indentation-scoped waiver covers `line`.
 fn waived(lines: &[&str], line: usize) -> bool {
     let mut floor = usize::MAX;
     for text in lines.iter().take(line).rev() {
@@ -137,7 +122,6 @@ fn waived(lines: &[&str], line: usize) -> bool {
     false
 }
 
-/// How far a line is indented, in bytes of leading whitespace.
 fn indent(text: &str) -> usize {
     text.len().saturating_sub(text.trim_start().len())
 }
@@ -150,7 +134,6 @@ fn clipped(text: &str) -> String {
     out
 }
 
-/// One literal a reader is handed, and the words left in it.
 struct Said {
     line: usize,
     seat: &'static str,
@@ -160,7 +143,6 @@ struct Said {
 mod markup;
 mod refusal;
 
-/// Text remaining after interpolations and escapes, when it contains adjacent letters.
 fn words_the_view_wrote(literal: &str) -> Option<String> {
     let mut left = String::new();
     let mut chars = literal.chars().peekable();

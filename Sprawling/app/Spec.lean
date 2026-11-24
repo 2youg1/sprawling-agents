@@ -10,6 +10,7 @@ import Sprawling.app.spec.Accounting.Worker
 import Sprawling.app.spec.Assembly
 import Sprawling.app.spec.Assembly.ChainWatch
 import Sprawling.app.spec.Assembly.Listening
+import Sprawling.app.spec.Assembly.Workspace
 import Sprawling.app.spec.BrowserBidi
 import Sprawling.app.spec.Console
 import Sprawling.app.spec.Console.Lifecycle
@@ -363,6 +364,7 @@ pub struct SystemClock;   // 墙钟的唯一采样点（clippy.toml 的 disallow
 | 8-154 | `Sprawling/app/spec/Assembly/Listening.lean` |
 | 8-155 | `Sprawling/app/spec/Supervising.lean` |
 | 8-157 | `Sprawling/app/spec/Doctor.lean` |
+| 8-160 | `Sprawling/app/spec/Assembly/Workspace.lean` |
 | 8-161 | `Sprawling/app/spec/Supervising.lean` |
 | 8-162 | `Sprawling/app/spec/Doctor.lean` |
 | 8-163 | `Sprawling/app/spec/Accounting/Worker.lean` |

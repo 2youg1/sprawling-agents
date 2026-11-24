@@ -1,0 +1,138 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+.talk-coin {
+  position: relative;
+  display: block;
+  flex-shrink: 0;
+  width: var(--spacing-coin);
+  height: var(--spacing-coin);
+  perspective: calc(var(--spacing-coin) * 7.5);
+  transition:
+    scale var(--transition-duration-short) var(--ease-leave),
+    color var(--transition-duration-short) var(--ease-leave);
+}
+.talk-coin-faces {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform var(--transition-duration-coin) var(--ease-arrive);
+}
+.talk-coin-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background-color: var(--color-page);
+  color: var(--color-text);
+  backface-visibility: hidden;
+  transition:
+    background-color var(--transition-duration-short) var(--ease-leave),
+    color var(--transition-duration-short) var(--ease-leave),
+    opacity var(--transition-duration-short) var(--ease-leave),
+    scale var(--transition-duration-short) var(--ease-leave);
+}
+.talk-coin-face[data-face="stop"] {
+  transform: rotateY(180deg);
+}
+
+.talk-coin:hover .talk-coin-face {
+  background-color: color-mix(in oklch, var(--color-text) 8%, var(--color-page));
+  transition-timing-function: var(--ease-arrive);
+}
+.talk-coin:hover {
+  scale: 1.06;
+  transition-timing-function: var(--ease-arrive);
+}
+.talk-coin[data-up="stop"] .talk-coin-faces {
+  transform: rotateY(180deg);
+}
+
+.talk-coin[data-kind="dispatch"] .talk-coin-face[data-face="send"] {
+  color: var(--color-accent);
+}
+.talk-coin:active {
+  scale: var(--scale-press);
+  transition-timing-function: var(--ease-arrive);
+}
+.talk-coin:active .talk-coin-faces {
+  scale: 1;
+}
+[data-motion="off"] .talk-coin,
+[data-motion="off"] .talk-coin-faces,
+[data-motion="off"] .talk-coin-face {
+  transition: none;
+}
+[data-motion="off"] .talk-coin:hover,
+[data-motion="off"] .talk-coin:active {
+  scale: 1;
+}
+[data-motion="off"] .talk-coin-faces,
+[data-motion="off"] .talk-coin-face[data-face="stop"] {
+  transform: none;
+}
+[data-motion="off"] .talk-coin-face[data-face="stop"],
+[data-motion="off"] .talk-coin[data-up="stop"] .talk-coin-face[data-face="send"] {
+  opacity: 0;
+}
+[data-motion="off"] .talk-coin[data-up="stop"] .talk-coin-face[data-face="stop"] {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="on"]) .talk-coin,
+  :root:not([data-motion="on"]) .talk-coin-faces,
+  :root:not([data-motion="on"]) .talk-coin-face {
+    transition: none;
+  }
+  :root:not([data-motion="on"]) .talk-coin:hover,
+  :root:not([data-motion="on"]) .talk-coin:active {
+    scale: 1;
+  }
+  :root:not([data-motion="on"]) .talk-coin-faces,
+  :root:not([data-motion="on"]) .talk-coin-face[data-face="stop"] {
+    transform: none;
+  }
+  :root:not([data-motion="on"]) .talk-coin-face[data-face="stop"],
+  :root:not([data-motion="on"]) .talk-coin[data-up="stop"] .talk-coin-face[data-face="send"] {
+    opacity: 0;
+  }
+  :root:not([data-motion="on"]) .talk-coin[data-up="stop"] .talk-coin-face[data-face="stop"] {
+    opacity: 1;
+  }
+}
+
+.talk-microphone {
+  position: relative;
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: var(--spacing-control-sm);
+  height: var(--spacing-control-sm);
+  border-radius: var(--radius-pill);
+  background-color: var(--color-raised);
+  color: var(--color-text-quiet);
+}
+.talk-microphone::before {
+  content: "";
+  position: absolute;
+  inset: calc((var(--spacing-touch) - var(--spacing-control-sm)) / -2);
+}
+.talk-microphone[data-hearing="ready"]:hover {
+  background-color: var(--color-raised-hover);
+  color: var(--color-text);
+}
+.talk-microphone[data-hearing="taking"] {
+  background-color: var(--color-alert);
+  color: var(--color-on-accent);
+}
+.talk-microphone[data-hearing="taking"]:hover {
+  filter: brightness(1.06);
+}
+.talk-microphone[data-hearing="hearing"] {
+  color: var(--color-text-disabled);
+}

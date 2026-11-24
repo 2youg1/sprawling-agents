@@ -161,8 +161,13 @@ pub struct ModelReturned {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SteerReceived {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub pictures: Vec<crate::ImageRef>,
+
     pub source: String,
     pub text: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub idem: Option<crate::IdemKey>,
 }
 
 impl SteerReceived {

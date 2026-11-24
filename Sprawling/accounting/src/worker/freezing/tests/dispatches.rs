@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What one dispatch freezes and what it leaves behind: the handoff it
-//! refuses, the job bytes the history carries, the prompt it sends, and
-//! the lineage a fork of it writes.
-
 #![allow(
     clippy::let_underscore_must_use,
     clippy::let_underscore_untyped,
@@ -17,8 +13,6 @@ use super::super::*;
 use crate::worker::fixture::*;
 use crate::worker::*;
 
-/// A handoff that exists and cannot be read is not the absence of a
-/// handoff, and the next session is assembled from it.
 #[test]
 fn a_handoff_that_cannot_be_read_is_refused_by_name() {
     let dir = tempfile::tempdir().unwrap();
@@ -40,6 +34,8 @@ fn a_handoff_that_cannot_be_read_is_refused_by_name() {
         policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"handoff"),
         session: None,
+        resume: None,
+        images: Vec::new(),
         effort: None,
         model: None,
     });
@@ -87,6 +83,8 @@ fn work_offered_in_up_mode_without_a_test_does_not_land() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::new(0), b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -135,6 +133,8 @@ fn the_job_lands_in_the_room_and_the_history_carries_the_same_bytes() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -156,8 +156,6 @@ fn the_job_lands_in_the_room_and_the_history_carries_the_same_bytes() {
         "the run's job locator addresses the same bytes the room holds"
     );
 
-    // The must-read list is filled from the norms rather than recited:
-    // the city's own instructions, this building's rules, and the job.
     let handoff: serde_json::Value = verified
         .raw_lines()
         .iter()
@@ -169,9 +167,6 @@ fn the_job_lands_in_the_room_and_the_history_carries_the_same_bytes() {
         .expect("the handoff carries its must-read list");
     assert_eq!(must_read.len(), 3, "city, building, job: {must_read:?}");
 
-    // Every stored entry of that list is pinned to the room the run
-    // works in, so `read` there admits it instead of refusing a block
-    // with no origin.
     let unreadable: Vec<String> = must_read
         .iter()
         .filter_map(|entry| kernel::Locator::parse(entry.as_str()?).ok())
@@ -192,20 +187,6 @@ fn the_job_lands_in_the_room_and_the_history_carries_the_same_bytes() {
     assert_eq!(unreadable, Vec::<String>::new(), "{must_read:?}");
 }
 
-/// The prefix carries what it tells the agent to read.
-///
-/// Before this card the building slot held twelve bytes of address
-/// and the run slot held a `cas:` hash no tool in the city can
-/// resolve, so an agent was told to read its building's rules and
-/// its own task and had no way to reach either.
-/// The conversation an old run had has an address, and the handoff
-/// names it.
-///
-/// The address is the room's, never the ledger's: the ledger lives under
-/// the reserved subtree `read` refuses, and it is one chain for the
-/// whole city. What lands beside the room is what this run's model
-/// actually saw, one message per line, so `search` can find a line in
-/// it and `read` can continue from that line.
 #[test]
 fn a_frozen_run_leaves_its_transcript_beside_the_room_and_the_handoff_names_it() {
     let dir = tempfile::tempdir().unwrap();
@@ -227,6 +208,8 @@ fn a_frozen_run_leaves_its_transcript_beside_the_room_and_the_handoff_names_it()
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -284,10 +267,6 @@ fn a_frozen_run_leaves_its_transcript_beside_the_room_and_the_handoff_names_it()
     );
 }
 
-/// The handoff a run is frozen with is the one its room holds: the
-/// sections the last session wrote, and the file's own bytes pinned as
-/// something the successor must read, rather than a line that points at
-/// a roadmap the file never mentioned.
 #[test]
 fn the_frozen_handoff_carries_the_rooms_own_sections_and_pins_its_bytes() {
     let dir = tempfile::tempdir().unwrap();
@@ -311,6 +290,8 @@ fn the_frozen_handoff_carries_the_rooms_own_sections_and_pins_its_bytes() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
         })
         .unwrap();

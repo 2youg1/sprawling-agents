@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The bytes these structs write are the bytes the hand-written maps in
-//! `runtime::run::lifecycle` and `runtime::fork` wrote. Each test keeps
-//! the old `insert` sequence verbatim and asserts the two encodings are
-//! the same string, so a replay over a ledger written by the previous
-//! build reads back and re-hashes identically.
-
 use serde_json::{Map, Value};
 
 use super::*;
@@ -22,8 +16,6 @@ fn job() -> Locator {
     Locator::parse("file:sim/lobby/room1@8ea61adc1c8339d02a5c665ba8280a85151ee549").unwrap()
 }
 
-/// The writer that stood in `runtime::run::lifecycle::dispatch` before
-/// this struct existed, copied key for key.
 fn hand_written_started(
     task: &str,
     goal: &str,
@@ -65,6 +57,7 @@ fn hand_written_started(
 
 fn typed_started(parent: Option<RunId>, predecessor: Option<RunId>) -> RunStarted {
     RunStarted {
+        pictures: Vec::new(),
         task: "walk two waves".to_owned(),
         goal: "let an intervention land between them".to_owned(),
         job: Some(job()),
@@ -177,8 +170,6 @@ fn the_golden_fixture_line_reads_back_and_writes_itself_again() {
     assert_eq!(bytes(&Payload::of(&read).unwrap()), raw);
 }
 
-/// The policy a run was dispatched under is on its first line, in the
-/// spelling the wire uses, and reads back whole.
 #[test]
 fn a_run_started_line_records_its_policy() {
     use crate::model::{AdmissionRequirement, LandingPolicy, Mode};
@@ -204,9 +195,6 @@ fn a_run_started_line_records_its_policy() {
     assert_eq!(payload.read::<RunStarted>().unwrap(), started);
 }
 
-/// The identity version a run's session froze is on its first line as
-/// the digest a page reads the names back by, and is absent when the run
-/// froze none.
 #[test]
 fn a_run_started_line_records_the_naming_it_froze() {
     let naming = B3Hash::digest(b"{\"person\":\"2youg1\"}");
@@ -224,9 +212,6 @@ fn a_run_started_line_records_the_naming_it_froze() {
     assert!(!bytes(&bare).contains("naming"), "{}", bytes(&bare));
 }
 
-/// The effort a run's requests froze is on its first line, and a run
-/// that stated none writes no key, so "the provider chooses" never reads
-/// back as asking it not to think.
 #[test]
 fn a_run_started_line_records_the_effort_it_froze() {
     let started = RunStarted {
@@ -245,8 +230,6 @@ fn a_run_started_line_records_the_effort_it_froze() {
 
 #[test]
 fn an_empty_payload_reads_as_a_run_that_said_nothing() {
-    // `Tools/fixtures/golden-s1` holds exactly this line. A reader that
-    // refused it would refuse a ledger this repository ships.
     let read: RunStarted = Payload::empty().read().unwrap();
     assert_eq!(read, RunStarted::default());
     assert_eq!(read.job, None);
@@ -277,9 +260,6 @@ fn a_fork_writes_the_two_keys_runtime_fork_wrote() {
     assert_eq!(back.at_seq, Seq::new(41));
 }
 
-/// The writer that stood in `runtime::run::lifecycle::freeze` before
-/// this struct existed: `Completion::extend_payload`, which is the map
-/// this struct has to reproduce key for key.
 fn hand_written_frozen(completion: &Completion) -> Payload {
     let mut map = Map::new();
     completion.extend_payload(&mut map).unwrap();
@@ -346,8 +326,6 @@ fn the_two_endings_that_cite_nothing_leave_the_key_absent() {
     }
 }
 
-/// The bytes `accounting::worker::probing` wrote by hand for an
-/// `eval_run` line, empty lists included.
 #[test]
 fn an_eval_line_keeps_the_bytes_its_ledger_already_holds() {
     let predecessor = RunId::from_bytes([5u8; 16]);

@@ -207,6 +207,7 @@ impl Reply {
             },
             Ok(
                 wire::ServerFrame::Welcome(_)
+                | wire::ServerFrame::Accepted(_)
                 | wire::ServerFrame::Delta(_)
                 | wire::ServerFrame::Log(_)
                 | wire::ServerFrame::Lagged(_)

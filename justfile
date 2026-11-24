@@ -619,7 +619,7 @@ check-console:
 fuzz-desktop rounds="1000000" seed="5eedf022":
     DESKTOP_FFI_FUZZ_ROUNDS={{rounds}} DESKTOP_FFI_FUZZ_SEED={{seed}} cargo nextest run -p sprawling-desktop-ffi --locked --run-ignored only -E 'test(/for_as_long_as_asked/)'
 
-# The browser client (RefRain/Spec.lean): Svelte + Effect, built by
+# The browser client (RefRain/Spec.lean): Solid + Effect, built by
 # Vite under bun, bundled into Sprawling/app/web-dist where
 # Sprawling/app/build.rs reads it and where `cargo package` archives it. `just prereqs` names bun. `--frozen-lockfile` makes bun.lock
 # the authority, so a build cannot resolve a version nobody committed.
@@ -648,13 +648,10 @@ check-client: build-web client-checks
 
 # The generated offline playback page, then the client's own gates on
 # the dependencies build-web installed. Both checks run under Bun.
-# `bun check` is a type check of the client's TypeScript in about a fifth
-# of a second; it reads no `.svelte` file, so `bun run typecheck`'s
-# `svelte-check` stays the type lane and this one only catches a `.ts`
-# error sooner.
+# Bun checks the installed Solid JSX types and TypeScript sources.
 client-checks:
     bun Sprawling/city/skills/playback/assemble.js --check
-    cd RefRain && bun run lint && bun check && bun run typecheck && bun run test
+    cd RefRain && bun run lint && bun run typecheck && bun run test
 
 # The gate that opens the gallery in a real engine, on its own: roles,
 # accessible names, landmarks, one left edge, nothing outside its box.
@@ -677,13 +674,13 @@ swap:
     set -euo pipefail
     tests=()
     while IFS= read -r look; do
-        test="src/${look%.look.svelte}.test.ts"
+        test="src/${look%.look.solid.tsx}.test.ts"
         if [ ! -f "RefRain/$test" ]; then
             echo "swap: RefRain/swap/$look replaces a part with no wiring test at RefRain/$test" >&2
             exit 1
         fi
         tests+=("./$test")
-    done < <(cd RefRain/swap && find . -name '*.look.svelte' | sed 's#^\./##' | sort)
+    done < <(cd RefRain/swap && find . -name '*.look.solid.tsx' | sed 's#^\./##' | sort)
     if [ ${#tests[@]} -eq 0 ]; then
         echo "swap: RefRain/swap holds no look, so nothing would be swapped" >&2
         exit 1

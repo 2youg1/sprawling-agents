@@ -17,13 +17,19 @@ impl Freezing<'_> {
         &mut self,
         plan: &RunPlan,
         mut must_read: Vec<Locator>,
+        read_room: bool,
     ) -> Result<Handoff, AxError> {
         let transcript = runtime::Transcript::address(&plan.addr, plan.run)?;
         let dispatched = format!(
             "dispatched from the control surface; transcript at {}",
             transcript.as_str()
         );
-        let Some(text) = city::handoff(self.city_root, &plan.addr)? else {
+        let text = if read_room {
+            city::handoff(self.city_root, &plan.addr)?
+        } else {
+            None
+        };
+        let Some(text) = text else {
             return Handoff::new(
                 must_read,
                 task_line(plan),

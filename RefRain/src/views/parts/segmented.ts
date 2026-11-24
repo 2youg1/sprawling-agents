@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import { createAttachmentKey } from "svelte/attachments";
-import type { Attachment } from "svelte/attachments";
-
 export type Tone = "plain" | "alert" | "accent";
 
 export interface Group {
@@ -104,15 +101,17 @@ export interface GroupWire {
   readonly "aria-label": string;
 }
 
+export type HoldCell = (node: HTMLButtonElement) => void;
+
 export interface CellWire {
   readonly role: "radio";
-  readonly "aria-checked": boolean;
-  readonly "aria-disabled": boolean;
+  readonly "aria-checked": "true" | "false";
+  readonly "aria-disabled": "true" | "false";
   readonly "aria-describedby": string | undefined;
   readonly tabindex: 0 | -1;
-  readonly onclick: () => void;
-  readonly onkeydown: (event: KeyPress) => void;
-  readonly [hold: symbol]: Attachment<HTMLElement>;
+  readonly onClick: () => void;
+  readonly onKeyDown: (event: KeyPress) => void;
+  readonly ref: HoldCell;
 }
 
 export interface Why {
@@ -149,10 +148,8 @@ export interface SegmentedLook {
 
 export interface Hands<V extends string> {
   readonly focus: (value: V) => void;
-  readonly hold: (value: V) => Attachment<HTMLElement>;
+  readonly hold: (value: V) => HoldCell;
 }
-
-const HOLD = createAttachmentKey();
 
 export function lookOf<V extends string>(
   props: SegmentedProps<V>,
@@ -179,20 +176,20 @@ export function lookOf<V extends string>(
       why,
       wire: {
         role: "radio",
-        "aria-checked": choice.value === held,
-        "aria-disabled": why !== undefined,
+        "aria-checked": choice.value === held ? "true" : "false",
+        "aria-disabled": why !== undefined ? "true" : "false",
         "aria-describedby": why?.id,
         tabindex: at === stop ? 0 : -1,
-        onclick: () => {
+        onClick: () => {
           choose(at);
         },
-        onkeydown: (event) => {
+        onKeyDown: (event) => {
           const to = landing(options, at, event.key);
           if (to === undefined) return;
           event.preventDefault();
           choose(to);
         },
-        [HOLD]: hands.hold(choice.value),
+        ref: hands.hold(choice.value),
       },
     };
   };

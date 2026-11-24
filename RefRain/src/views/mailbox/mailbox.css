@@ -1,0 +1,113 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+@counter-style mailbox-blank {
+  system: cyclic;
+  symbols: "";
+}
+@counter-style mailbox-digit {
+  system: extends decimal;
+  range: 1 9;
+  fallback: mailbox-blank;
+}
+.mailbox-entries {
+  counter-reset: entry;
+}
+.mailbox-entries [data-entry] {
+  counter-increment: entry;
+}
+.mailbox-entries .entry-n {
+  flex-shrink: 0;
+  min-width: 1ch;
+  margin-inline-start: var(--spacing-snug);
+  font-family: var(--font-mono);
+  font-size: var(--text-note);
+  line-height: 1;
+  color: var(--color-text-faint);
+}
+.mailbox-entries .entry-n::before {
+  content: counter(entry, mailbox-digit);
+}
+
+.mailbox-key-host {
+  display: contents;
+}
+
+:root[data-expose] .mailbox-key-host [data-exposable] {
+  display: block;
+  opacity: 1;
+  transition-delay: 0ms;
+}
+
+.mailbox-key {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--spacing-key);
+  height: var(--spacing-key);
+  border-radius: var(--radius-key);
+  color: var(--color-text);
+  transition: translate var(--transition-duration-short) var(--ease-leave);
+}
+.mailbox-key:hover {
+  translate: 0 -1px;
+  transition-timing-function: var(--ease-arrive);
+}
+
+.mailbox-key-foot {
+  position: absolute;
+  bottom: calc((var(--spacing-key) - var(--spacing-glyph-key)) / 4);
+  left: 50%;
+  display: flex;
+  gap: var(--spacing-hair);
+  translate: -50% 0;
+}
+.mailbox-key-tick,
+.mailbox-key-bar {
+  display: block;
+  height: var(--spacing-hair);
+  border-radius: var(--radius-pill);
+}
+.mailbox-key-tick {
+  width: var(--spacing-tick);
+  background-color: var(--color-mark);
+}
+.mailbox-key-tick[data-held="true"] {
+  background-color: var(--color-accent);
+}
+
+.mailbox-key-bar {
+  width: calc(var(--spacing-tick) * 3 + var(--spacing-hair) * 2);
+  background-color: var(--color-text-quiet);
+}
+.mailbox-key-bar[data-link="refused"] {
+  background-color: var(--color-alert);
+}
+
+.mailbox-key-count {
+  position: absolute;
+  top: calc(var(--spacing-tight) * -1);
+  right: calc(var(--spacing-tight) * -1);
+  display: grid;
+  place-items: center;
+  min-width: var(--spacing-glyph-key);
+  height: var(--spacing-glyph-key);
+  padding-inline: var(--spacing-tight);
+  border-radius: var(--radius-pill);
+  background-color: var(--color-alert);
+  color: var(--color-on-accent);
+  font-size: var(--text-tally);
+  font-weight: var(--font-weight-label);
+  line-height: 1;
+}
+.mailbox-key-fresh {
+  position: absolute;
+  top: calc(var(--spacing-tight) * -1 + (var(--spacing-glyph-key) - var(--spacing-dot)) / 2);
+  right: calc(var(--spacing-tight) * -1 + (var(--spacing-glyph-key) - var(--spacing-dot)) / 2);
+  width: var(--spacing-dot);
+  height: var(--spacing-dot);
+  border-radius: var(--radius-pill);
+  background-color: var(--color-text-quiet);
+}

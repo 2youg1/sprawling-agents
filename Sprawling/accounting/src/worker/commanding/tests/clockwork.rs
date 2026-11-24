@@ -68,6 +68,8 @@ fn a_repeat_of_a_command_already_underway_is_not_a_second_piece_of_work() {
         policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"lab/room1|read the plan"),
         session: None,
+        resume: None,
+        images: Vec::new(),
         effort: None,
         model: None,
     };

@@ -20,14 +20,14 @@ import Sprawling.wire.spec.Reception
 pub struct Keys<'a> { pub face: &'a BindFace, pub sessions: &'a Sessions }
 impl Keys<'_> { pub fn pairing(&self, offered: Option<&str>) -> Pairing; }   // 一问，hello 与每个 POST 共用
 pub fn decide_admission(door: Door, pairing: Pairing) -> Admission;
-// Transcribe | Enroll | Drop：Absent 即 E_GATE_DENIED；Acp：Absent 仍进，携 Pairing::Absent
+// Transcribe | Enroll | Drop | Workspace：Absent 即 E_GATE_DENIED；Acp：Absent 仍进，携 Pairing::Absent
 ```
 
 口径：
 
 - **没有「没配令牌就人人算配过」这一支**。面总带一把钥匙（§8-41），所以回环城与暴露城对一个空手的来者是同一个答案。
 - **`Door` 是枚举而不是路径字符串**。门烧进 `route_layer` 的状态里，路由表因此仍是全仓唯一拼出 `/transcribe`、`/enroll` 的地方；middleware 不回头读 `uri().path()`，否则路径就有了第二个家。
-- **会动作的三扇门当场拒，`/acp` 不拒**。花钱、收凭证、落文件是动作，空手的来者不该触发；外来编辑器「只学到一位」是 `agent_protocols::admit` 的措辞权（`Sprawling/agent_protocols/Spec.lean` §9），所以那扇门把 `Pairing` 传进去而不是自己写拒词。`/acp` 的凭据写在 body 的 `token` 键里（编辑器没有别的地方写），判定调的是同一个 `Keys::pairing`。
+- **会动作的四扇门当场拒，`/acp` 不拒**。花钱、收凭证、落文件是动作，空手的来者不该触发；外来编辑器「只学到一位」是 `agent_protocols::admit` 的措辞权（`Sprawling/agent_protocols/Spec.lean` §9），所以那扇门把 `Pairing` 传进去而不是自己写拒词。`/acp` 的凭据写在 body 的 `token` 键里（编辑器没有别的地方写），判定调的是同一个 `Keys::pairing`。
 - **`/` 与 `/{*asset}` 不问凭据**：人要先拿到页面，才有地方配对。它们仍过入口判定的 Host 一步。
 - **凭据怎么递**：socket 写在 hello 帧的 `token` 里，POST 走 `Authorization: Bearer`，`offered_pairing` 是这条拼写在服务端的唯一读者。原生客户端（`sprawling call`、`gauge`、`enrol`、远程中继）递native key，浏览器递会话令牌。
 - **`/enroll` 与保存凭据的那条路共用一个构造点**：realm 与 name 交给 `kernel::SecretRef::new` 建引用，建不出来即 422；201 正文引用的是 `secret_captured` 记录里那句 `ref`。
@@ -37,12 +37,13 @@ namespace Wire.Reception.Admission
 
 open Wire.Reception
 
-/-- 四扇 HTTP 门，穷尽（`reception::admission::Door`）。 -/
+/-- 五扇 HTTP 门，穷尽（`reception::admission::Door`）。 -/
 inductive Door where
   | Transcribe
   | Enroll
   | Acp
   | Drop
+  | Workspace
   deriving DecidableEq, Repr
 
 /-- 来者握没握着这座城认的凭据（`auth::Pairing`）。 -/
@@ -72,6 +73,7 @@ def decideAdmission (door : Door) (pairing : Pairing) : Admission :=
   | .Absent, .Transcribe => .Refuse
   | .Absent, .Enroll => .Refuse
   | .Absent, .Drop => .Refuse
+  | .Absent, .Workspace => .Refuse
 
 /-- **`/acp` 从不拒绝**：外来编辑器只学到一位，那一位由 `agent_protocols::admit` 措辞。 -/
 theorem the_acp_door_never_refuses (pairing : Pairing) :
