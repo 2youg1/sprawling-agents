@@ -70,7 +70,6 @@ license = "MPL-2.0"
 # never just because the pin moved (`Sprawling/app/spec/Doctor.lean` D31).
 rust-version = "1.97"
 repository = "https://github.com/2youg1/sprawling-agents"
-homepage = "https://github.com/2youg1/sprawling-agents"
 readme = "README.md"
 publish = true
 
