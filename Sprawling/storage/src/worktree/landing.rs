@@ -42,7 +42,8 @@ impl Worktrees {
                 .find_reference(PENDING)
                 .and_then(|mut reference| reference.delete())
                 .map_err(landing_error),
-            state => self.complete_landing(oid, state == LandingRecord::Reviewed),
+            LandingRecord::Completed => self.complete_landing(oid, false),
+            LandingRecord::Reviewed => self.complete_landing(oid, true),
         }
     }
 
