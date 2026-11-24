@@ -7,7 +7,7 @@ use crate::worker::fixture::*;
 use crate::worker::*;
 
 #[test]
-fn two_runs_in_one_room_under_review_work_in_one_tree() {
+fn two_runs_in_one_room_under_review_have_separate_checkouts() {
     let dir = tempfile::tempdir().unwrap();
     let report = crate::worker::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
@@ -34,10 +34,7 @@ fn two_runs_in_one_room_under_review_work_in_one_tree() {
 
     let opened = trees_opened(&report.ledger_dir);
     assert_eq!(opened.len(), 2, "each run opened a tree: {opened:?}");
-    assert_eq!(
-        opened[0], opened[1],
-        "the room's second run took its tree back"
-    );
+    assert_ne!(opened[0], opened[1], "each run owns its writable files");
 }
 
 #[test]
@@ -75,7 +72,9 @@ fn a_tree_left_locked_by_a_dead_writer_is_lent_again() {
     let name = storage::WorktreeName::parse(&trees_opened(&report.ledger_dir)[0]).unwrap();
 
     drop(
-        storage::Worktrees::open(dir.path())
+        storage::ProjectRepository::at(dir.path(), &Address::parse("lab").unwrap())
+            .unwrap()
+            .trees()
             .unwrap()
             .claim(&name, &["lab".to_owned()])
             .unwrap(),
@@ -150,7 +149,7 @@ fn trees_opened(ledger_dir: &std::path::Path) -> Vec<String> {
 }
 
 #[test]
-fn a_tree_that_waits_on_the_index_lock_is_placed_in_the_lane() {
+fn a_source_index_lock_cannot_block_the_private_run() {
     let dir = tempfile::tempdir().unwrap();
     crate::worker::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab").join("room1")).unwrap();
@@ -183,8 +182,8 @@ fn a_tree_that_waits_on_the_index_lock_is_placed_in_the_lane() {
         "the desk took the dispatch off while the index was locked"
     );
     assert!(
-        landed.is_err(),
-        "and the lane that could not place the tree came home refused"
+        landed.is_ok(),
+        "the lane works independently of this source index lock: {landed:?}"
     );
 }
 

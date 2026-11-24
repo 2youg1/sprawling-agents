@@ -331,7 +331,9 @@ impl Prepared {
                 head,
             } => {
                 let far = head.map_or(storage::Head::WorkingTree, storage::Head::Commit);
-                match storage::between(&city_root, base, far) {
+                match storage::ProjectRepository::containing(&city_root, base)
+                    .and_then(|project| project.changes(base, far))
+                {
                     Ok(files) => wire::Answer::Changes(wire::ChangesAnswer { base, head, files }),
                     Err(_) => unavailable(format!("Changes({base})")),
                 }

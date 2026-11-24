@@ -20,10 +20,6 @@ fn resident() -> Provenance {
     )
 }
 
-/// A base checkpoint over a city that already has a HEAD leaves the branch
-/// alone and files its commit, and a wave checkpoint on a fresh handle
-/// afterwards still writes to disk: the in-memory store left with the
-/// handle that held it.
 #[test]
 fn a_base_checkpoint_beside_history_is_filed_and_leaves_later_checkpoints_on_disk() {
     let tmp = tempfile::tempdir().unwrap();
@@ -79,9 +75,6 @@ fn a_base_checkpoint_beside_history_is_filed_and_leaves_later_checkpoints_on_dis
     );
 }
 
-/// A base checkpoint refused by the staged-secret scan leaves the disk as it
-/// found it: no index entry and no HEAD names an object that only the
-/// in-memory store held, so a wave checkpoint over the cleaned folder commits.
 #[test]
 fn a_refused_base_checkpoint_leaves_no_reference_to_objects_it_never_wrote() {
     let tmp = tempfile::tempdir().unwrap();
@@ -113,9 +106,6 @@ fn a_refused_base_checkpoint_leaves_no_reference_to_objects_it_never_wrote() {
     );
 }
 
-/// The object files under `.git/objects`: loose objects (one file each under
-/// a two-digit directory) and packs. Counted by name, so the count does not
-/// depend on the order a platform lists a directory in.
 fn object_files(root: &std::path::Path) -> (usize, usize) {
     let objects = root.join(".git").join("objects");
     let names = |dir: &std::path::Path| -> Vec<std::path::PathBuf> {
@@ -137,9 +127,6 @@ fn object_files(root: &std::path::Path) -> (usize, usize) {
     (loose, packs)
 }
 
-/// The first base of a city writes every object it makes as one pack, at
-/// N, 2N and 4N files alike: the cost that grew with the file count was one
-/// new loose-object file per blob (storage §8-8).
 #[test]
 fn a_first_base_writes_one_pack_and_no_loose_object_at_any_file_count() {
     let counts: Vec<(bool, usize, usize)> = [8usize, 16, 32]
@@ -163,10 +150,6 @@ fn a_first_base_writes_one_pack_and_no_loose_object_at_any_file_count() {
     assert_eq!(counts, vec![(true, 0, 1); 3]);
 }
 
-/// Derived from `a_held_base_moves_head_only_from_what_it_read`
-/// (`Sprawling/storage/spec/Checkpoint/Concurrent.lean`): a base that read
-/// "no HEAD" and finds a branch another writer created since is refused,
-/// and HEAD stays the other writer's commit.
 #[test]
 fn a_base_that_read_no_head_is_refused_once_another_writer_made_one() {
     let tmp = tempfile::tempdir().unwrap();
@@ -188,6 +171,7 @@ fn a_base_that_read_no_head_is_refused_once_another_writer_made_one() {
 
     let refused = stale.write_held(
         &BaseOf {
+            source: None,
             scopes: &["shop".to_owned()],
             t: TimeMs::new(2_000),
             of: &resident(),

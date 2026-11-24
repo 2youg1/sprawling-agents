@@ -148,10 +148,10 @@ impl Laying {
     fn open_checkpoint(
         &self,
         root: &std::path::Path,
-        writer: kernel::RunId,
+        of: &storage::Provenance,
         entropy_allow: kernel::EntropyAllowlist,
     ) -> Result<storage::Checkpoint, AxError> {
-        storage::Checkpoint::open_writer(root, writer)
+        storage::ProjectRepository::run_checkpoint(&self.city_root, root, of.run(), of.actor())
             .map(|checkpoint| checkpoint.with_entropy_allowlist(entropy_allow))
             .map_err(storage::StorageError::into_ax)
     }

@@ -32,6 +32,7 @@ mod recording;
 mod registering;
 mod relay;
 mod reviewing;
+pub use reviewing::{PublicationTarget, publish_project};
 mod rooms;
 mod settling;
 mod toolkits;
@@ -130,6 +131,7 @@ pub struct RunWorker {
 
     city: std::sync::OnceLock<kernel::B3Hash>,
     ledger: JsonlLedger,
+    recovered_projects: std::collections::BTreeSet<kernel::Address>,
 
     opening: LedgerOpening,
     cas: Cas,

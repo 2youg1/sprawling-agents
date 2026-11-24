@@ -168,7 +168,7 @@ pub fn ask(city_root: &Path, query: &wire::Query) -> Result<wire::Answer, AxErro
 **一轮检查点是一个动作，不是一个 run 的一部分，而它不必与别的 run 的检查点排队。** 一个 ready set 里的每个节点各占一条 lane 同时跑（§8-46-4），它们都落在**同一个仓库**里。两条 lane 共用仓库的那一份 index 时，libgit2 为暂存取 `.git/index.lock`，后到的一条拿到「the index is locked; this might be due to a concurrent or crashed process」，以 `cancelled` 冻结，它的节点被当作「自己的 done check 没过」交回——所以检查点之间必须有一个次序。这个次序不需要一把全城的锁给：每条 lane 用 `Checkpoint::open_writer(city_root, run)` 开一个自己 index 的句柄，暂存、写树、建提交只碰它自己的 index，共享的对象库与以 oid 为名的引用在任何交错下都等于某个串行次序（storage D25）。于是：
 
 - **lane 的波前检查点**（`driving::lane` 的 `checkpoint` 闭包，`wave_pre`）、**harness run 的提交**（`driving::harness::commit`）各用这个 run 的写者句柄，不取任何锁。run 落地时 `close_writer` 删掉它的 index 文件。
-- **建检查点仓库**只在开城时做（`RunWorker` 打开时，`accounting::worker::lifetime` 的 `open_checkpoints`，城还没有仓库时 `Checkpoint::open` 建它），同一时刻 `Checkpoint::sweep_writers` 删掉崩溃留下的私有 index。lane 的写入波只用 `open_writer`（`workbench::Laying::open_checkpoint` 也是），它从不建仓库。`lend_tree` 的 `ensure_base` 与落地时的 `wave_post`（`dispatching::heavy_landing`）经 `Checkpoint::open` 用城的 index；仓库已在、`core.autocrlf` 已钉成 `false` 时 `open` 既不建仓库也不写配置，所以两条 lane 不争仓库的 config 锁（`storage::checkpoint::opening`）。
+- 开城与开启会话只需要账本。启动恢复清理遗留的私有 index，领取写者时才取得检查点仓库。源仓库的工作树登记与锁归该仓库的写者所有；城的恢复只处理城自己登记在保留目录下的工作树。
 - **`ensure_base`**（`workbench::standing::lend_tree`）改写 HEAD，HEAD 是比较后交换：两条 lane 同时见到一座没有提交的城，一条的提交成为 HEAD，另一条重读后什么也不做（storage §8-39）；同一进程里它还经那把只护 HEAD 的锁（storage D26），这把锁不在写入波的路上。它用的是城的 index，与人自己的 `git add` 是同一个文件，所以它仍走 `storage::checkpoint::scan::write_index` 的等待。
 
 **两道保险各管一个对手，理由写在各自的位置**：同一个进程里两条 lane 之间，由各自的 index 隔开；`storage::checkpoint::scan::write_index` 的等待管**城的那一份 index 上的另一个进程**——人自己的 git，或误开在同一座城上的另一个 sprawling——那是任何进程内的机制都看不见的对手。

@@ -21,6 +21,7 @@ pub(in crate::worker) mod owing;
 mod placing;
 
 pub(crate) struct Driving {
+    pub(super) city_root: std::path::PathBuf,
     pub adapter: super::keeping_warm::Door,
 
     pub bench: ToolBench,

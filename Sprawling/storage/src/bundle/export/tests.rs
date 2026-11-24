@@ -262,6 +262,13 @@ fn a_bundle_carrying_git_metadata_is_refused_rather_than_planted() {
     );
 }
 
+pub(super) fn private(root: &std::path::Path) -> std::path::PathBuf {
+    crate::ProjectRepository::at(root, &kernel::Address::parse("lab").unwrap())
+        .unwrap()
+        .root()
+        .to_owned()
+}
+
 pub(super) fn log_of(root: &std::path::Path) -> Vec<String> {
     let Ok(repo) = git2::Repository::open(root) else {
         return Vec::new();
@@ -276,7 +283,8 @@ pub(super) fn log_of(root: &std::path::Path) -> Vec<String> {
 }
 
 pub(super) fn committed_twice(root: &std::path::Path) -> Vec<String> {
-    let repo = git2::Repository::init(root).unwrap();
+    let repo = git2::Repository::init(private(root)).unwrap();
+    repo.set_workdir(root, false).unwrap();
     let who = git2::Signature::new("owner", "owner@city", &git2::Time::new(1, 0)).unwrap();
     let mut parents = Vec::new();
     for (step, file) in ["City.md", "lab/Roadmap.md"].into_iter().enumerate() {
@@ -296,7 +304,7 @@ pub(super) fn committed_twice(root: &std::path::Path) -> Vec<String> {
             .unwrap();
         parents = vec![repo.find_commit(id).unwrap()];
     }
-    let log = log_of(root);
+    let log = log_of(&private(root));
     assert_eq!(log.len(), 2);
     log
 }
@@ -312,7 +320,7 @@ fn the_git_history_comes_back_commit_for_commit() {
     let elsewhere = tempfile::tempdir().unwrap();
     Bundle::restore(carried.path(), elsewhere.path()).unwrap();
 
-    assert_eq!(log_of(elsewhere.path()), before);
+    assert_eq!(log_of(&private(elsewhere.path())), before);
     assert!(
         !elsewhere
             .path()
@@ -321,20 +329,4 @@ fn the_git_history_comes_back_commit_for_commit() {
             .join("post-checkout")
             .exists()
     );
-}
-
-pub(super) fn copy_dir(from: &std::path::Path, to: &std::path::Path) -> u64 {
-    std::fs::create_dir_all(to).unwrap();
-    let mut copied = 0;
-    for entry in std::fs::read_dir(from).unwrap() {
-        let entry = entry.unwrap();
-        let target = to.join(entry.file_name());
-        if entry.file_type().unwrap().is_dir() {
-            copied = copy_dir(&entry.path(), &target).saturating_add(copied);
-        } else {
-            std::fs::copy(entry.path(), target).unwrap();
-            copied = copied.saturating_add(1);
-        }
-    }
-    copied
 }

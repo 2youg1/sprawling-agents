@@ -104,7 +104,7 @@ impl Bundle {
         bundle: &Path,
         city_root: &Path,
     ) -> Result<Manifest, StorageError> {
-        let mut claimed = {
+        let claimed = {
             let at = bundle.join(MANIFEST);
             let bytes = vfs
                 .read(&at)
@@ -112,8 +112,7 @@ impl Bundle {
             Manifest::from_json(&bytes, &at)?
         };
 
-        let repository = only_city_files(vfs.as_ref(), &bundle.join(CITY))?;
-        claimed.files = claimed.files.saturating_sub(repository);
+        only_city_files(vfs.as_ref(), &bundle.join(CITY))?;
         let layout = kernel::layout::CityLayout::new(city_root);
         let ledger_dir = layout.ledger();
         let cas_dir = layout.cas();
@@ -138,8 +137,8 @@ impl Bundle {
         copy_tree(vfs.as_mut(), city_root, &bundle.join(LEDGER), &ledger_dir)?;
         copy_tree(vfs.as_mut(), city_root, &bundle.join(CAS), &cas_dir)?;
         copy_city_files(vfs.as_mut(), city_root, &bundle.join(CITY), city_root)?;
-        if let Some(history) = history {
-            history.land(city_root)?;
+        for (project, history) in history {
+            history.land(project.root())?;
         }
 
         let restored = Manifest {

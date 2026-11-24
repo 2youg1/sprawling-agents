@@ -38,6 +38,14 @@ pub fn working_status(
     base: Option<GitOid>,
 ) -> Result<WorkingStatus, StorageError> {
     let repo = git2::Repository::open(city_root).map_err(git_err("open the city repository"))?;
+    working_status_in(&repo, scope, base)
+}
+
+pub(crate) fn working_status_in(
+    repo: &git2::Repository,
+    scope: Option<&str>,
+    base: Option<GitOid>,
+) -> Result<WorkingStatus, StorageError> {
     let head = match repo.head() {
         Ok(found) => Some(found),
 
@@ -85,7 +93,7 @@ pub fn working_status(
         .map_err(git_err("look for renames"))?;
     Ok(WorkingStatus {
         branch: branch.clone(),
-        drift: drift_of(&repo, branch.as_deref())?,
+        drift: drift_of(repo, branch.as_deref())?,
         files: collect(&diff)?,
     })
 }

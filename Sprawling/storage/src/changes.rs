@@ -29,6 +29,15 @@ pub fn between(
     head: Head,
 ) -> Result<Vec<FileChange>, StorageError> {
     let repo = git2::Repository::open(city_root).map_err(git_err("open the city repository"))?;
+    between_in(&repo, base, head, None)
+}
+
+pub(crate) fn between_in(
+    repo: &git2::Repository,
+    base: GitOid,
+    head: Head,
+    scope: Option<&str>,
+) -> Result<Vec<FileChange>, StorageError> {
     let find = |oid: GitOid| -> Result<git2::Tree<'_>, StorageError> {
         let parsed =
             git2::Oid::from_str(&oid.to_string()).map_err(git_err("parse a checkpoint"))?;
@@ -41,6 +50,9 @@ pub fn between(
     let mut options = git2::DiffOptions::new();
 
     options.context_lines(0);
+    if let Some(scope) = scope {
+        options.pathspec(scope);
+    }
     let mut diff = match head {
         Head::Commit(oid) => {
             let new = find(oid)?;

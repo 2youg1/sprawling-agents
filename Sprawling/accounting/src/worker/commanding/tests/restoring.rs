@@ -37,7 +37,10 @@ fn a_discarded_file_comes_back_and_its_row_closes() {
             effort: None,
         },
     );
-    let mut checkpoint = storage::Checkpoint::open(root).unwrap();
+    let mut checkpoint = storage::ProjectRepository::at(root, of.actor())
+        .unwrap()
+        .checkpoint()
+        .unwrap();
     let pre = checkpoint
         .wave_pre(&["lab".to_owned()], kernel::TimeMs::new(1_000), &of)
         .unwrap();

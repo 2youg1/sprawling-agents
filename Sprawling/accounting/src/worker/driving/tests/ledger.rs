@@ -54,8 +54,6 @@ fn what_a_run_changes_is_changed_after_the_line_that_announces_it() {
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
 
-    // Which line landed, and whether the city already carried what
-    // it announces at that moment.
     let seen: Arc<std::sync::Mutex<Vec<(&'static str, bool)>>> =
         Arc::new(std::sync::Mutex::new(Vec::new()));
     let watch = Arc::clone(&seen);
@@ -109,8 +107,6 @@ fn what_a_run_changes_is_changed_after_the_line_that_announces_it() {
          {early:?}"
     );
 
-    // Ordered, not lost: both changes are the city's once the run
-    // is over.
     let lab_addr = Address::parse("lab").unwrap();
     assert_eq!(
         city::archive_index(dir.path(), &lab_addr).unwrap().len(),
@@ -175,8 +171,6 @@ fn a_resident_crosses_two_runs_with_the_same_identity_segment() {
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     assert!(seen.len() >= 2, "two runs, two model calls at least");
-    // The resident segment is index 2 of the four; the run segment
-    // differs between the two errands, the resident one does not.
     let first = seen[0].as_array().unwrap();
     let second = seen[seen.len() - 1].as_array().unwrap();
     assert_eq!(
@@ -230,29 +224,19 @@ fn the_views_answer_from_the_ledger_and_rebuild_to_the_same_answer() {
     let wire::Answer::Run(Some(one)) = live.prepare(&wire::Query::RunView { run }).finish() else {
         panic!("RunView answers about a run the city has");
     };
-    assert_eq!(one.last_kind, EventKind::RunFrozen);
+    assert_eq!(one.last_kind, EventKind::CheckpointCommitted);
 
-    // The same answer arrives from a cold rebuild: a view is
-    // disposable exactly to the extent that this holds.
     let rebuilt = crate::views::Views::rebuild(&report.ledger_dir).unwrap();
     let wire::Answer::City(again) = rebuilt.prepare(&wire::Query::CityView).finish() else {
         panic!("CityView answers with a city");
     };
     assert_eq!(city, again);
 
-    // Every query this build carries now answers; the shape that
-    // named itself unavailable is gone because nothing is left to
-    // name. What a page must still be able to tell apart is "this
-    // city archived nothing" from "this build cannot say", and the
-    // first is an empty list rather than a refusal.
     let wire::Answer::Registry(registry) = live.prepare(&wire::Query::RegistryView).finish() else {
         panic!("RegistryView answers with a registry");
     };
     assert!(registry.assets.is_empty());
 }
-/// A real dispatch reaches the checkpoint through the production lane. An
-/// entropy-only example in a committed document is recorded, not a veto that
-/// freezes the run before its edit.
 #[test]
 fn an_entropy_only_document_does_not_block_a_real_run() {
     let dir = tempfile::tempdir().unwrap();
@@ -326,8 +310,6 @@ fn an_entropy_only_document_does_not_block_a_real_run() {
     }));
 }
 
-/// The same production lane writes the structured refusal before freezing a
-/// run that met a known provider shape; the matched bytes reach no Ledger line.
 #[test]
 fn a_known_shape_refusal_is_queryable_after_a_real_run() {
     let dir = tempfile::tempdir().unwrap();
@@ -344,7 +326,7 @@ fn a_known_shape_refusal_is_queryable_after_a_real_run() {
         vec![completion("editing", Some(("tu_1", "lab/room1/notes.md")))],
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
-    worker
+    let refusal = worker
         .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
             task: "attempt one edit beside a known key shape".to_owned(),
@@ -355,7 +337,8 @@ fn a_known_shape_refusal_is_queryable_after_a_real_run() {
             effort: None,
             model: None,
         })
-        .unwrap();
+        .unwrap_err();
+    assert_eq!(refusal.code(), &kernel::AxCode::SecretEgress);
 
     let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
     let blocked = verified
@@ -404,9 +387,6 @@ fn a_commit_the_city_made_says_which_run_wrote_it() {
         })
         .unwrap();
 
-    // The line that announced a commit, read out of the one history:
-    // the pin that opens a dispatch names a job and no oid, so the
-    // question asked is whether the record names a commit.
     let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
     let announced = verified
         .raw_lines()
@@ -440,7 +420,6 @@ fn a_commit_the_city_made_says_which_run_wrote_it() {
         "the room is what a person called this line of work"
     );
 
-    // An oid this city never wrote is not an empty answer.
     assert!(matches!(
         views
             .prepare(&wire::Query::Commit {

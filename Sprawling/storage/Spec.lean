@@ -300,6 +300,7 @@ error ◀──使用── 其余模块（StorageError 与 into_ax 的唯一定
 | D35 | 保温续期在归因里单独报数，按 kernel 的一条读法分四格 | `Sprawling/storage/spec/Attribution.lean` |
 | D36 | 续期花费进总额与每一个维度，在每一维都有带名字的去处 | `Sprawling/storage/spec/Attribution.lean` |
 | D95 | checkpoint 只对已知密钥形状硬拒绝，熵命中提交并留下不含正文的 finding | `Sprawling/storage/spec/Checkpoint.lean` |
+| D96 | 每个项目私有仓库，每次 run 独立索引与工作树，显式注册与发布 | `Sprawling/storage/spec/Worktree.lean` |
 -/
 
 /-! ## 13 依赖选型

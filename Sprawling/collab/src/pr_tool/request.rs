@@ -12,6 +12,7 @@ use crate::workshop::NodeId;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OpenRequest {
     pub node: NodeId,
+    pub project: kernel::Address,
     pub implementer: String,
     pub branch: String,
 
@@ -19,6 +20,11 @@ pub struct OpenRequest {
 }
 
 impl OpenRequest {
+    pub fn file(self, open: &mut Vec<Self>) {
+        open.retain(|prior| prior.project != self.project || prior.branch != self.branch);
+        open.push(self);
+    }
+
     pub fn payload(&self) -> Result<Payload, AxError> {
         Payload::of(self)
     }
@@ -43,6 +49,7 @@ impl OpenRequest {
     ) -> Result<Payload, AxError> {
         Payload::of(&MergedRequest {
             node: self.node.clone(),
+            project: self.project.clone(),
             implementer: self.implementer.clone(),
             branch: self.branch.clone(),
             reviewed_commit: self.commit.clone(),
@@ -56,6 +63,7 @@ impl OpenRequest {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MergedRequest {
     pub node: NodeId,
+    pub project: kernel::Address,
     pub implementer: String,
     pub branch: String,
 

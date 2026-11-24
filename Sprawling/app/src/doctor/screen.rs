@@ -64,7 +64,19 @@ pub(crate) fn asked(
 }
 
 pub fn verb(args: &[String], unnamed: fn() -> PathBuf) -> ExitCode {
-    let asked = asked(args, std::env::var_os("NO_COLOR"), unnamed);
+    let mut asked = asked(args, std::env::var_os("NO_COLOR"), unnamed);
+    if let Some(workspace) = &asked.city {
+        match accounting::home::Home::detect().and_then(|home| home.workspace(workspace)) {
+            Ok(city) => {
+                asked.scanned.clone_from(&city);
+                asked.city = Some(city);
+            }
+            Err(err) => {
+                eprintln!("{err}");
+                return ExitCode::FAILURE;
+            }
+        }
+    }
     let machine = ThisMachine::new(Platform::current(), PATIENCE);
     let answered = run(
         &asked,

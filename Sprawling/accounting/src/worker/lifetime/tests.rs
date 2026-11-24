@@ -7,6 +7,37 @@ use crate::worker::RunWorker;
 use std::io::Write;
 
 #[test]
+fn opening_a_workspace_with_independent_projects_leaves_git_to_the_projects() {
+    let workspace = tempfile::tempdir().unwrap();
+    let first = git2::Repository::init(workspace.path().join("first")).unwrap();
+    let second = git2::Repository::init(workspace.path().join("second")).unwrap();
+    let editor_lock = second.path().join("index.lock");
+    std::fs::write(&editor_lock, b"editor").unwrap();
+    let first_config = std::fs::read(first.path().join("config")).unwrap();
+    crate::worker::fixture::init_city(workspace.path()).unwrap();
+    let mut worker = RunWorker::new(
+        workspace.path(),
+        runtime::diagnostics::Diagnostics::off(),
+        crate::worker::fixture::hands(),
+    )
+    .unwrap();
+    worker
+        .open_session(
+            &kernel::Address::parse("hall").unwrap(),
+            wire::Carry::Nothing,
+            None,
+        )
+        .unwrap();
+    assert!(!workspace.path().join(".git").exists());
+    assert_eq!(
+        std::fs::read(first.path().join("config")).unwrap(),
+        first_config
+    );
+    assert_eq!(std::fs::read(editor_lock).unwrap(), b"editor");
+    drop(worker);
+}
+
+#[test]
 fn a_torn_tail_is_told_in_the_startup_scan() {
     let dir = tempfile::tempdir().unwrap();
     crate::worker::fixture::init_city(dir.path()).unwrap();
@@ -38,28 +69,32 @@ fn a_torn_tail_is_told_in_the_startup_scan() {
 }
 
 #[test]
-fn a_crash_left_worktree_is_gone_once_the_city_opens() {
+fn opening_a_city_defers_worktree_recovery_until_that_project_runs() {
     let dir = tempfile::tempdir().unwrap();
     crate::worker::fixture::init_city(dir.path()).unwrap();
-    let repo = git2::Repository::init(dir.path()).unwrap();
+    let project =
+        storage::ProjectRepository::at(dir.path(), &kernel::Address::parse("lab").unwrap())
+            .unwrap();
+    let repo = git2::Repository::init(project.root()).unwrap();
     let signature = git2::Signature::now("city", "city@example.invalid").unwrap();
     let tree = repo
         .find_tree(repo.index().unwrap().write_tree().unwrap())
         .unwrap();
     repo.commit(Some("HEAD"), &signature, &signature, "base", &tree, &[])
         .unwrap();
-    let trees = storage::Worktrees::open(dir.path()).unwrap();
+    let trees = storage::Worktrees::open(project.root()).unwrap();
     let name = storage::WorktreeName::parse("run-1").unwrap();
     drop(trees.claim(&name, &[]).unwrap());
 
-    drop(
-        RunWorker::new(
-            dir.path(),
-            runtime::diagnostics::Diagnostics::off(),
-            crate::worker::fixture::hands(),
-        )
-        .unwrap(),
-    );
-
+    let mut worker = RunWorker::new(
+        dir.path(),
+        runtime::diagnostics::Diagnostics::off(),
+        crate::worker::fixture::hands(),
+    )
+    .unwrap();
+    assert_eq!(trees.live().unwrap(), vec![name]);
+    worker
+        .recover_project(&kernel::Address::parse("lab").unwrap())
+        .unwrap();
     assert_eq!(trees.live().unwrap(), Vec::new());
 }

@@ -23,6 +23,49 @@ pub(super) struct Written {
 
 const GITLINK: u32 = 0o160_000;
 
+pub(super) fn tree_bytes(
+    repo: &git2::Repository,
+    root: git2::Oid,
+) -> Result<ByteLen, StorageError> {
+    use std::collections::VecDeque;
+    use std::sync::{Mutex, PoisonError};
+
+    static RECENT: Mutex<VecDeque<(git2::Oid, ByteLen)>> = Mutex::new(VecDeque::new());
+    const CAPACITY: usize = 64;
+    let recent = || RECENT.lock().unwrap_or_else(PoisonError::into_inner);
+    if let Some((_, bytes)) = recent().iter().find(|(id, _)| *id == root) {
+        return Ok(*bytes);
+    }
+
+    let refused = |err: git2::Error| StorageError::Worktree {
+        op: "measure the checkout tree",
+        detail: format!("{root}: {err}"),
+    };
+    let odb = repo.odb().map_err(refused)?;
+    let mut pending = vec![root];
+    let mut bytes = 0u64;
+    while let Some(id) = pending.pop() {
+        let tree = repo.find_tree(id).map_err(refused)?;
+        for entry in &tree {
+            match entry.kind() {
+                Some(git2::ObjectType::Tree) => pending.push(entry.id()),
+                Some(git2::ObjectType::Blob) => {
+                    let (size, _) = odb.read_header(entry.id()).map_err(refused)?;
+                    bytes = bytes.saturating_add(u64::try_from(size).unwrap_or(u64::MAX));
+                }
+                _ => {}
+            }
+        }
+    }
+    let bytes = ByteLen::new(bytes);
+    let mut saved = recent();
+    if saved.len() >= CAPACITY {
+        saved.pop_front();
+    }
+    saved.push_back((root, bytes));
+    Ok(bytes)
+}
+
 pub(super) fn written(tree: &git2::Worktree) -> Result<Written, StorageError> {
     let refuse = |op: &'static str, err: git2::Error| StorageError::Worktree {
         op,

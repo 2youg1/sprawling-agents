@@ -257,13 +257,36 @@ pub(super) const FORK: Row = Row {
     after_dashes: AfterDashes::Refused,
 };
 
-pub(super) const ADOPT: Row = Row {
-    verb: Verb::Adopt,
-    name: "adopt",
+pub(super) const REGISTER: Row = Row {
+    verb: Verb::Register,
+    name: "project register",
     aliases: &[],
-    positionals: &[("city", Required), ("addr", Required)],
+    positionals: &[
+        ("city", Required),
+        ("building", Required),
+        ("source", Required),
+        ("commit", Required),
+    ],
     flags: &[],
-    says: "take an existing directory in as a building",
+    says: "register a committed project snapshot in this private workspace",
+    effect: Effect::Changes,
+    after_dashes: AfterDashes::Refused,
+};
+
+pub(super) const PUBLISH: Row = Row {
+    verb: Verb::Publish,
+    name: "project publish",
+    aliases: &[],
+    positionals: &[
+        ("city", Required),
+        ("building", Required),
+        ("reviewed", Required),
+        ("destination", Required),
+        ("base-branch", Required),
+        ("contribution-branch", Required),
+    ],
+    flags: &[],
+    says: "publish an approved commit to a new branch in the selected repository",
     effect: Effect::Changes,
     after_dashes: AfterDashes::Refused,
 };

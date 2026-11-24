@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Whole turns of a played harness, from the person's door to the
-//! landing: done and offered, and cut at the building's ceiling.
-
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -17,9 +14,6 @@ use serde_json::json;
 
 use super::{Heard, Step, city_with, dispatch, opening, played, records, said, worker};
 
-/// The whole turn: the harness works in the room's own tree, reports,
-/// and ends its turn with an answer. The run's lines are the order
-/// Session.lean proves, and it freezes done citing its answer.
 #[test]
 fn a_harness_that_ends_its_turn_is_frozen_done_on_its_answer() {
     let (dir, _, ledger) = city_with("pi");
@@ -51,7 +45,6 @@ fn a_harness_that_ends_its_turn_is_frozen_done_on_its_answer() {
     assert_eq!(
         run.iter().map(|record| record.kind()).collect::<Vec<_>>(),
         vec![
-            // 城的第一个提交借给这个 run 的树，它的记录随同一次扫描落到账本
             EventKind::CheckpointCommitted,
             EventKind::WorktreeOpened,
             EventKind::RunStarted,
@@ -60,13 +53,10 @@ fn a_harness_that_ends_its_turn_is_frozen_done_on_its_answer() {
             EventKind::HarnessAnswered,
             EventKind::HandoffWritten,
             EventKind::RunFrozen,
-            // 落地自己的提交，它的扫描 finding 只在这条记录里
             EventKind::CheckpointCommitted,
             EventKind::PrOpened,
         ]
     );
-    // The ledger names the agent by its id, the version it reported and
-    // the consented digest, never by its command line (kernel §8-87).
     let opened: kernel::event::record::RunStarted = run
         .iter()
         .find(|record| record.kind() == EventKind::RunStarted)
@@ -106,7 +96,24 @@ fn a_harness_that_ends_its_turn_is_frozen_done_on_its_answer() {
     let heard = heard.lock().unwrap();
     let tree = heard.cwd.clone().unwrap();
     assert_ne!(tree, dir.path(), "the harness ran in the room's own tree");
-    assert!(tree.join("lab/room1/notes.md").is_file());
+    assert!(!tree.exists());
+    let request = run
+        .iter()
+        .find(|record| record.kind() == EventKind::PrOpened)
+        .unwrap();
+    let request = collab::OpenRequest::from_payload(request.data()).unwrap();
+    let addr = kernel::Address::parse("lab/room1/notes.md").unwrap();
+    let project = storage::ProjectRepository::at(dir.path(), &addr).unwrap();
+    assert_eq!(
+        storage::blob_at(
+            project.root(),
+            kernel::GitOid::parse(&request.commit).unwrap(),
+            &addr
+        )
+        .unwrap()
+        .unwrap(),
+        b"# Notes\n\nThey read well now.\n"
+    );
     assert!(
         !dir.path().join("lab/room1/notes.md").exists(),
         "what the harness wrote waits in its tree until a merge"
@@ -125,7 +132,6 @@ fn a_harness_that_ends_its_turn_is_frozen_done_on_its_answer() {
     );
 }
 
-/// The kinds of the one run in the history, and that run's records.
 fn the_run(ledger: &Path) -> Vec<EventRecord> {
     let all = records(ledger);
     let started = all
@@ -138,9 +144,6 @@ fn the_run(ledger: &Path) -> Vec<EventRecord> {
         .collect()
 }
 
-/// A run frozen done offers its tree: the city opens the request the
-/// harness cannot open itself, on the branch of the tree it worked in,
-/// and the existing review decides what reaches the building.
 #[test]
 fn a_harness_run_frozen_done_offers_its_tree_for_review() {
     let (dir, _, ledger) = city_with("pi");
@@ -178,7 +181,6 @@ fn a_harness_run_frozen_done_offers_its_tree_for_review() {
     );
 }
 
-/// A clock that moves thirty seconds every time it is read.
 struct Hurried(AtomicU64);
 
 impl crate::Clock for Hurried {
@@ -187,9 +189,6 @@ impl crate::Clock for Hurried {
     }
 }
 
-/// A harness that neither speaks nor ends is cut at the building's
-/// ceiling: the cancel goes out, the harness answers cancelled, and the
-/// run freezes as limit, not as a run somebody cancelled.
 #[test]
 fn a_harness_that_says_nothing_is_cut_at_the_ceiling_and_frozen_limit() {
     let (dir, _, ledger) = city_with("pi");
@@ -236,15 +235,9 @@ fn a_harness_that_says_nothing_is_cut_at_the_ceiling_and_frozen_limit() {
     );
 }
 
-/// A known provider key shape in the harness's own tree refuses its
-/// closing commit. The run still freezes, and the report reaches the
-/// Ledger before that freeze, so `sprawling secrets` can name the line
-/// afterwards without carrying its bytes.
 #[test]
 fn a_harness_that_writes_a_known_key_shape_is_refused_and_reported_before_the_freeze() {
     let (dir, _, ledger) = city_with("pi");
-    // Assembled at runtime: this file is scanned by the city's own
-    // `xtask secret`, and a literal key here would be a finding itself.
     let token = ["sk-ant-api03-", "Zx9yQ2mK4pL7", "vB1nC5tR8sD3"].concat();
     let mut script = opening();
     script.extend([
@@ -296,10 +289,6 @@ fn a_harness_that_writes_a_known_key_shape_is_refused_and_reported_before_the_fr
     }));
 }
 
-/// The city's first commit is raised while lending the room its tree, not
-/// by a wave. Its scan findings are recorded on that commit, so a folder
-/// that already held an entropy-shaped string is reported even though the
-/// unchanged blob is never read again.
 #[test]
 fn a_base_checkpoints_entropy_finding_is_recorded_on_the_commit_it_made() {
     let (dir, _, ledger) = city_with("pi");

@@ -12,7 +12,7 @@ use crate::error::StorageError;
 use super::landing::{CheckoutRun, Landing, PlannedMerge, check_out};
 use super::lease::{FileWork, WorktreeLease};
 use super::name::WorktreeName;
-use super::weight::{Weight, Written, measure, written};
+use super::weight::{Weight, Written, tree_bytes, written};
 use kept::Standing;
 
 mod kept;
@@ -21,7 +21,7 @@ mod stock;
 pub(super) const WORKTREE_DIR: &str = "worktrees";
 
 pub struct Worktrees {
-    pub(super) repo: git2::Repository,
+    pub(crate) repo: git2::Repository,
     pub(super) home: PathBuf,
 
     pub(super) city_root: PathBuf,
@@ -38,6 +38,10 @@ impl std::fmt::Debug for Worktrees {
 }
 
 impl Worktrees {
+    pub(super) fn registry(&self) -> Result<crate::checkpoint::opening::HeadGuard, StorageError> {
+        crate::checkpoint::opening::moving_head(&self.repo.commondir().join(WORKTREE_DIR))
+    }
+
     pub fn open(city_root: &Path) -> Result<Worktrees, StorageError> {
         let repo = open_city(city_root).map_err(|err| StorageError::Worktree {
             op: "open the city repository",
@@ -72,14 +76,6 @@ impl Worktrees {
 
     fn place(&self, name: &WorktreeName) -> Result<WorktreeLease, StorageError> {
         let city = self.refuse_oversized(name.as_str())?;
-        if self.repo.head().is_err() {
-            return Err(StorageError::Worktree {
-                op: "branch a worktree",
-                detail: "the city has no checkpoint yet, and a tree branches from a commit"
-                    .to_owned(),
-            });
-        }
-
         self.clear_unregistered(name.as_str())?;
         if let Some(lease) = self.adopt(name, &city)? {
             return Ok(lease);
@@ -102,11 +98,26 @@ impl Worktrees {
     }
 
     pub(super) fn refuse_oversized(&self, id: &str) -> Result<Weight, StorageError> {
-        let source = self.repo.workdir().ok_or_else(|| StorageError::Worktree {
-            op: "find the city working tree",
-            detail: "the repository is bare".to_owned(),
-        })?;
-        let city = measure(source)?;
+        let tree = self
+            .repo
+            .head()
+            .and_then(|head| head.peel_to_tree())
+            .map_err(|err| StorageError::Worktree {
+                op: "read the tree to place",
+                detail: if err.code() == git2::ErrorCode::UnbornBranch {
+                    format!("{id}: the project has no checkpoint yet")
+                } else {
+                    format!("{id}: {err}")
+                },
+            })?;
+        self.check_size(id, tree.id())
+    }
+
+    pub(super) fn check_size(&self, id: &str, tree: git2::Oid) -> Result<Weight, StorageError> {
+        let city = Weight {
+            bytes: tree_bytes(&self.repo, tree)?,
+            walked: 0,
+        };
         if city.bytes.get() > self.ceiling.get() {
             return Err(StorageError::WorktreeBusy {
                 name: id.to_owned(),
@@ -128,6 +139,7 @@ impl Worktrees {
     ) -> Result<WorktreeLease, StorageError> {
         let (path, checked_out) = self.check_out_tree(name.as_str(), reference)?;
         Ok(WorktreeLease {
+            owner: self.city_root.clone(),
             name: name.clone(),
             disk: checked_out.bytes,
             path,
@@ -149,6 +161,13 @@ impl Worktrees {
             path: self.home.clone(),
             source,
         })?;
+        let registry = self.registry()?;
+        let admin = self.repo.commondir().join(WORKTREE_DIR);
+        std::fs::create_dir_all(&admin).map_err(|source| StorageError::Io {
+            op: "create the worktree registry",
+            path: admin,
+            source,
+        })?;
         let path = self.home.join(id);
 
         crate::alias::WriteTarget::within("place a worktree", &self.city_root, &path)?;
@@ -163,6 +182,7 @@ impl Worktrees {
                     detail: format!("{id}: {err}"),
                 })?;
 
+        drop(registry);
         Ok((path, written(&tree)?))
     }
 
@@ -176,6 +196,32 @@ impl Worktrees {
             .get()
             .peel_to_commit()
             .map_err(|err| refuse("read a node branch", err.to_string()))?;
+        self.plan_candidate(name, &theirs, false)
+    }
+
+    pub fn plan_completed(
+        &self,
+        name: &WorktreeName,
+        point: &kernel::GitOid,
+    ) -> Result<PlannedMerge<'_>, StorageError> {
+        self.plan_candidate(name, &self.commit_at(point)?, false)
+    }
+
+    pub fn plan_reviewed(
+        &self,
+        name: &WorktreeName,
+        point: &kernel::GitOid,
+    ) -> Result<PlannedMerge<'_>, StorageError> {
+        self.plan_candidate(name, &self.commit_at(point)?, true)
+    }
+
+    fn plan_candidate(
+        &self,
+        name: &WorktreeName,
+        theirs: &git2::Commit<'_>,
+        reviewed: bool,
+    ) -> Result<PlannedMerge<'_>, StorageError> {
+        let refuse = |op: &'static str, detail: String| StorageError::Worktree { op, detail };
         let head = self
             .repo
             .head()
@@ -189,28 +235,57 @@ impl Worktrees {
                 .repo
                 .graph_descendant_of(theirs.id(), ours.id())
                 .map_err(|err| refuse("judge a fast-forward", err.to_string()))?;
-        if !descends {
-            return Err(StorageError::MergeStale {
-                name: name.as_str().to_owned(),
-                detail: format!("the trunk moved to {} after this node branched", ours.id()),
-            });
-        }
-        let tree = theirs
-            .tree()
-            .map_err(|err| refuse("read the node tree", err.to_string()))?;
+        let stale = || StorageError::MergeStale {
+            name: name.as_str().to_owned(),
+            detail: format!(
+                "the project trunk moved to {} after this run branched",
+                ours.id()
+            ),
+        };
+        let tree = if descends {
+            theirs
+                .tree()
+                .map_err(|err| refuse("read the run tree", err.to_string()))?
+        } else {
+            if reviewed {
+                return Err(stale());
+            }
+            let mut combined = self
+                .repo
+                .merge_commits(&ours, theirs, None)
+                .map_err(|err| refuse("integrate concurrent runs", err.to_string()))?;
+            if combined.has_conflicts() {
+                return Err(stale());
+            }
+            let result = combined
+                .write_tree_to(&self.repo)
+                .map_err(|err| refuse("store the integrated tree", err.to_string()))?;
+            self.repo
+                .find_tree(result)
+                .map_err(|err| refuse("read the integrated tree", err.to_string()))?
+        };
         check_out(&self.repo, &tree, CheckoutRun::DryRun)?;
         Ok(PlannedMerge {
             trees: self,
+            trunk: head
+                .name()
+                .map_err(|err| refuse("read the city trunk", err.to_string()))?
+                .to_owned(),
+            base: ours.id(),
             target: theirs.id(),
+            tree: tree.id(),
+            reviewed,
         })
     }
 
     pub(super) fn land_merge(
         &self,
-        target: git2::Oid,
+        plan: &PlannedMerge<'_>,
         landing: &Landing<'_>,
-    ) -> Result<(), StorageError> {
+        record: impl FnOnce(String) -> Result<(), kernel::AxError>,
+    ) -> Result<String, StorageError> {
         let refuse = |op: &'static str, detail: String| StorageError::Worktree { op, detail };
+        let _moving = crate::checkpoint::opening::moving_head(self.repo.path())?;
         let head = self
             .repo
             .head()
@@ -218,14 +293,26 @@ impl Worktrees {
         let ours = head
             .peel_to_commit()
             .map_err(|err| refuse("read the city trunk", err.to_string()))?;
+        if head
+            .name()
+            .map_err(|err| refuse("read the city trunk", err.to_string()))?
+            != plan.trunk
+            || ours.id() != plan.base
+        {
+            return Err(StorageError::MergeStale {
+                name: plan.trunk.clone(),
+                detail: format!("the reviewed base {} moved to {}", plan.base, ours.id()),
+            });
+        }
         let theirs = self
             .repo
-            .find_commit(target)
+            .find_commit(plan.target)
             .map_err(|err| refuse("read the node commit", err.to_string()))?;
 
-        let tree = theirs
-            .tree()
-            .map_err(|err| refuse("read the node tree", err.to_string()))?;
+        let tree = self
+            .repo
+            .find_tree(plan.tree)
+            .map_err(|err| refuse("read the integrated tree", err.to_string()))?;
         let seconds = i64::try_from(landing.t.value().saturating_div(1000)).unwrap_or(0);
         let when = git2::Time::new(seconds, 0);
         let email = landing.of.email();
@@ -248,12 +335,18 @@ impl Worktrees {
                 &[&ours, &theirs],
             )
             .map_err(|err| refuse("commit the merge", err.to_string()))?;
-        check_out(&self.repo, &tree, CheckoutRun::Write)?;
-        let trunk = head.name().unwrap_or("HEAD");
+        check_out(&self.repo, &tree, CheckoutRun::DryRun)?;
         self.repo
-            .reference_matching(trunk, merge, true, ours.id(), landing.subject)
-            .map_err(|err| refuse("move the city trunk", err.to_string()))?;
-        Ok(())
+            .reference(
+                super::landing::PENDING,
+                merge,
+                false,
+                "prepare project landing",
+            )
+            .map_err(|err| refuse("reserve the project landing", err.to_string()))?;
+        record(merge.to_string()).map_err(|source| StorageError::Draft { source })?;
+        self.complete_landing(merge, plan.reviewed)?;
+        Ok(merge.to_string())
     }
 
     pub fn release(&self, lease: WorktreeLease) -> Result<(), StorageError> {

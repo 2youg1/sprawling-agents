@@ -331,11 +331,11 @@ CLI 显示你正在对话的那个房间：你说的话、每个 run 用的模�
 
 Ctrl+C 和 Ctrl+V 归终端：Ctrl+C 复制选中的文字，城市收到 Ctrl+C 时什么也不做，每个会话只提示一次「关闭城市用 /quit」。Esc 依次是关掉菜单、清空输入行、打断你正在对话的房间里的 run。行尾写 `\` 再按 Enter 就换到新的一行；终端分得清 Shift+Enter 时也可以用它。macOS 和 Linux 上，粘贴的内容整段进入输入行，换行也保留；Windows 上，粘贴的每一行到达时就发送。关掉终端窗口时，run 会在下一个安全点停下，城市在几秒内关闭。
 
-**城市放在哪里。** 本指南把城市放在 `./cities/first`，好让下面每条命令都能写出它。不给文件夹时，`sprawling up` 打开个人配置里 `city` 一行写的那座城市（`~/.sprawling/config.toml` 必须是绝对路径），没写就打开 `~/sprawling/city`，那里还没有城市就先建起来。城市不放在二进制旁边，因为更新时新版二进制会解压进另一个文件夹。
+**选择工作区。** 本指南使用 `./cities/first`。省略文件夹参数时，`sprawling up` 打开 `~/.sprawling/config.toml` 的 `city` 行指定的绝对路径，默认工作区是 `~/sprawling/city`。账本、项目和各 run 的工作树位于 `~/.sprawling/w/`。用 `sprawling export <工作区> <包目录>` 可以备份这座私有城市。
 
-什么参数都不带的 `sprawling` 打开同一座城市，只是直接进 CLI，`/web` 之前不打开浏览器。那里还没有城市时，它先给出打算建城的文件夹，等你回答：按 Enter 就在那里建；输入一个已经存在的文件夹，就围着里面已有的工作把它建成城市。两种选择都会写进 `city` 一行，下次启动直接打开它。`sprawling up <文件夹>` 只在这一次打开那个文件夹，什么也不写。
+直接执行 `sprawling` 会打开 CLI。首次启动时按 Enter 选择建议的工作区，也可输入已有文件夹。CLI 会保存选择。只想打开一次时，执行 `sprawling up <文件夹>`。
 
-**已有项目怎么进来。** 在装着这些项目的文件夹里建城市，或者把项目挪进城市的文件夹，再用 `sprawling adopt ./cities/first myproject` 把它收为一栋楼。收编不覆盖任何文件：它在你的工作旁边放下城市的表单，并加一条 `.gitignore`，让城市的笔记不进你项目的历史。
+**已有项目怎么进来。** 先打开几个仓库所在的工作区。对每个项目执行 `sprawling project register <工作区> <楼名> <仓库绝对路径> <完整提交号>`。注册读取指定提交里的文件，你可以继续在原仓库里编辑和使用 Git。各个 run 在私有副本中开发、评审。评审通过后，执行 `sprawling project publish <工作区> <楼名> <评审合并提交号> <目标仓库> <基线分支> <新分支>` 创建贡献分支，再按项目惯例发起 PR。
 
 **这台电脑能不能跑。** `sprawling doctor` 分两层检查：第一层是城市要用的东西，比如浏览器工具需要的浏览器引擎；第二层是改这份代码要的工具，也就是 `just prereqs` 读的那一份清单。它列出的每一项都带安装命令，`--install` 会逐项征得同意后再装。Windows 上请在 Git Bash 里运行 `just`：别的终端先找到的 `bash` 可能是 `C:\Windows\System32\bash.exe`，它启动的是 WSL，不是 shell。贡献者不用新机器也能核一遍从归档到第一次派活的整条路，见[发布前的最终测量](performance.md#final-release-measurements-through-actions)。
 
@@ -420,7 +420,7 @@ Mayor 会先读每一栋楼的 `Roadmap.md`、`Memo.md`、`Handoff.md`，也读 
 要落地的活在城市里走 pull request，而写这份活的居民不能验证它：没有别人验证过的请求，根本没有「合并」这个方法。按这个顺序读：
 
 1. **run 的改动视图。** 动过的文件一行一个，点开一行给出那个文件的补丁。被凭证扫描命中的行只报行号与理由，不回显原文。
-2. **那栋楼里的 `git log`。** 城市在每一波工具调用前写的检查点，是没有任何 `HEAD` 指向的提交，挂在 `refs/sprawling/runs/` 下，所以你的历史仍是你离开时的形状。
+2. **项目私有仓库里的 `git show <提交号>`。** 账本给出 run 的检查点，私有仓库在 `refs/sprawling/runs/` 下保留这些提交。工作树回收后仍可按提交号抽查。
 3. **合并提交的 trailer。** `Sprawling-Run`、`Sprawling-Actor`、`Sprawling-Model`、`Sprawling-Effort`、`Sprawling-City`，接替另一次 run 的还多一条 `Sprawling-Predecessor`。你复核过的合并另带 `Reviewed-by`，前提是这个仓库的 git config 里有 `user.name` 与 `user.email`。
 4. **反过来问账本。** `sprawling whose ./cities/first <commit>` 要给完整的四十位提交 id；退出码 1 表示这座城市没有写过那个提交的记录。加上 `--trace`，它列出那次 run 从上一个提交以来做过的调用，每条带时间、工具与结局；同一栋楼里在这一段调用过工具的别的 run 作为候选，只给出调用次数。
 

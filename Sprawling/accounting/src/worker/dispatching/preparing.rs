@@ -139,7 +139,10 @@ struct Restock {
 
 impl Restock {
     fn owed_by(self, borrowed: Option<&storage::WorktreeLease>) -> Option<Restock> {
-        borrowed.map(|_| self)
+        borrowed.map(|lease| Restock {
+            city_root: lease.owner().to_owned(),
+            ..self
+        })
     }
 
     fn put_back(self) {
@@ -282,6 +285,7 @@ impl LaneHalf {
             .with_recovery("report this: stand_up always seats an adapter"));
         };
         Ok(Driving {
+            city_root: laying.city_root.clone(),
             adapter,
             bench,
             signals: std::sync::Arc::clone(&desks.signals),

@@ -57,7 +57,8 @@ impl RunWorker {
     // 换掉其中一只手的门照旧：with_models、with_connectors、with_clock、with_machine、with_browsers、with_desktop_program
 }
 // accounting::worker::genesis
-pub fn form(city_root: &Path, adopt: Adopt, hands: Hands) -> Result<InitReport, AxError>;
+pub enum Adopt<'a> { Nothing, Named(&'a [Address]) }
+pub fn form(city_root: &Path, adopt: Adopt<'_>, hands: Hands) -> Result<InitReport, AxError>;
 // accounting::worker::attend
 pub fn attend(worker: &mut RunWorker, desk: &CommandDesk);
 // accounting::worker::chain_halt
@@ -69,7 +70,7 @@ impl RunWorker { pub fn chain_under_audit(&mut self) -> ChainUnderAudit; }   // 
 pub struct SystemClock;                                  // 墙钟，唯一被许可的采样点
 pub fn hands(vault: gateway::Custodian) -> accounting::worker::Hands;
 pub fn init_city(city_root: &Path) -> Result<InitReport, AxError>;          // form(city_root, Adopt::Nothing, hands(Custodian::probe))
-pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError>;
+pub fn form_city(city_root: &Path, adopt: Adopt<'_>) -> Result<InitReport, AxError>;
 ```
 
 **收口带着它是怎样停的**（`accounting::worker::lifetime::closing`、`accounting::worker::desk`）：

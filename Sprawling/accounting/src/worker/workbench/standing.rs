@@ -83,22 +83,12 @@ pub(in crate::worker) struct Placing<'a> {
 }
 
 impl Site {
-    fn works_apart(&self, at: &super::super::Assignment) -> bool {
-        match at.policy.landing {
-            kernel::LandingPolicy::Experiment => true,
-            kernel::LandingPolicy::Ordinary => self.rules.review(),
-        }
-    }
-
     pub(in crate::worker) fn place_tree<L: kernel::Ledger>(
         &mut self,
         at: &super::super::Assignment,
         placing: &Placing<'_>,
         lines: &mut Stamping<'_, L>,
     ) -> Result<(), AxError> {
-        if !self.works_apart(at) {
-            return Ok(());
-        }
         let addr = &at.addr;
 
         let of = provenance(
@@ -143,15 +133,35 @@ pub(in crate::worker) fn lend_tree<L: kernel::Ledger>(
     placing: &Placing<'_>,
     lines: &mut Stamping<'_, L>,
 ) -> Result<storage::WorktreeLease, AxError> {
-    let base = storage::Checkpoint::open(placing.city_root)
+    let project = storage::ProjectRepository::at(placing.city_root, lending.building.addr())
+        .map_err(storage::StorageError::into_ax)?;
+    let base = project
+        .checkpoint()
         .map_err(storage::StorageError::into_ax)?
         .with_entropy_allowlist(lending.entropy_allow.clone())
         .ensure_base(
-            &[lending.addr.as_str().to_owned()],
+            &[lending.building.addr().as_str().to_owned()],
             placing.clock.now()?,
             lending.of,
-        )
-        .map_err(storage::StorageError::into_ax)?;
+        );
+    let base = match base {
+        Ok(base) => base,
+        Err(err) => {
+            let failure = runtime::CheckpointFailure::from(err);
+            if let Some(report) = failure.refusal() {
+                lines.record_for(
+                    lending.run_id,
+                    effect::Line {
+                        who: lending.who.to_owned(),
+                        addr: lending.addr.clone(),
+                        kind: EventKind::SecretEgressBlocked,
+                        data: Payload::of(report)?,
+                    },
+                )?;
+            }
+            return Err(failure.into_cause());
+        }
+    };
 
     if let Some(base) = base {
         lines.record_for(
@@ -164,12 +174,8 @@ pub(in crate::worker) fn lend_tree<L: kernel::Ledger>(
             },
         )?;
     }
-    let claimed = storage::Worktrees::open(placing.city_root)
-        .map_err(storage::StorageError::into_ax)?
-        .claim(
-            &tree_of(lending.addr)?,
-            &super::tree_scope(lending.building),
-        )
+    let claimed = project
+        .claim(lending.run_id, &super::tree_scope(lending.building))
         .map_err(storage::StorageError::into_ax)?;
     lines.record_for(
         lending.run_id,
@@ -186,13 +192,8 @@ pub(in crate::worker) fn lend_tree<L: kernel::Ledger>(
 }
 
 impl Site {
-    pub(in crate::worker) fn name_tree(
-        &mut self,
-        at: &super::super::Assignment,
-    ) -> Result<(), AxError> {
-        if self.works_apart(at) {
-            self.branch = Some(tree_of(&at.addr)?.as_str().to_owned());
-        }
+    pub(in crate::worker) fn name_tree(&mut self) -> Result<(), AxError> {
+        self.branch = Some(tree_of(self.run_id)?.as_str().to_owned());
         Ok(())
     }
 }
@@ -249,11 +250,6 @@ impl RunWorker {
     }
 }
 
-fn tree_of(addr: &Address) -> Result<storage::WorktreeName, AxError> {
-    let digest: String = kernel::B3Hash::digest(addr.as_str().as_bytes())
-        .to_string()
-        .chars()
-        .take(16)
-        .collect();
-    storage::WorktreeName::parse(&format!("room-{digest}")).map_err(storage::StorageError::into_ax)
+fn tree_of(run: RunId) -> Result<storage::WorktreeName, AxError> {
+    storage::WorktreeName::parse(&format!("run-{run}")).map_err(storage::StorageError::into_ax)
 }

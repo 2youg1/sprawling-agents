@@ -98,7 +98,7 @@ every week.
 | Client | Svelte and Effect, bundled by Vite, driven by bun | Its runtime dependencies are exactly the list `RUNTIME` in `Tools/xtask/src/npm.rs`, each admitted under `RefRain/Spec.lean` §7-9, and no framework runtime beyond Svelte. Svelte compiles its templates away; Effect decodes the wire with `Schema` and carries the client's few effectful steps. Cost: a JavaScript toolchain has to be present to build the page the binary embeds. |
 | History | JSONL segments, appended, chain-verified | A history a person can read with `tail` and a machine can verify byte by byte. Cost: the Ledger's throughput is the city's throughput (§11). |
 | Content store | BLAKE3 | One hash for the whole library: content addressing and `IdemKey` derivation. Identical content is stored once. |
-| Restoration | `git2`, vendored libgit2 | Git is the restoration authority for tracked files, so a discarded file points at a checkpoint commit. Also one worktree per reviewing run. Cost: a C library in the tree, vendored so there is no system dependency. |
+| Restoration | `git2`, vendored libgit2 | Each project owns a private Git object database, and each run owns its working files, index and checkpoint references. A discarded file points at the private commit containing its bytes. Cost: a C library in the tree, vendored so there is no system dependency. |
 | Exec confinement | OS process arms (`copied_tree`, `native`, `container`) and host Python | Commands and Python scripts run as host processes under the building's chosen arm. Python uses `SPRAWLING_PYTHON` or `python3`/`python` on `PATH`. Network and filesystem guarantees come from the arm, not from a guest ABI. |
 | Credentials | `keyring-core` with one store crate per platform (platform credential service), `secrecy`, `zeroize` | Plaintext lives in the operating system's own vault, never in a file we wrote. The only credential the city takes is a key a person hands it: it signs in to no subscription. |
 | Entropy | `getrandom` | OS entropy for values a stranger must not guess: the door's pairing key, and the salt and nonce of the encrypted vault file. No decision path reads it, so replay never needs it (§10 rule 4). |
@@ -577,8 +577,14 @@ workshop. A frozen run is history, and history is read rather than woken.
 
 ## 6 On disk
 
-A city is one directory. Copy it and it is the same city; delete it and
-nothing outside it changes.
+A workspace can contain several independent repositories. Its canonical path selects a
+private city under the user's product directory. Starting a session opens the city's
+ledger. A project registration reads one explicitly selected Git commit into its own
+building. Each project owns a trunk and each run gets a checkout, so runs in two
+projects can checkpoint and land independently. The workspace's Git metadata belongs
+to the project owner. Publication takes a reviewed merge and an explicit destination
+and creates a contribution branch in that repository. The destination's checkout
+continues to show the branch and files its owner selected.
 
 The tree below is the **trunk, not the full set**. `kernel::layout` derives
 the paths this product writes from a city root and an address, and it is
@@ -594,7 +600,9 @@ documents such as `Memo.md` in `city::spine_files`, `worktrees/` in
 ├─ .sprawling/                 the city's own reserved subtree
 │  ├─ ledger/                  the only history — jsonl segments, appended, chain-verified
 │  ├─ cas/                     content-addressed store, BLAKE3, one copy per content
-│  ├─ worktrees/               one git worktree per reviewing run, objects shared
+│  ├─ projects/<building>/     private Git store for one project
+│  │  ├─ .git/                 project trunk, objects, review receipts and run indexes
+│  │  └─ .sprawling/worktrees/  live run checkouts and the project's spare checkout
 │  ├─ library/                 skills more than one building admits
 │  ├─ snapshot/                what an open resumes the views from, so it folds only the tail
 │  ├─ remote/                  the remote gate's own state

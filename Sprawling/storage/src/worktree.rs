@@ -12,7 +12,7 @@ mod sweep;
 mod trees;
 mod weight;
 
-pub use landing::{Landing, PlannedMerge};
+pub use landing::{Landing, LandingRecord, PlannedMerge, ReviewPlan};
 pub use lease::{FileWork, WorktreeLease};
 pub use name::WorktreeName;
 pub use trees::Worktrees;

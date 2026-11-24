@@ -316,6 +316,7 @@ workspace 内的依赖由 ARCHITECTURE.md §3 的 `depmap` 定；规格只 impor
 | D53 | `Sprawling/accounting/spec/Worker.lean` |
 | D54 | `Sprawling/accounting/spec/Worker.lean` |
 | D55 | `Sprawling/accounting/spec/Views/Usage.lean` |
+| D123 | `Sprawling/accounting/spec/Home.lean` |
 -/
 
 /-! ## 13 依赖选型

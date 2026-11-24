@@ -14,17 +14,21 @@ fn adopting_a_folder_checkpoints_it_as_one_pack_before_any_dispatch() {
     }
     crate::worker::genesis::form(
         dir.path(),
-        Adopt::EveryFolder,
+        Adopt::Named(&[Address::parse("shop").unwrap()]),
         crate::worker::fixture::hands(),
     )
     .unwrap();
 
-    let carried = git2::Repository::open(dir.path()).ok().is_some_and(|repo| {
-        repo.head()
-            .and_then(|head| head.peel_to_tree())
-            .is_ok_and(|tree| tree.get_path(std::path::Path::new("shop/b.md")).is_ok())
-    });
-    let objects = dir.path().join(".git").join("objects");
+    let project =
+        storage::ProjectRepository::at(dir.path(), &Address::parse("shop").unwrap()).unwrap();
+    let carried = git2::Repository::open(project.root())
+        .ok()
+        .is_some_and(|repo| {
+            repo.head()
+                .and_then(|head| head.peel_to_tree())
+                .is_ok_and(|tree| tree.get_path(std::path::Path::new("shop/b.md")).is_ok())
+        });
+    let objects = project.root().join(".git").join("objects");
     let loose = std::fs::read_dir(&objects)
         .map(|entries| {
             entries
@@ -51,7 +55,7 @@ fn forming_a_city_keeps_its_own_subtree_out_of_the_workspaces_git() {
     std::fs::write(dir.path().join(".gitignore"), "target/\n").unwrap();
     crate::worker::genesis::form(
         dir.path(),
-        Adopt::EveryFolder,
+        Adopt::Named(&[Address::parse("src").unwrap()]),
         crate::worker::fixture::hands(),
     )
     .unwrap();
@@ -78,7 +82,7 @@ fn a_dispatch_leaves_nothing_the_projects_git_would_pick_up_as_work() {
     std::fs::write(dir.path().join("proj").join("src").join("lib.rs"), "\n").unwrap();
     crate::worker::genesis::form(
         dir.path(),
-        Adopt::EveryFolder,
+        Adopt::Named(&[Address::parse("proj").unwrap()]),
         crate::worker::fixture::hands(),
     )
     .unwrap();
@@ -147,7 +151,7 @@ fn opening_a_city_gives_an_older_building_the_rules_it_lacks() {
     std::fs::create_dir_all(dir.path().join("proj")).unwrap();
     crate::worker::genesis::form(
         dir.path(),
-        Adopt::EveryFolder,
+        Adopt::Named(&[Address::parse("proj").unwrap()]),
         crate::worker::fixture::hands(),
     )
     .unwrap();
@@ -166,4 +170,76 @@ fn opening_a_city_gives_an_older_building_the_rules_it_lacks() {
         rules.starts_with("Roadmap.md\nMemo.md\n") && rules.lines().any(|line| line == "JOB.md"),
         "{rules}"
     );
+}
+
+#[test]
+fn an_absolute_host_folder_is_copied_into_a_building_without_moving_the_source() {
+    let city_dir = tempfile::tempdir().unwrap();
+    let source = tempfile::tempdir().unwrap();
+    let report = crate::worker::fixture::init_city(city_dir.path()).unwrap();
+    std::fs::create_dir_all(source.path().join("src")).unwrap();
+    std::fs::write(source.path().join("src/main.rs"), "fn main() {}\n").unwrap();
+    let repo = git2::Repository::init(source.path()).unwrap();
+    let mut index = repo.index().unwrap();
+    index.add_path(std::path::Path::new("src/main.rs")).unwrap();
+    std::fs::write(source.path().join(".gitignore"), "kept.bin\n").unwrap();
+    std::fs::write(source.path().join("kept.bin"), "tracked by source").unwrap();
+    std::fs::create_dir_all(source.path().join(".sprawling")).unwrap();
+    std::fs::write(
+        source.path().join(".sprawling/foreign"),
+        "unrelated settings",
+    )
+    .unwrap();
+    for path in [".gitignore", "kept.bin", ".sprawling/foreign"] {
+        index.add_path(std::path::Path::new(path)).unwrap();
+    }
+    let tree = repo.find_tree(index.write_tree().unwrap()).unwrap();
+    let signature = git2::Signature::now("tester", "tester@example.invalid").unwrap();
+    repo.commit(
+        Some("HEAD"),
+        &signature,
+        &signature,
+        "registered baseline",
+        &tree,
+        &[],
+    )
+    .unwrap();
+    let mut worker = RunWorker::new(
+        city_dir.path(),
+        runtime::diagnostics::Diagnostics::off(),
+        crate::worker::fixture::hands(),
+    )
+    .unwrap();
+
+    worker
+        .handle(wire::Command::CreateBuilding {
+            addr: Address::parse("imported").unwrap(),
+            template: wire::TemplateName::parse("minimal").unwrap(),
+            rules: None,
+            source: Some(source.path().to_string_lossy().into_owned()),
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"import"),
+        })
+        .unwrap();
+
+    assert_eq!(
+        std::fs::read_to_string(city_dir.path().join("imported/src/main.rs")).unwrap(),
+        "fn main() {}\n"
+    );
+    assert_eq!(
+        std::fs::read_to_string(source.path().join("src/main.rs")).unwrap(),
+        "fn main() {}\n"
+    );
+    let project =
+        storage::ProjectRepository::at(city_dir.path(), &Address::parse("imported").unwrap())
+            .unwrap();
+    let private = git2::Repository::open(project.root()).unwrap();
+    let tree = private.head().unwrap().peel_to_tree().unwrap();
+    assert!(
+        tree.get_path(std::path::Path::new("imported/kept.bin"))
+            .is_ok()
+    );
+    assert!(!city_dir.path().join("imported/.sprawling/foreign").exists());
+    let line = super::tests::created_line(&report.ledger_dir, "imported");
+    assert_eq!(line["data"]["adopted"], serde_json::json!(true));
+    assert!(line["data"].get("source").is_none());
 }

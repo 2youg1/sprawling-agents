@@ -20,7 +20,7 @@
 
 ```rust
 // bin::firstrun
-pub(crate) enum FirstScreen { Start(PathBuf), Quit }
+pub(crate) enum FirstScreen { Start(PathBuf), Use(PathBuf), Quit }
 
 // bin::router（二进制那一半）
 fn default_city_location() -> Result<PathBuf, AxError>;   // 个人配置的 city，否则 Home::default_city()
@@ -32,9 +32,8 @@ pub(crate) fn open_paired(origins_url: &str, door: &wire::LocalDoor) -> Result<(
 - **`up <dir>`＝序列的唯一定义**：目录里没有 ledger 就先 `init`，随后 `serve`。无参屏与 `start.cmd` 都落到它，`init`／`serve` 仍各自独立可用——一段序列一处权威。三扇门的序列相同，终端面不同（§8-11）：无参启动进 CLI，不开浏览器，人敲 `/web` 再开；`up` 与启动器进安静宿主并开浏览器，双击的人仍然一步到网页。
 - **genesis 要人同意**：写 Ledger 第 0 行是全系统唯一一次不可撤销的语义写入，不因「有人双击了一个文件」而发生。无参屏只在默认位置还没有城时出现，是 CLI 的头两行：`sprawling  no city yet`，`start one at <路径>?   Enter yes   type a folder to use it   q quit`；按键**之前**最终路径已经在屏上，人按回车才开城；`q` 退出并打印命令表。默认位置已经是一座城时不再问，直接开它。
 - **非交互 stdin 无此问**：`read_line` 得 EOF（管道、CI、无人值守）即 `Quit`，主流程打印命令表退 2。这条让该路径在没有 TTY 的地方也可测。
-- **没指名的城按三级找**：命令行位置参数 > 个人配置顶层 `city`（`Sprawling/accounting/spec/Person.lean` §8-8）> `Home::default_city()`，即 `~/sprawling/city`（`Sprawling/accounting/Spec.lean` §8-7）。城不放在二进制旁：升级是把新版解压进另一个目录，城留在旧目录里，新版第一屏就成了「还没有城」。家目录找不到、个人配置读不动或写的是相对路径时 `up` 与第一屏拒并给恢复语，不退回二进制旁；doctor 印出同一句拒词后扫一个空路径，报告那里没有城。
-- **上一版放在二进制旁的城搬一次家**（`bin::beside_binary::bring_home`）：个人配置还没写 `city`、`<二进制目录>/city` 有账本时，`up`（没给位置参数）与第一屏先把它整个改名到 `~/sprawling/city`，再 `settle_city`，于是这一步只会发生一次。改名前取账本的写者锁（`storage::LedgerHold`）确认没有城在用它：Windows 以外锁一直持到改名之后，于是中间没有城能从旧文件夹起来；Windows 不许改名一个里面有打开文件的文件夹（锁文件也算），所以在改名前放掉，而同一条规则让中间起来的城变成一次失败的改名，不会让城在运行中被搬走。改名后 `Worktrees::relink_moved` 把 git 两侧记的绝对路径改指新位置（`Sprawling/storage/spec/Worktree.lean` §8-9），`gitdir` 最后写，中途失败的一棵下一次还选得中；改写失败不撤销搬家，只告诉人，因为链接认不出的备树会在下一次补树时被收回重备（`Sprawling/app/spec/Supervising.lean`）。搬完后经 `name_city` 写个人配置，写失败也只报告。目标处已有一座城或别的文件时拒（`E_INVALID_ARGS`），恢复语请人自己搬或在个人配置里写 `city`。目标在另一个卷上时（Windows 上二进制解压在 `D:`、家目录在 `C:` 很常见）不搬也不拒：`bring_home` 答 `Homing::OnAnotherVolume`，城留在原处，经同一个 `name_city` 把旧路径写进个人配置，这一次启动直接打开原处的城，不经个人配置再读一遍：写失败只报告，城照样在原处打开，而不是在空着的 `~/sprawling/city` 上起一座新城（那样旧城就被晾在一边，下一次搬家还会因目标已有城而被拒）；只在这一次说明为什么没搬、人怎样自己搬（先停城，整个文件夹搬过去，再改个人配置里的 `city`），之后的启动因为个人配置里有 `city` 不再找它。被否：跨卷时拒——它让每一次无参启动都被拒，第一屏与 `up` 都进不了城；跨卷复制——要复制、校验账本、在旧处留「已迁走」标记，中途失败留下的半座城比原处的整座城难收拾。留在原处可以回退：人随时自己搬，再改那一行。doctor 不搬：它默认只检查。
-- **第一屏把选定的城写进个人配置**：回车建城与输入文件夹接管两条路在开城之前调 `name_city`，下次无参启动直接开它；写失败只报告，城照起，下次再问一遍，与没选过时一样。`up <dir>` 是一次性的覆盖，不写。
+- 显式路径、个人配置 `city`、默认路径依次选择工作区。初次打开为这个工作区建立私有城。
+- 第一屏把选定的工作区写入个人配置。`up <dir>` 只在本次启动使用该工作区。
 - **默认路径只有 `accounting::home` 一处权威**：`~/sprawling/city` 由 `Home::default_city()` 给出，目录名 `city` 由 `home::CITY_DIR` 一处定义。
 - **开浏览器恒非致命**：`open_paired` 失败只记一行，`serve` 照跑——URL 在这之前已经打印。命名不取 `browser`：`Sprawling/browser` 已占住「Agent 驱动真实浏览器」这个概念，一名一义。
 - **开浏览器经跳转文件，不经命令行**：`open_paired` 向这台电脑上的这扇门要一个开页码（`Sprawling/wire/spec/Reception/Pairing.lean` §8-95），写 `<每用户运行目录>/sprawling/open-<pid>.html`（目录与钥匙文件同一个，只给本用户读），内容是一句 `<meta http-equiv="refresh">` 加一句 `location.replace`，指向 `<url>/#open=<码>`，再把这个文件的路径交给系统打开器。命令行里只有路径：交给 `cmd /C start`、`open`、`xdg-open` 的 URL 会留在浏览器主进程的 argv 里，Linux 上别的用户读得到 `/proc/<pid>/cmdline`。码兑掉或过期（120 s）时删掉这个文件；城被强制结束时来不及删，所以每次起城先删掉运行目录里比开页码寿命（`wire::OPEN_CODE_LIFETIME_MS`）更旧的 `open-*.html`，它们装的码都已过期。只删更旧的，不删别的进程号的全部：同一个用户可能同时开着两座城，另一座城刚写下、浏览器还没读的那一份不能删。WSL 里 `file:` 页开不了 Windows 一侧的浏览器，`WSL_DISTRO_NAME` 在场时只开裸地址，人用终端上的配对码配对。CLI 的 `/web`、安静宿主的 Enter 与 `up` 的开页都走 `open_paired`，三处同一条路。
@@ -45,3 +44,8 @@ pub(crate) fn open_paired(origins_url: &str, door: &wire::LocalDoor) -> Result<(
 
 **本章测试**：个人配置 `city` 的读写与相对路径的拒在 `accounting::person` 旁；`ask` 空行得 `Start`、`q` 得 `Quit`、EOF 得 `Quit`；第一屏文本在返回前已含最终路径（证明「先示后写」）。URL 由 `wire::ListenerOrigins::url` 给出，它对未指定地址给回环形，测试在 `wire::reception::entry` 旁。
 -/
+
+/-! All city arguments to the executable select a workspace. Commands which read, serve
+or change city state resolve the same private city through accounting::home::Home::workspace.
+The first screen remembers the user's workspace selection and opens only its private city.
+Project registration is explicit. Sessions enumerate only private state. -/

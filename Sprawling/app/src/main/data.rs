@@ -120,8 +120,10 @@ pub(super) fn restore(bundle: Option<&String>, city: Option<&String>) -> ExitCod
     }
 }
 
-pub(super) fn fork(args: &[String]) -> ExitCode {
-    let (Some(dir), Some(run_raw), Some(seq_raw)) = (args.get(1), args.get(2), args.get(3)) else {
+pub(super) fn fork(args: &Arguments) -> ExitCode {
+    let (Some(dir), Some(run_raw), Some(seq_raw)) =
+        (args.positional(1), args.positional(2), args.positional(3))
+    else {
         eprintln!("usage: sprawling fork <city-dir> <run-id> <at-seq> [addr]");
         return ExitCode::from(2);
     };
@@ -133,7 +135,7 @@ pub(super) fn fork(args: &[String]) -> ExitCode {
         eprintln!("not a sequence number: {seq_raw}");
         return ExitCode::from(2);
     };
-    let addr = match args.get(4).map(|raw| kernel::Address::parse(raw)) {
+    let addr = match args.positional(4).map(|raw| kernel::Address::parse(raw)) {
         None => None,
         Some(Ok(addr)) => Some(addr),
         Some(Err(err)) => return report(err),
@@ -172,30 +174,70 @@ pub(super) fn fork(args: &[String]) -> ExitCode {
     }
 }
 
-pub(super) fn adopt(dir: Option<&String>, addr: Option<&String>) -> ExitCode {
-    let (Some(dir), Some(addr_raw)) = (dir, addr) else {
-        eprintln!("usage: sprawling adopt <city-dir> <addr>");
-        eprintln!("move or clone the directory under the city first, then adopt it");
+pub(super) fn register(args: &Arguments) -> ExitCode {
+    let (Some(dir), Some(addr), Some(source), Some(point)) = (
+        args.positional(1),
+        args.positional(2),
+        args.positional(3),
+        args.positional(4),
+    ) else {
         return ExitCode::from(2);
     };
-    let addr = match kernel::Address::parse(addr_raw) {
+    let addr = match kernel::Address::parse(addr) {
         Ok(addr) => addr,
         Err(err) => return report(err),
     };
+    let Some(point) = kernel::GitOid::parse(point) else {
+        eprintln!("supply the full source commit ID");
+        return ExitCode::from(2);
+    };
     let (vault, _notice) = serving::open_vault();
-    let outcome = accounting::worker::RunWorker::new(
+    match accounting::worker::RunWorker::new(
         std::path::Path::new(dir),
         runtime::diagnostics::Diagnostics::off(),
         assembly::hands(vault),
     )
-    .and_then(|mut worker| worker.adopt_building(addr.clone()));
-    match outcome {
+    .and_then(|mut worker| worker.register_project(&addr, std::path::Path::new(source), &point))
+    {
         Ok(()) => {
-            println!(
-                "adopted {} - its files are untouched, its rules are new",
-                addr.as_str()
-            );
-            println!("edit {}/RULES.toml to shape them", addr.as_str());
+            println!("registered {addr} at {point}");
+            ExitCode::SUCCESS
+        }
+        Err(err) => report(err),
+    }
+}
+
+pub(super) fn publish(args: &Arguments) -> ExitCode {
+    let (Some(city), Some(addr), Some(point), Some(destination), Some(base), Some(branch)) = (
+        args.positional(1),
+        args.positional(2),
+        args.positional(3),
+        args.positional(4),
+        args.positional(5),
+        args.positional(6),
+    ) else {
+        return ExitCode::from(2);
+    };
+    let addr = match kernel::Address::parse(addr) {
+        Ok(addr) => addr,
+        Err(err) => return report(err),
+    };
+    let Some(point) = kernel::GitOid::parse(point) else {
+        eprintln!("supply the full reviewed merge commit ID");
+        return ExitCode::from(2);
+    };
+    match accounting::worker::publish_project(
+        std::path::Path::new(city),
+        &addr,
+        point,
+        &accounting::worker::PublicationTarget {
+            repository: std::path::Path::new(destination),
+            base,
+            branch,
+        },
+    ) {
+        Ok(oid) => {
+            println!("{branch} {oid}");
             ExitCode::SUCCESS
         }
         Err(err) => report(err),

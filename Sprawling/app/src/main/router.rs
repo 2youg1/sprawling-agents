@@ -9,7 +9,7 @@ use sprawling::firstrun;
 
 use super::calling::call;
 use super::city::{Entrance, init, resume, serve, up, up_at, use_folder};
-use super::data::{adopt, enrol, export, fork, install, replay, restore, status};
+use super::data::{enrol, export, fork, install, replay, restore, status};
 use super::grammar::{Arguments, Invocation, parse};
 use super::verbs::{self, Verb};
 use super::{CLIENT_COMPLETE, CLIENT_FILES};
@@ -42,7 +42,10 @@ pub(super) fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         Ok(Invocation::Version) => status(&args),
-        Ok(Invocation::Run(verb, read)) => run(verb, &read, &args),
+        Ok(Invocation::Run(verb, mut read)) => match read.resolve_city(verb) {
+            Ok(()) => run(verb, &read, &args),
+            Err(err) => super::city::report(err),
+        },
         Err(refused) => {
             if let Some(result) = runtime::tools::run_container_guard(&args) {
                 return match result {
@@ -132,8 +135,9 @@ fn run(verb: Verb, read: &Arguments, args: &[String]) -> ExitCode {
         Verb::Export => export(nth(1), nth(2)),
         Verb::Restore => restore(nth(1), nth(2)),
         Verb::Resume => resume(nth(1)),
-        Verb::Fork => fork(args),
-        Verb::Adopt => adopt(nth(1), nth(2)),
+        Verb::Fork => fork(read),
+        Verb::Register => super::data::register(read),
+        Verb::Publish => super::data::publish(read),
     }
 }
 
@@ -167,7 +171,10 @@ pub(super) fn first_screen() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    if city::has_history(&city).is_ok_and(|history| history == city::History::Present) {
+    if private_city(&city)
+        .and_then(|root| city::has_history(&root))
+        .is_ok_and(|history| history == city::History::Present)
+    {
         let code = up_at(&city, DEFAULT_AT, &[], Entrance::Bare);
         hold();
         return code;
@@ -206,60 +213,25 @@ fn default_city_location() -> Result<std::path::PathBuf, kernel::AxError> {
 }
 
 pub(super) fn city_to_open() -> Result<std::path::PathBuf, kernel::AxError> {
-    if accounting::person::city()?.is_none()
-        && let Some(stayed) = move_home_from_beside_the_binary()?
-    {
-        return Ok(stayed);
-    }
     default_city_location()
 }
 
-fn move_home_from_beside_the_binary() -> Result<Option<std::path::PathBuf>, kernel::AxError> {
-    let exe_dir = match std::env::current_exe() {
-        Ok(exe) => match exe.parent() {
-            Some(dir) => dir.to_path_buf(),
-            None => return Ok(None),
-        },
-        Err(_) => return Ok(None),
-    };
-    let to = accounting::home::Home::detect()?.default_city();
-    match sprawling::beside_binary::bring_home(&exe_dir, &to)? {
-        sprawling::beside_binary::Homing::NothingBeside => Ok(None),
-        sprawling::beside_binary::Homing::Moved { from, to, relinked } => {
-            println!("moved the city from {} to {}", from.display(), to.display());
-            match relinked {
-                Ok(count) => println!("{count} worktree(s) re-pointed at the new folder"),
-                Err(error) => eprintln!(
-                    "{}the spare worktree is checked out again when the city next needs one",
-                    super::refusal::written(&error, super::refusal::Form::Human)
-                ),
-            }
-            name_city(&to);
-            Ok(None)
-        }
-        sprawling::beside_binary::Homing::OnAnotherVolume { at, home } => {
-            println!(
-                "the city stays at {}: {} is on another volume, and this release does not copy a city across volumes",
-                at.display(),
-                home.display()
-            );
-            println!(
-                "to move it yourself, stop the city, move that folder whole, then change the city line in the person's config.toml"
-            );
-            name_city(&at);
-            Ok(Some(at))
-        }
-    }
+pub(super) fn private_city(
+    workspace: &std::path::Path,
+) -> Result<std::path::PathBuf, kernel::AxError> {
+    accounting::home::Home::detect()?.workspace(workspace)
 }
 
 fn doctor_city() -> std::path::PathBuf {
-    default_city_location().unwrap_or_else(|error| {
-        eprint!(
-            "{}",
-            super::refusal::written(&error, super::refusal::Form::Human)
-        );
-        std::path::PathBuf::new()
-    })
+    default_city_location()
+        .and_then(|city| private_city(&city))
+        .unwrap_or_else(|error| {
+            eprint!(
+                "{}",
+                super::refusal::written(&error, super::refusal::Form::Human)
+            );
+            std::path::PathBuf::new()
+        })
 }
 
 pub(super) fn name_city(city: &std::path::Path) {

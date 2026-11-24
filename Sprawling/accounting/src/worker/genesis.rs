@@ -27,9 +27,9 @@ pub struct InitReport {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Adopt {
+pub enum Adopt<'a> {
     Nothing,
-    EveryFolder,
+    Named(&'a [Address]),
 }
 
 pub(super) fn standing_of(city_root: &Path, history: History) -> city::Standing {
@@ -43,7 +43,7 @@ pub(super) fn standing_of(city_root: &Path, history: History) -> city::Standing 
     city::survey(&entries, history == History::Present)
 }
 
-pub fn form(city_root: &Path, adopt: Adopt, hands: Hands) -> Result<InitReport, AxError> {
+pub fn form(city_root: &Path, adopt: Adopt<'_>, hands: Hands) -> Result<InitReport, AxError> {
     let history = has_history(city_root)?;
     let standing = standing_of(city_root, history);
     let dir = kernel::layout::CityLayout::new(city_root).ledger();
@@ -118,7 +118,7 @@ pub fn form(city_root: &Path, adopt: Adopt, hands: Hands) -> Result<InitReport, 
     let (hall, template) = plan.hall();
     worker.create_building(hall.clone(), template.name())?;
     let mut adopted = Vec::new();
-    if let (Adopt::EveryFolder, city::Standing::Work { adoptable, .. }) = (adopt, &standing) {
+    if let Adopt::Named(adoptable) = adopt {
         for addr in adoptable {
             worker.adopt_building(addr.clone())?;
             adopted.push(addr.clone());
@@ -204,11 +204,73 @@ impl RunWorker {
         rules: Option<&str>,
         source: Option<&std::path::Path>,
     ) -> Result<(), AxError> {
+        self.raise_at(addr, template, rules, source.map(|path| (path, None)))
+    }
+
+    pub fn register_project(
+        &mut self,
+        addr: &Address,
+        source: &Path,
+        point: &kernel::GitOid,
+    ) -> Result<(), AxError> {
+        self.raise_at(
+            addr,
+            city::BuildingTemplate::Minimal.name(),
+            None,
+            Some((source, Some(point))),
+        )
+    }
+
+    fn raise_at(
+        &mut self,
+        addr: &Address,
+        template: &str,
+        rules: Option<&str>,
+        source: Option<(&Path, Option<&kernel::GitOid>)>,
+    ) -> Result<(), AxError> {
         let template = city::BuildingTemplate::parse(template)?;
         if let Some(text) = rules {
             let evaluated = city::evaluate(addr, text)?;
             self.validate_workspace_models(&evaluated)?;
         }
+        if let Some((path, _)) = source {
+            if !path.is_absolute() {
+                return Err(AxError::failure(
+                    AxCode::InvalidArgs,
+                    "register the source repository",
+                    path.display().to_string(),
+                )
+                .with_recovery("supply the absolute source repository path"));
+            }
+            let target = self.city_root.join(addr.as_str());
+            let project = storage::ProjectRepository::at(&self.city_root, addr)
+                .map_err(storage::StorageError::into_ax)?;
+            for path in [target.as_path(), project.root()] {
+                match std::fs::symlink_metadata(path) {
+                    Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(err) => {
+                        return Err(AxError::failure(
+                            AxCode::StorageFatal,
+                            "inspect the registration target",
+                            format!("{}: {err}", path.display()),
+                        )
+                        .with_recovery("check the private workspace directory permissions"));
+                    }
+                    Ok(_) => {
+                        return Err(AxError::failure(
+                            AxCode::InvalidArgs,
+                            "register the source repository",
+                            path.display().to_string(),
+                        )
+                        .with_recovery("choose an unused building address"));
+                    }
+                }
+            }
+        }
+        let snapshot = source
+            .map(|(source, point)| storage::SourceSnapshot::read(&self.city_root, source, point))
+            .transpose()
+            .map_err(storage::StorageError::into_ax)?;
         let written = rules.map_or(city::RulesText::Template, city::RulesText::Written);
         let (building, founding) = city::raise_building(
             &self.city_root,
@@ -216,12 +278,12 @@ impl RunWorker {
                 addr,
                 template,
                 rules: written,
-                source,
+                source: snapshot.as_ref().map(storage::SourceSnapshot::path),
             },
         )?;
         match founding {
             city::Founding::Built => self.built(&building, template),
-            city::Founding::Adopted => self.adopted(&building, template),
+            city::Founding::Adopted => self.adopted(&building, template, snapshot.as_ref()),
         }
     }
 
@@ -245,21 +307,42 @@ impl RunWorker {
 
     pub fn adopt_building(&mut self, addr: Address) -> Result<(), AxError> {
         let building = city::adopt_building(&self.city_root, &addr)?;
-        self.adopted(&building, city::BuildingTemplate::Minimal)
+        self.adopted(&building, city::BuildingTemplate::Minimal, None)
     }
 
     fn adopted(
         &mut self,
         building: &city::Building,
         template: city::BuildingTemplate,
+        snapshot: Option<&storage::SourceSnapshot>,
     ) -> Result<(), AxError> {
         self.note(
             runtime::diagnostics::Level::Effect,
             "city::building",
             &format!("{} adopted as a building", building.addr().as_str()),
         );
-        let base = match self.adoption_base(building) {
+        let project = storage::ProjectRepository::at(&self.city_root, building.addr())
+            .map_err(storage::StorageError::into_ax)?;
+        let prepared = self.adoption_base(building, snapshot).and_then(|base| {
+            if let (Some(snapshot), Some(commit)) = (snapshot, &base) {
+                snapshot
+                    .bind(&project, commit.oid)
+                    .map_err(storage::StorageError::into_ax)?;
+            }
+            Ok(base)
+        });
+        let base = match prepared {
             Ok(base) => base,
+            Err(refused) if snapshot.is_some() => {
+                for path in [building.root(&self.city_root).as_path(), project.root()] {
+                    match std::fs::remove_dir_all(path) {
+                        Ok(()) => {}
+                        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+                        Err(err) => return Err(refused.rewrite_recovery(format!("remove the refused private registration at {} ({err}), then register the corrected revision", path.display()))),
+                    }
+                }
+                return Err(refused);
+            }
             Err(refused) => return Err(self.withdrawn(building, refused)),
         };
         let payload = city::building_adopted_payload(building, template)?;
@@ -289,7 +372,11 @@ impl RunWorker {
         }
     }
 
-    fn adoption_base(&mut self, building: &city::Building) -> Result<Option<Commit>, AxError> {
+    fn adoption_base(
+        &mut self,
+        building: &city::Building,
+        source: Option<&storage::SourceSnapshot>,
+    ) -> Result<Option<Commit>, AxError> {
         let addr = building.addr();
 
         let of = storage::Provenance::new(
@@ -305,17 +392,24 @@ impl RunWorker {
         let entropy_allow = city::load(&self.city_root, addr)?
             .checkpoint_entropy_allow()
             .clone();
-        let made = storage::Checkpoint::open(&self.city_root).and_then(|checkpoint| {
-            checkpoint
-                .with_entropy_allowlist(entropy_allow)
-                .base_checkpoint(&[addr.as_str().to_owned()], t, &of, &mut |step| {
+        let made = storage::ProjectRepository::at(&self.city_root, addr)
+            .and_then(|project| project.checkpoint())
+            .and_then(|checkpoint| {
+                let writer = checkpoint.with_entropy_allowlist(entropy_allow);
+                let mut progress = |step| {
                     self.note(
                         runtime::diagnostics::Level::Effect,
                         "storage::checkpoint",
                         &format!("{}: base checkpoint {step:?}", addr.as_str()),
                     );
-                })
-        });
+                };
+                match source {
+                    Some(source) => source.checkpoint(writer, t, &of, &mut progress),
+                    None => {
+                        writer.base_checkpoint(&[addr.as_str().to_owned()], t, &of, &mut progress)
+                    }
+                }
+            });
         match made {
             Ok(record) => Ok(Some(record)),
             Err(err) => {

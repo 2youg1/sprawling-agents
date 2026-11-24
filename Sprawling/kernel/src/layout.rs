@@ -194,7 +194,16 @@ impl CityLayout {
 
     #[must_use]
     pub fn of_ledger(dir: &Path) -> Option<CityLayout> {
-        if dir.file_name()? != LEDGER_DIR {
+        Self::of_store(dir, LEDGER_DIR)
+    }
+
+    #[must_use]
+    pub fn of_cas(dir: &Path) -> Option<CityLayout> {
+        Self::of_store(dir, CAS_DIR)
+    }
+
+    fn of_store(dir: &Path, name: &str) -> Option<CityLayout> {
+        if dir.file_name()? != name {
             return None;
         }
         let governed = dir.parent()?;

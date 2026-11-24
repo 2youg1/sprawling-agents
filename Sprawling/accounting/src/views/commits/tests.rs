@@ -113,7 +113,12 @@ fn a_commit_names_the_one_its_run_announced_before_it() {
 #[test]
 fn a_page_of_commits_carries_each_ones_parents_from_git() {
     let dir = tempfile::tempdir().unwrap();
-    let repo = git2::Repository::init(dir.path()).unwrap();
+    let repo = git2::Repository::init(
+        storage::ProjectRepository::at(dir.path(), &Address::parse("lab").unwrap())
+            .unwrap()
+            .root(),
+    )
+    .unwrap();
     let signature = git2::Signature::now("city", "city@example.invalid").unwrap();
     let tree = repo
         .find_tree(repo.index().unwrap().write_tree().unwrap())
@@ -173,7 +178,12 @@ fn a_page_of_commits_carries_each_ones_parents_from_git() {
 #[test]
 fn a_page_of_commits_carries_each_ones_message_from_git() {
     let dir = tempfile::tempdir().unwrap();
-    let repo = git2::Repository::init(dir.path()).unwrap();
+    let repo = git2::Repository::init(
+        storage::ProjectRepository::at(dir.path(), &Address::parse("lab").unwrap())
+            .unwrap()
+            .root(),
+    )
+    .unwrap();
     let signature = git2::Signature::now("city", "city@example.invalid").unwrap();
     let tree = repo
         .find_tree(repo.index().unwrap().write_tree().unwrap())

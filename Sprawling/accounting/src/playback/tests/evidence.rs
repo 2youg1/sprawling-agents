@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a bundle carries beside the lines (`Sprawling/accounting/spec/Playback/Traced.lean` §8-17): a
-//! call's duration only where both its moments were measured, a run's
-//! policy, and a commit's base, diff and trace, each state kept apart.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -23,8 +19,6 @@ use serde_json::{Value, json};
 use super::super::{Request, Selection, export};
 use super::{Line, addr, confidential, parsed, person, run, seqs, write};
 
-/// The ledger lines `script` spells, chained from genesis, each line
-/// written at its own ledger version and `t`.
 pub(super) fn versioned(script: Vec<(u32, u64, Line)>) -> Vec<Vec<u8>> {
     let mut prev = kernel::GENESIS_PREV;
     let mut out = Vec::new();
@@ -64,13 +58,9 @@ fn policy() -> Value {
 }
 
 fn request() -> Value {
-    json!({"node": "1", "implementer": "lab/a", "branch": "lab-a", "commit": "1".repeat(40)})
+    json!({"node": "1", "project": "lab", "implementer": "lab/a", "branch": "lab-a", "commit": "1".repeat(40)})
 }
 
-/// Run 1 calls four tools: one written before lines recorded their own
-/// moment, one measured, one the city answered itself after a restart,
-/// and one never answered. Its pull request is refused at the merge for
-/// want of the evidence its policy asked for.
 fn timed() -> (tempfile::TempDir, Vec<Vec<u8>>) {
     let dir = tempfile::tempdir().unwrap();
     let r1 = run(1);
@@ -200,9 +190,14 @@ fn a_call_is_timed_only_where_both_its_moments_were_measured() {
     );
 }
 
-/// A commit in the city's own repository with `files`, on `parent`.
 fn commit(root: &Path, files: &[(&str, &[u8])], parent: Option<git2::Oid>) -> git2::Oid {
-    let repo = git2::Repository::open(root).unwrap();
+    let repo = git2::Repository::open(
+        storage::ProjectRepository::at(root, &kernel::Address::parse("lab").unwrap())
+            .unwrap()
+            .root(),
+    )
+    .unwrap();
+    repo.set_workdir(root, false).unwrap();
     let mut index = repo.index().unwrap();
     for (path, body) in files {
         let on_disk = root.join(path);
@@ -223,15 +218,10 @@ fn commit(root: &Path, files: &[(&str, &[u8])], parent: Option<git2::Oid>) -> gi
         .unwrap()
 }
 
-/// The key-shaped line a patch must never echo.
 fn key() -> String {
     format!("sk-ant-api03-{}", "a1B2c3D4e5".repeat(9))
 }
 
-/// Run 1 commits twice in `lab/a` and makes one call in between, then
-/// announces a commit the repository does not hold. The second commit
-/// changes a text file (one line key-shaped), a binary file, a file in
-/// the confidential building `vault`, and leaves a fourth unchanged.
 fn committed() -> (tempfile::TempDir, [String; 3]) {
     let dir = tempfile::tempdir().unwrap();
     let (script, oids) = committed_in(dir.path());
@@ -240,10 +230,13 @@ fn committed() -> (tempfile::TempDir, [String; 3]) {
     (dir, oids)
 }
 
-/// The repository of [`committed`] at `root`, and the ledger script that
-/// announces its commits.
 pub(super) fn committed_in(root: &Path) -> (Vec<Line>, [String; 3]) {
-    git2::Repository::init(root).unwrap();
+    git2::Repository::init(
+        storage::ProjectRepository::at(root, &kernel::Address::parse("lab").unwrap())
+            .unwrap()
+            .root(),
+    )
+    .unwrap();
     let first = commit(
         root,
         &[
@@ -359,9 +352,6 @@ fn a_commits_diff_keeps_each_state_apart_and_its_trace_names_the_calls() {
     );
 }
 
-/// After the export, another run in the same building checkpoints the
-/// same tree again. The bundle's trace was the first announcement's, so
-/// recomputing it from the longer history gives the same bytes.
 #[test]
 fn a_commit_announced_again_after_the_export_recomputes_the_same() {
     let dir = tempfile::tempdir().unwrap();

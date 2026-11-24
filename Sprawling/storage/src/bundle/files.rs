@@ -72,21 +72,30 @@ pub(crate) fn read_lines(vfs: &dyn Vfs, ledger_dir: &Path) -> Result<Vec<Vec<u8>
 }
 
 pub(crate) fn walk(vfs: &dyn Vfs, root: &Path) -> Result<Vec<PathBuf>, StorageError> {
+    walk_selected(vfs, root, |_| true)
+}
+
+fn walk_selected(
+    vfs: &dyn Vfs,
+    root: &Path,
+    include: impl Fn(&Path) -> bool,
+) -> Result<Vec<PathBuf>, StorageError> {
+    let selected = |path: &PathBuf| path.strip_prefix(root).is_ok_and(&include);
     let mut found = Vec::new();
     let mut pending = vec![root.to_path_buf()];
     while let Some(dir) = pending.pop() {
         let Some(files) = present(vfs.list(&dir), &dir)? else {
             continue;
         };
-        for file in &files {
-            refuse_alias(file)?;
+        for file in files.into_iter().filter(&selected) {
+            refuse_alias(&file)?;
+            found.push(file);
         }
-        found.extend(files);
         if let Some(dirs) = present(vfs.list_dirs(&dir), &dir)? {
-            for sub in &dirs {
-                refuse_alias(sub)?;
+            for sub in dirs.into_iter().filter(&selected) {
+                refuse_alias(&sub)?;
+                pending.push(sub);
             }
-            pending.extend(dirs);
         }
     }
     found.sort();
@@ -111,19 +120,11 @@ fn travels(relative: &Path) -> bool {
         })
 }
 
-pub(crate) fn only_city_files(vfs: &dyn Vfs, root: &Path) -> Result<u64, StorageError> {
-    let mut repository = 0u64;
+pub(crate) fn only_city_files(vfs: &dyn Vfs, root: &Path) -> Result<(), StorageError> {
     for path in walk(vfs, root)? {
         let Ok(relative) = path.strip_prefix(root) else {
             continue;
         };
-        if relative
-            .strip_prefix(kernel::GIT_METADATA)
-            .is_ok_and(|inner| !inner.as_os_str().is_empty())
-        {
-            repository = repository.saturating_add(1);
-            continue;
-        }
         if !travels(relative) {
             return Err(StorageError::Bundle {
                 op: "restore",
@@ -134,7 +135,7 @@ pub(crate) fn only_city_files(vfs: &dyn Vfs, root: &Path) -> Result<u64, Storage
             });
         }
     }
-    Ok(repository)
+    Ok(())
 }
 
 fn present(
@@ -189,7 +190,7 @@ pub(crate) fn copy_city_files(
 ) -> Result<u64, StorageError> {
     let mut copied = 0u64;
     let mut seen = BTreeMap::new();
-    for path in walk(vfs, city_root)? {
+    for path in walk_selected(vfs, city_root, travels)? {
         let Ok(relative) = path.strip_prefix(city_root) else {
             continue;
         };

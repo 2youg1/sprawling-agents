@@ -69,6 +69,7 @@ pub struct Checkpoint {
     pub(crate) last: Option<git2::Oid>,
 
     pub(crate) index: super::opening::IndexOwner,
+    pub(crate) reference: Option<String>,
 
     pub(crate) entropy_allow: kernel::EntropyAllowlist,
 }
@@ -90,14 +91,21 @@ impl Checkpoint {
         if Self::head_commit(&self.repo)?.is_some() {
             return Ok(None);
         }
-        let _head_moves = super::opening::moving_head()?;
+        let _head_moves = super::opening::moving_head(self.repo.path())?;
         if Self::head_commit(&self.repo)?.is_some() {
             return Ok(None);
         }
 
-        let made =
-            self.reopened()?
-                .write_held(&BaseOf { scopes, t, of }, BaseTarget::Head, &mut |_| {});
+        let made = self.reopened()?.write_held(
+            &BaseOf {
+                scopes,
+                t,
+                of,
+                source: None,
+            },
+            BaseTarget::Head,
+            &mut |_| {},
+        );
 
         self.repo
             .index()

@@ -61,7 +61,8 @@ impl WorktreeLease {
 
 - **一节点一棵，且它是 git worktree**：对象共享、工作树不共享，于是两个 Agent 看不见对方的中间态，而合入只走 PR 流。它从 `storage::checkpoint` 已在管的那个仓库分枝——城里不开第二个仓库。
 - **建树前预检，不是建到一半失败**：工作树字节数 > `WORKTREE_MAX_BYTES` 即拒，拒词带当前上限与实测值。reflink 今天不尝试（无 unsafe FFI 或新依赖就没有 CoW 接口），故设计里「CoW 则 reflink，否则按上限拒」在每个平台上都只走后一臂——这是当前口径，不是已实现的 CoW。可用磁盘余量未探（std 无该接口），同样写在明处。
-- **上限只称人的字节**：`measure` 跳 `.git` 与 `RESERVED_PREFIX` 子树（谓词住 `storage::reserved`，与 checkpoint 的 `stage_tree` 同一个）。
+- **放置成本**：按所选提交的 tree OID 缓存 blob 逻辑长度之和，冷读从对象头取长度，缓存命中不遍历工作区。保留树回收的磁盘占用另计。
+- **磁盘占用**：`measure` 跳 `.git` 与 `RESERVED_PREFIX` 子树（谓词住 `storage::reserved`，与 checkpoint 的 `stage_tree` 同一个）。
   账本、CAS、投影与别人的工作树都住 reserved 之下；把它们算进来，跑了一个月的城会因为自己的簿记长大而拒绝派活，
   并用一句「城的工作树有 N 字节」说这件事。断言：账本 4 KB、产品文件不到 1 KB 的城仍可领树。
 - **上限称一次检出，不称留着的树之和**：`WORKTREE_MAX_BYTES` 只在 `place`（新建一棵：接管备树或全量检出，8-35）与 `stock` 之前量城的工作树；再领一棵留着的树不量，留着的各棵也不相加。
@@ -79,7 +80,7 @@ impl WorktreeLease {
   索引与分支头一致是这条的关键：路径收窄的检出只改 scope 内的索引项，scope 外的索引项若留在上一次 run 的提交上（分支刚随干线快进），下一次按 scope 暂存的提交会把干线在别处的改动悄悄退回去；若是某次 run 在 scope 外暂存过、却没有献出的路径，它会搭下一次献出进提交。所以重读的条件是「索引写成的树不是分支头的树」，而不是「分支动过」：后者漏掉第二种。先比后读，因为整份重读要走整棵树，而分支与索引都停在上一次 run 留下之处的再领最常见；比较用 `Index::write_tree`，索引的树缓存完整时它不必哈希就给出根。
   否决 skip-worktree 位：所用 git2 版本所带的 libgit2 在 `Index::update_all` 里不认这一位，置了位、盘上又没有的文件会被记成删除。
   否决首次放置也只检出 scope：`Worktree::add` 总做一次全量检出，所用 git2 版本没有把 `checkout_options` 暴露成安全接口，而本 crate 禁 `unsafe`；重开的条件是 git2 暴露它。首次放置不在人等的时候检出，靠的是备树（8-35），不是缩小检出。
-  进程在 run 中途死掉会留下锁：一个城只有一个写者，所以新写者一拿到 `JsonlLedger` 就由 `lift_abandoned_leases` 解开全部锁——此时任何锁都不可能属于活着的 run。
+  进程在 run 中途死掉会留下锁。拿到 `JsonlLedger` 的独占权证明城的旧写者已结束，`lift_abandoned_leases` 只解开登记在城的工作树目录内的锁，包括备树。人的其它工作树可同时由另一进程持有。
   `E_WORKTREE_BUSY` 因此恒表示「锁着」，也就是有人正在用；登记在册但目录不存在即 prune 后重建，与 index 的「存疑即重建」同一反射。
   否决「释放即 prune 并删目录」：它让同一节点的下一次 run 重新量整个城并全量检出，代价随城的大小涨，而节点的分支本来就留着。
 - **开城清扫上一次服务留下的树（`storage::worktree::sweep`）**：租约的树在一次服务期间留在盘上给同名的下一次领用；开城时没有任何 run 持有树（账本的独占锁），
@@ -95,9 +96,10 @@ impl WorktreeLease {
 - **路径不入历史**：`worktree_opened` 载荷只携 name 与字节数。绝对路径是一台机器自己的事实，写进账本会使一本能搬到另一台机器的历史带上搬不走的东西。
 - **merge 只走 fast-forward**：trunk 在节点分枝之后动过即 `MergeStale`（→`E_VERSION_CONFLICT`），不由机器把一份活重放到别人的活上面——能说出「这份活是否仍然适用」的是做它的人。拒后城内文件逐字节不变（一条断言）。
 - **合并不覆盖城市目录**：`plan_merge` 以 libgit2 SAFE 策略对节点 tree 做一次 dry-run 检出，基线是当前干线；人改过未提交、且合并要改或删的被跟踪文件，以及挡在新路径上的未跟踪文件，都是冲突，合并以 `MergeWouldDiscard { paths }`（→`E_VERSION_CONFLICT`，恢复：提交或挪开这些改动再合）拒绝，列出全部路径。`apply` 先写不挪指针的 merge commit，再以 SAFE 检出，最后用 compare-and-swap 把干线移到它上面；从不强制检出。不选「只移分支、不碰目录」：那样城市目录与干线不一致，下一次 checkpoint 会把节点的改动当成人撤销了它们。
+- 自动评审的输入固定在请求记下的提交。分支在评审后前移时，发布入口只接受请求中的版本；干线在计划与执行之间前移时，本次计划失效，工作区文件与干线引用都保持原样。
 - **落地的形状是真合并提交**：`apply` 造一个
   **双亲**提交（trunk 当前提交在前、节点提交在后），树取节点的树，消息为
-  `<subject>\n\n<trailers>`。**判定不受此影响**——仍然只在 fast-forward 时才允许，
+  `<subject>\n\n<trailers>`。**判定不受此影响**——普通 run 的无冲突改动可三方合并，已评审的快照须基于当前干线；干线已前进且可合并时，重新开单评审合并后的快照，
   refusal 仍在 `plan_merge` 里发生；合并因此在
   `git log` 里是一件事，而不是一次无声的指针移动。否决纯指针移动，因为
   那样合并没有自己的消息，也就没有地方挂 trailers 与 `Reviewed-by:`。
@@ -234,3 +236,25 @@ theorem opening_a_city_leaves_only_the_stock (h : Home) :
   refine ⟨fun n => by simp [sweep], rfl⟩
 
 end Storage.Worktree
+
+/-! D96. A project's repository owns the Git database under the private city's
+reserved projects directory. A project is identified by its top-level building address.
+Each run leases a worktree named by its run ID. The project trunk stages only that
+building from the private city. Project repositories share neither their index nor a
+trunk ref. A private writer index is seeded from the committed tree. Uncommitted
+changes to another index cannot enter a run's checkpoint. -/
+
+/-! Registration selects a committed source revision. A private checkout reads its tree
+through a temporary object database and the building's scanned adoption checkpoint is
+bound to the native commit. The source index, working tree and refs remain untouched.
+Publication takes a reviewed merge, a destination repository, a baseline branch and
+a new contribution branch. The native baseline and contribution refs are checked under
+Git's reference locks. The destination baseline must descend from the registered native
+commit. Only the reviewed merge's delta from its first parent enters the contribution.
+The verified ledger names the project and merge; private conversation records stay private.
+The private review ref is durable even when the run checkout has been reclaimed. -/
+
+/-! A pending ref pins a prepared two-parent merge before its ledger entry. Publication
+of the trunk follows that entry. On reopening a project, an absent entry discards the
+intent; a verified entry finishes the checkout and compare-and-swap from the first parent.
+The reviewed receipt and the trunk can thus be reconstructed across a process exit. -/

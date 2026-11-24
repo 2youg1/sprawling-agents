@@ -45,7 +45,31 @@ impl Links {
 }
 
 impl Worktrees {
+    fn stock_guard(&self) -> Result<Option<std::fs::File>, StorageError> {
+        let path = self.repo.commondir().join("sprawling-stock.lock");
+        let failed = |source| StorageError::Io {
+            op: "reserve the spare worktree",
+            path: path.clone(),
+            source,
+        };
+        let file = std::fs::OpenOptions::new()
+            .create(true)
+            .read(true)
+            .write(true)
+            .truncate(false)
+            .open(&path)
+            .map_err(failed)?;
+        match file.try_lock() {
+            Ok(()) => Ok(Some(file)),
+            Err(std::fs::TryLockError::WouldBlock) => Ok(None),
+            Err(std::fs::TryLockError::Error(source)) => Err(failed(source)),
+        }
+    }
+
     pub fn stock(&self) -> Result<FileWork, StorageError> {
+        let Some(_exclusive) = self.stock_guard()? else {
+            return Ok(FileWork::default());
+        };
         match self.stock_standing()? {
             Stock::Absent => self.place_stock(),
             Stock::Busy => Ok(FileWork::default()),
@@ -62,11 +86,15 @@ impl Worktrees {
         name: &WorktreeName,
         city: &Weight,
     ) -> Result<Option<WorktreeLease>, StorageError> {
+        let Some(_exclusive) = self.stock_guard()? else {
+            return Ok(None);
+        };
         let Stock::Ready(_, links) = self.stock_standing()? else {
             return Ok(None);
         };
         let target = self.home.join(name.as_str());
         crate::alias::WriteTarget::within("place a worktree", &self.city_root, &target)?;
+        let _registry = self.registry()?;
         self.branch_at_trunk(name)?;
         match std::fs::rename(&links.tree, &target) {
             Ok(()) => {}
@@ -85,6 +113,7 @@ impl Worktrees {
             .map_err(|err| git("find a taken stock", name.as_str(), &err))?;
         let lease = self.reattach(name, &tree, &[])?;
         Ok(Some(WorktreeLease {
+            owner: self.city_root.clone(),
             work: FileWork {
                 walked: lease.work.walked.saturating_add(city.walked),
                 ..lease.work
@@ -172,6 +201,7 @@ impl Worktrees {
     }
 
     fn refresh_stock(&self, tree: &git2::Worktree) -> Result<FileWork, StorageError> {
+        let _registry = self.registry()?;
         tree.lock(Some(STOCKING))
             .map_err(|err| git("lock the stock", STOCK, &err))?;
         let trunk = self
@@ -305,9 +335,7 @@ mod tests {
         for files in [32, 64] {
             let dir = tempfile::tempdir().unwrap();
             let trees = bulk_city(dir.path(), files);
-            let city = entries(dir.path());
             let stocked = trees.stock().unwrap();
-            let city_at_claim = entries(dir.path());
             let placed = trees.claim(&name("node-1"), &["bulk".to_owned()]).unwrap();
             assert_eq!(
                 (
@@ -318,11 +346,11 @@ mod tests {
                 (
                     FileWork {
                         created: files,
-                        walked: city,
+                        walked: 0,
                         ..FileWork::default()
                     },
                     FileWork {
-                        walked: city_at_claim + entries(placed.path()),
+                        walked: entries(placed.path()),
                         ..FileWork::default()
                     },
                     files,

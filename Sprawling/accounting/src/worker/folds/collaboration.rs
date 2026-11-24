@@ -89,9 +89,9 @@ impl CollaborationFold {
                     }
                 }
             }
-            EventKind::PrOpened => self
-                .requests
-                .push(collab::OpenRequest::from_payload(record.data())?),
+            EventKind::PrOpened => {
+                collab::OpenRequest::from_payload(record.data())?.file(&mut self.requests)
+            }
 
             EventKind::PrMerged => {
                 let branch = record.data().read::<collab::MergedRequest>()?.branch;

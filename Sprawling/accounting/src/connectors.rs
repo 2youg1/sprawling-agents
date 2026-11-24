@@ -14,6 +14,8 @@ pub trait Connectors {
         resolve: &gateway::SecretResolver,
     ) -> Result<(Vec<agent_protocols::McpTool>, Reached), AxError>;
 
+    fn release_root(&self, _write_root: &std::path::Path) {}
+
     fn invalidate(&self, reference: &kernel::SecretRef);
 }
 

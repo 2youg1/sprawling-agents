@@ -42,6 +42,7 @@ pub(crate) fn drive_run<L: Ledger>(
     context: DriveContext,
 ) -> Result<Driven, AxError> {
     let Driving {
+        city_root,
         mut adapter,
         bench,
         signals,
@@ -75,9 +76,10 @@ pub(crate) fn drive_run<L: Ledger>(
     };
     let declared = bench.declared_writes();
 
-    let mut checkpoint_handle = storage::Checkpoint::open_writer(&write_root, run_id)
-        .map_err(storage::StorageError::into_ax)?
-        .with_entropy_allowlist(checkpoint_entropy_allow);
+    let mut checkpoint_handle =
+        storage::ProjectRepository::run_checkpoint(&city_root, &write_root, run_id, of.actor())
+            .map_err(storage::StorageError::into_ax)?
+            .with_entropy_allowlist(checkpoint_entropy_allow);
 
     let checkpointing = Checkpointing::opened();
     let asking = std::cell::RefCell::new(Interrupting {

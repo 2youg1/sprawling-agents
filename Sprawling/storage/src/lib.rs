@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Effect side of persistence: Ledger on disk, CAS, in-memory derived
-//! views, git checkpoints, queues. Implements kernel ports; holds no
-//! policy.
-
 mod error;
 
 pub use error::StorageError;
@@ -29,8 +25,6 @@ pub use jsonl::{CheckedLine, LineCheck, LineFault, read_line};
 pub use jsonl::{JsonlLedger, OpenReport, TailTruncation, ledger_segments_at, read_raw_lines_at};
 pub use jsonl::{TailLine, TailLines};
 
-// The projection the Ledger lays down beside each building: one file per
-// room, disposable, read by nobody in the product (`Sprawling/storage/spec/Sessions.lean` §8-24).
 mod sessions;
 
 pub use sessions::Sessions;
@@ -40,6 +34,9 @@ mod fault_fs;
 
 #[cfg(any(test, feature = "fault"))]
 pub use fault_fs::{FaultFs, FaultPlan, TornTail};
+
+mod project;
+pub use project::{ProjectRepository, SourceSnapshot};
 
 mod bundle;
 
@@ -115,11 +112,11 @@ pub use digest_cache::DigestCache;
 mod worktree;
 
 pub use worktree::FileWork;
-pub use worktree::Landing;
-pub use worktree::PlannedMerge;
 pub use worktree::WorktreeLease;
 pub use worktree::WorktreeName;
 pub use worktree::Worktrees;
+pub use worktree::{Landing, LandingRecord};
+pub use worktree::{PlannedMerge, ReviewPlan};
 
 mod checkpoint;
 

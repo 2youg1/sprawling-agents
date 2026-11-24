@@ -192,7 +192,9 @@ mod tests {
         });
         let torn = seen
             .iter()
-            .filter(|bytes| bytes.as_slice() != b"*\n")
+            .filter(|bytes| {
+                bytes.as_slice() != format!("*\n!{}\n", crate::spine_files::HANDOFF_FILE).as_bytes()
+            })
             .count();
         assert_eq!(
             (seen.len(), torn, refused),

@@ -31,7 +31,7 @@ pub fn ask<R: BufRead, W: Write>(
     )?;
     writeln!(
         out,
-        "  a folder you type becomes a city around your work, and your files stay as they are"
+        "  select a workspace for private sessions; use `sprawling project register` to bring in a repository"
     )?;
     write!(out, "> ")?;
     out.flush()?;
@@ -253,7 +253,7 @@ mod tests {
             _ => panic!("a path is a folder to use"),
         }
         assert!(
-            drawn.contains("your files stay as they are"),
+            drawn.contains("private sessions") && drawn.contains("sprawling project register"),
             "the screen has to say what will happen to their work: {drawn}"
         );
     }

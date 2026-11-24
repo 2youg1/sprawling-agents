@@ -23,7 +23,7 @@ impl OpenRuns {
     pub(super) fn observe(&mut self, record: &EventRecord) {
         let run = record.run();
         let kind = record.kind();
-        if kind == EventKind::RunStarted {
+        if matches!(kind, EventKind::RunStarted | EventKind::WorktreeOpened) {
             self.open.insert(
                 run,
                 Open {

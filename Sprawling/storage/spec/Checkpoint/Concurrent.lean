@@ -33,7 +33,7 @@ impl Checkpoint {
     /// `<root>/.sprawling/index/<run>`（`git2::Index::open` 加 `Repository::set_index`）。
     /// 文件不在时从仓库的 index 复制一份，于是第一道检查点仍按 stat 跳过没变的文件，
     /// 而不是为写域里的每个文件求一次哈希。没有仓库即 `StorageError::Checkpoint`：
-    /// 写者不建仓库，仓库在开城时由 `Checkpoint::open` 建一次。
+    /// 第一次领取写者时建立检查点仓库；开城与开启会话不建仓库。
     pub fn open_writer(root: &Path, writer: RunId) -> Result<Checkpoint, StorageError>;
     /// 写者的 run 落地后删掉它的 index 文件；不在即成功；`open` 开的句柄什么也不删。
     pub fn close_writer(self) -> Result<(), StorageError>;
