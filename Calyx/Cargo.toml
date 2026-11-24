@@ -5,7 +5,6 @@ edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 repository.workspace = true
-homepage.workspace = true
 readme = "README.md"
 publish.workspace = true
 description = "Calyx, the production terminal shell for sprawling and Mei."
