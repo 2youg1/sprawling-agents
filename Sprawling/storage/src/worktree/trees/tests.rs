@@ -174,6 +174,27 @@ fn a_city_with_no_checkpoint_is_told_why_it_cannot_have_a_tree() {
 }
 
 #[test]
+fn a_landing_plan_cannot_replace_a_trunk_that_advanced_after_review() {
+    let dir = tempfile::tempdir().unwrap();
+    let trees = city(dir.path());
+    let node = trees.claim(&name("node-1"), &[]).unwrap();
+    let plan = trees.plan_merge(node.name()).unwrap();
+    let other = dir.path().join("lab").join("other.md");
+    std::fs::write(&other, b"independent work").unwrap();
+    let landed = Checkpoint::open(dir.path())
+        .unwrap()
+        .land(&[], TimeMs::new(3_000), &owner(), "independent change")
+        .unwrap();
+    let rejected = plan.apply(&landing(4_000, &owner(), false)).unwrap_err();
+    assert_eq!(rejected.into_ax().code(), &kernel::AxCode::VersionConflict);
+    assert_eq!(std::fs::read(other).unwrap(), b"independent work");
+    assert_eq!(
+        trees.repo.head().unwrap().target().unwrap().to_string(),
+        landed.oid.to_string()
+    );
+}
+
+#[test]
 fn a_verified_node_lands_in_the_city_and_a_stale_one_is_sent_back() {
     let dir = tempfile::tempdir().unwrap();
     let trees = city(dir.path());
