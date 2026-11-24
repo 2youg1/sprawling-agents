@@ -20,6 +20,31 @@ release notes and their commits.
 
 ---
 
+## v0.18.0-261125
+
+Wire moves from 80 to 82, including workspace operations and request-correlated conversation receipts. Reload browser tabs from the previous release after upgrading. `EVENT_LOG_V` stays at 2 and the configuration formats stay at 1. Stop the city and verify a restorable backup before updating.
+
+### RefRain
+
+- **Files and conversations share a Solid 2 workspace.** Register a local folder, browse it on demand, and reopen a file at its reading position. A rename on the same volume keeps the file record, and a copy gets its own. The PDF reader attaches versioned selections, and Markdown edits write back after acceptance when the saved baseline still matches (#387).
+- **Continue a selected historical session or explicitly branch it.** Send and Steer track their own receipts and retain drafts and image crops when a request is refused. The embedded client serves its reading typeface offline (#387).
+
+### Mei and Calyx
+
+- **The terminal reflows while preserving reading and selection positions.** The transcript supports copy, foldable reasoning and Python output, image previews, Markdown tables, math and Mermaid diagrams. `/e` opens the effort menu for the next task (#376, #378).
+- **Mei keeps reading a delayed Windows response on its original connection.** A pending socket read stays within its original deadline (#389).
+
+### Project repositories
+
+- **Each project has a private city repository, and each run has its own checkout.** A lock on the original repository's index does not stop a run. The landing receipt names the reviewed merge, interrupted writes can recover, and a candidate whose target branch advanced goes back for review (#380).
+
+### Distribution and verification
+
+- **The build toolchain pins Rust 1.100.0.** The published minimum stays at 1.97. The nightly workflow runs both the desktop buffer and Calyx frame-renderer fuzz campaigns (#379).
+- The release archives cover sprawling and Mei on Windows x86-64, macOS arm64 and Linux x86-64 musl. Windows builds are unsigned. Mei executes Python on the host. Use a disposable project copy and a separate, revocable and spending-limited API key.
+
+---
+
 ## 0.17.2
 
 **sprawling 0.17.2**

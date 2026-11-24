@@ -11,7 +11,7 @@ project rules, skills and tool connections shape the workflow.
 One Rust binary serves the browser client and records the city's history in an
 append-only Ledger. The project supports long-running project work and
 experiments in agent communication, coordination and social simulation. It is
-at <!-- xtask:begin workspace_version -->0.17.2<!-- xtask:end -->; the three numbers name maturity, the whole-repository release and an individual package
+at <!-- xtask:begin workspace_version -->0.18.0<!-- xtask:end -->; the three numbers name maturity, the whole-repository release and an individual package
 release, in that order. Use the behavior in the reader's installed version when describing what
 they can do.
 

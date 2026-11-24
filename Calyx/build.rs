@@ -34,7 +34,7 @@ fn main() -> Result<(), String> {
         println!("cargo::rustc-link-lib=dylib=pthread");
         println!("cargo::rustc-link-lib=dylib=m");
     }
-    install_face(&out)?;
+    install_face(&out, &target_os)?;
     Ok(())
 }
 
@@ -97,8 +97,8 @@ fn built(here: &Path, out: &Path, zig_target: &str) -> Result<(), String> {
     ))
 }
 
-fn install_face(out: &Path) -> Result<(), String> {
-    let name = if cfg!(windows) {
+fn install_face(out: &Path, target_os: &str) -> Result<(), String> {
+    let name = if target_os == "windows" {
         format!("{FACE}.exe")
     } else {
         FACE.to_owned()
@@ -132,8 +132,18 @@ fn install_face(out: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn profile_dir(out: &Path) -> Result<PathBuf, String> {
-    out.join("../../..")
-        .canonicalize()
-        .map_err(|err| format!("resolve cargo profile dir from {}: {err}", out.display()))
+fn profile_dir(out: &Path) -> Result<&Path, String> {
+    out.ancestors()
+        .find(|path| path.ends_with("build"))
+        .and_then(Path::parent)
+        .ok_or_else(|| {
+            format!(
+                "```toml\ncode = \"E_CALYX_BUILD_PROFILE\"\n\
+                 action = \"place the Calyx executable\"\n\
+                 subject = \"Cargo OUT_DIR\"\npath = {out:?}\n\
+                 value = \"no enclosing build directory with a parent\"\n\
+                 rule = \"Cargo places build-script output under the profile build directory\"\n\
+                 fix = \"use the workspace Cargo configuration and run just dist-mei\"\n```"
+            )
+        })
 }

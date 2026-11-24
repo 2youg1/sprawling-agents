@@ -273,3 +273,15 @@ Git HEAD 查询为符号分支和分离 HEAD 共用 500 ms 截止时间，超时
 target 同一次构建绑定；②为 musl 另开 feature 跳过壳——静态 Linux 归档必须带 Calyx；
 ③继续显式 `dylib=c` 给 musl——与 `crt-static`/`static-pie` 冲突。
 -/
+
+/-! D20 Calyx 可执行文件交给 Cargo 的 profile 目录
+
+决定：工作区共用 Cargo 的目标与构建根时，构建脚本从 `OUT_DIR` 找到最近的 `build`
+祖先，将 Zig 产出的 `calyx` 安装到其父级 profile 目录。文件名由 Cargo 目标系统决定，
+Windows 目标带 `.exe`。Mei 的归档入口在同一个 profile 目录读取这份可执行文件。
+
+理由：Cargo 1.100 在 `build` 内增加了包目录，固定向上三层会写入中间产物目录。两代
+Cargo 布局的 profile 与 `build` 关系一致，按目录职责定位保留对最低支持工具链的兼容。
+被否：固定增加一层会使旧工具链生成的文件离开 profile 目录。
+验收：`just dist-mei` 后运行 `just archive-mei`，归档包含同一次构建产出的 Calyx 和 Mei。
+-/
