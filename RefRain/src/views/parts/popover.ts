@@ -5,8 +5,6 @@
 
 import type { Key } from "../../core/lang";
 
-export { default as Popover } from "./popover.svelte";
-
 export interface PopoverRow {
   readonly id: string;
   readonly label: string;

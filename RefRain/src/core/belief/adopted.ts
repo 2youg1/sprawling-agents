@@ -32,6 +32,7 @@ export function adopted(summary: RunSummary, held: RunBelief | undefined): RunBe
       started: at,
       task: held.task ?? summary.task ?? null,
       goal: held.goal ?? summary.goal ?? null,
+      sessionBegan: held.sessionBegan ?? summary.session_began ?? undefined,
       pr,
       local: false,
     };
@@ -43,6 +44,7 @@ export function adopted(summary: RunSummary, held: RunBelief | undefined): RunBe
     started: summary.started ?? held?.started ?? null,
     task: summary.task ?? held?.task ?? null,
     goal: summary.goal ?? held?.goal ?? null,
+    sessionBegan: summary.session_began ?? held?.sessionBegan ?? undefined,
     lastSeq: summary.last_seq,
     doing: summary.frozen ? frozen(summary, held) : going(summary, held),
     model: held?.model ?? null,

@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { Snippet } from "svelte";
-import type { Attachment } from "svelte/attachments";
+import type { Snippet } from "../../core/snippet";
+import type { ElementRef } from "../../core/element_ref";
 
 import type { CopyProps } from "./copy";
 
@@ -42,8 +42,8 @@ export interface CodeLook {
 
   readonly cited: number | undefined;
   readonly copy: CopyProps;
-  readonly scroller: Attachment<HTMLElement>;
-  readonly mark: Attachment<HTMLElement>;
+  readonly scroller: ElementRef<HTMLElement>;
+  readonly mark: ElementRef<HTMLElement>;
   readonly aside: Snippet | undefined;
 }
 

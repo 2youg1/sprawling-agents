@@ -14,7 +14,7 @@
 
 > **这是规格，不是描述。** 表里写的是部件欠使用者什么，代码照它实现；拆成座位与外观的部件，键、Tab 站与 `aria-*` 都由座位经接线包交给外观（`RefRain/Spec.lean` D95）。模式名与键表借鉴自哪几份文档、为什么不产生许可证义务，一处记在 `docs/third-party.md` §6，本节不复述。
 
-**判定：一个库只在它替换掉一样东西、并且同一变更集里有生产读者时才进来（由人定）。** `Tools/xtask/src/npm.rs` 的 `RUNTIME` 是这条判定的机器面——运行时依赖恰为那张表所列，名单以表为准；加一项是门机制的一次提交，与引入它的变更集分开，好让评审看见门为什么动。**平台先来**：`parts/dialog.svelte` 把模态整个交给原生 `<dialog>`（top layer、焦点陷阱、Esc、其余页面 `inert`，见设计 4-20），`parts/tip.svelte` 把 `title` 换成一个 `role="tooltip"` 的兄弟节点（设计 4-18）；平台已经提供的行为不再引一个库来提供第二遍，因为同一件事两个提供者，第一次分歧就落在键盘用户身上。今天名单上的界面库有两项：`@lucide/svelte`，它替换了 `parts/glyph.ts` 手画的那张路径表，换来人在别的软件里已经认得的图标（`docs/frontend-method.md` §4-34）；CodeMirror 6 的五个包，它替换了 RefRain 原本要手写的编辑面与行级 diff（D23）；pdf.js 与 docx-preview，它们替换了本客户端画不出的 PDF 页与 DOCX 页（D32）。引入的条件写在 7-9。
+**判定：一个库只在它替换掉一样东西、并且同一变更集里有生产读者时才进来（由人定）。** `Tools/xtask/src/npm.rs` 的 `RUNTIME` 是这条判定的机器面——运行时依赖恰为那张表所列，名单以表为准；加一项是门机制的一次提交，与引入它的变更集分开，好让评审看见门为什么动。**平台先来**：`parts/dialog` 把模态整个交给原生 `<dialog>`（top layer、焦点陷阱、Esc、其余页面 `inert`，见设计 4-20），`parts/tip` 把 `title` 换成一个 `role="tooltip"` 的兄弟节点（设计 4-18）；平台已经提供的行为不再引一个库来提供第二遍，因为同一件事两个提供者，第一次分歧就落在键盘用户身上。今天名单上的界面库有两项：`@lucide/solid`，它替换了 `parts/glyph.ts` 手画的那张路径表，换来人在别的软件里已经认得的图标（`docs/frontend-method.md` §4-34）；CodeMirror 6 的五个包，它替换了 RefRain 原本要手写的编辑面与行级 diff（D23）；pdf.js 与 docx-preview，它们替换了本客户端画不出的 PDF 页与 DOCX 页（D32）。引入的条件写在 7-9。
 -/
 
 /-!
@@ -24,14 +24,14 @@
 
 | 部件 | 角色 | `aria-*` 的确切取值 |
 |---|---|---|
-| `badge.svelte` | 无（行内文本） | 圆点 `aria-hidden="true"`；状态由词承担，颜色只重复那个词 |
-| `banner.svelte` | 实时区域 | `weight="alert"` → `role="alert"`；其余 → `role="status"` |
-| `notice.svelte` | 实时区域 | 同上；`seat` 只改画法（浮起或列在中心），不改角色。拒绝形（`action`／`code`／`subject`／`recovery`）的 `weight` 由调用方给；页面对一次落空按键的回答是 `heading`／`next` 两个 `lang.json` 键，没有码、没有折叠，取 `info`，所以是 `role="status"` |
-| `empty.svelte` | 无 | 形状 `aria-hidden="true"`；那句话与那个动作是它全部的可读内容 |
-| `progress.svelte` | `role="progressbar"` | `aria-label` 取调用方给的名字；`aria-valuemin="0"` 恒在；`total > 0` 时 `aria-valuemax="<total>"`、`aria-valuenow="<done>"`、`aria-busy="false"`，`total ≤ 0` 时这两个值一个都不写并 `aria-busy="true"` |
-| `skeleton.svelte` | `role="status"` | `aria-label`、`aria-busy="true"`；每根条 `aria-hidden="true"` |
-| `row.svelte` 的 `Row` | 无 | `onOpen` 在场时两段文字合成一个 `<button>`，右侧动作各自是独立的一站；`chosen` 的那一行在 `<li>` 上写 `aria-current="true"`，其余行不写；行本身不收键，走动由 `RowList` 承担（7-4）|
-| `kbd.svelte` 的 `Kbd` | 无 | 一个字形一个 `<kbd>`，不取焦、不收键 |
+| `badge.solid.tsx` | 无（行内文本） | 圆点 `aria-hidden="true"`；状态由词承担，颜色只重复那个词 |
+| `banner.solid.tsx` | 实时区域 | `weight="alert"` → `role="alert"`；其余 → `role="status"` |
+| `notice` | 实时区域 | 同上；`seat` 只改画法（浮起或列在中心），不改角色。拒绝形（`action`／`code`／`subject`／`recovery`）的 `weight` 由调用方给；页面对一次落空按键的回答是 `heading`／`next` 两个 `lang.json` 键，没有码、没有折叠，取 `info`，所以是 `role="status"` |
+| `empty.solid.tsx` | 无 | 形状 `aria-hidden="true"`；那句话与那个动作是它全部的可读内容 |
+| `progress.solid.tsx` | `role="progressbar"` | `aria-label` 取调用方给的名字；`aria-valuemin="0"` 恒在；`total > 0` 时 `aria-valuemax="<total>"`、`aria-valuenow="<done>"`、`aria-busy="false"`，`total ≤ 0` 时这两个值一个都不写并 `aria-busy="true"` |
+| `skeleton.solid.tsx` | `role="status"` | `aria-label`、`aria-busy="true"`；每根条 `aria-hidden="true"` |
+| `row.solid.tsx` 的 `Row` | 无 | `onOpen` 在场时两段文字合成一个 `<button>`，右侧动作各自是独立的一站；`chosen` 的那一行在 `<li>` 上写 `aria-current="true"`，其余行不写；行本身不收键，走动由 `RowList` 承担（7-4）|
+| `kbd.ts` 的 `Kbd` | 无 | 一个字形一个 `<kbd>`，不取焦、不收键 |
 -/
 
 /-!
@@ -39,26 +39,26 @@
 
 | 部件 | 模式 | 键 | 结果 |
 |---|---|---|---|
-| `button.svelte` | APG Button | Enter | 激活；`state() !== "idle"` 时 `onClick` 原地返回 |
+| `button.solid.tsx` | APG Button | Enter | 激活；`state() !== "idle"` 时 `onClick` 原地返回 |
 | | | Space | 同 Enter：平台把两个键都送进同一个 `onClick`，所以一次判定挡住指针、Enter 与 Space 三种输入 |
-| `icon_button.svelte` 只有图标的键 | APG Button | Enter／Space | 激活；`why` 在场时 `onclick` 原地返回 |
-| `path.svelte` 的显示控件（一个 `icon_button`） | APG Button | Enter／Space | 地址解析得出时发 `reveal`；解析不出时 `aria-disabled="true"`，点击落进一个空操作 |
-| `field.svelte` | 有标签的文本框（无复合模式） | 平台的单行编辑键 | 由浏览器实现，本部件不截获 |
+| `icon_button.solid.tsx` 只有图标的键 | APG Button | Enter／Space | 激活；`why` 在场时 `onclick` 原地返回 |
+| `path.solid.tsx` 的显示控件（一个 `icon_button`） | APG Button | Enter／Space | 地址解析得出时发 `reveal`；解析不出时 `aria-disabled="true"`，点击落进一个空操作 |
+| `field.solid.tsx` | 有标签的文本框（无复合模式） | 平台的单行编辑键 | 由浏览器实现，本部件不截获 |
 | | | ↑／↓（`kind="number"`） | 按 `step` 增减，由平台实现 |
-| `inspect/patch.svelte` 的行号栏（调用方给了 `talk` 地址时：检视面的 diff 与 `changes.svelte` 打开的一行） | 链接 | Enter | 把「路径:新行号」（删去的行是「路径@旧提交:旧行号」）和该行的引文接到那个地址的草稿之后，再打开那段对话；composer 挂载时从草稿门读出它。每行一站 Tab，不给 `talk` 的页面行号栏不取焦 |
-| `building/commits.svelte` 的提交行 | APG Disclosure | Enter／Space | 展开或收起这次提交的事实单与改动的文件，`aria-expanded` 随之（4-50 其二） |
+| `inspect/patch.solid.tsx` 的行号栏（调用方给了 `talk` 地址时：检视面的 diff 与 `changes.solid.tsx` 打开的一行） | 链接 | Enter | 把「路径:新行号」（删去的行是「路径@旧提交:旧行号」）和该行的引文接到那个地址的草稿之后，再打开那段对话；composer 挂载时从草稿门读出它。每行一站 Tab，不给 `talk` 的页面行号栏不取焦 |
+| `building/commits.solid.tsx` 的提交行 | APG Disclosure | Enter／Space | 展开或收起这次提交的事实单与改动的文件，`aria-expanded` 随之（4-50 其二） |
 | 提交的父提交 | APG Button | Enter／Space | 父提交在已读的页里时展开那一行；不在时就地问 `Query::Commit` 并画出谁写了它 |
 | 提交列表头部的 oid 框 | 有标签的文本框 | Enter | 问 `Query::Commit { oid }`；框里不是一个 oid 时不发问，框下说为什么 |
-| `building/status.svelte` 的改动行 | APG Button | Enter／Space | 在右侧打开这个文件的工作树版本（4-50 其三）；右侧关上时焦点回到这一行（7-7） |
-| 改动行与提交文件的「取回」 | APG Button，打开 `dialog.svelte` | Enter／Space | 先问一次（7-3 的 dialog）；确认才发 `restore_file`，取消或 Esc 时焦点回到「取回」 |
-| `building/plan.svelte` 的计划行 | APG Disclosure | Enter／Space | 展开或收起这个节点的花费（4-50 其六） |
-| `building/sandbox.svelte` 的保存 | APG Button | Enter | 整值发 `configureSandbox`；燃料不是正整数时按不动，`why` 说为什么 |
+| `building/status.solid.tsx` 的改动行 | APG Button | Enter／Space | 在右侧打开这个文件的工作树版本（4-50 其三）；右侧关上时焦点回到这一行（7-7） |
+| 改动行与提交文件的「取回」 | APG Button，打开 `dialog` | Enter／Space | 先问一次（7-3 的 dialog）；确认才发 `restore_file`，取消或 Esc 时焦点回到「取回」 |
+| `building/plan.solid.tsx` 的计划行 | APG Disclosure | Enter／Space | 展开或收起这个节点的花费（4-50 其六） |
+| `building/sandbox.solid.tsx` 的保存 | APG Button | Enter | 整值发 `configureSandbox`；燃料不是正整数时按不动，`why` 说为什么 |
 
-`button.svelte` 的 `aria-*`：`aria-disabled` 在 `loading` 或 `why` 在场时为 `"true"`，`aria-busy` 只在 `loading` 时为 `"true"`，`why` 在场时 `aria-describedby` 指向 `Tip` 的 id。**用 `aria-disabled` 而不是 `disabled`**：控件因此留在 Tab 序列里，键盘到得了它，读屏也读得到它为什么按不动。调用方给了 `name` 时键的可访问名字是 `name`（写成 `aria-label`），面子仍是 `label`：行内动作的面子可以只是动词（「忘掉」），名字仍带行首文字已指出的对象（「忘掉 Firefox · Windows」），因为行的主文字不在键自己的名字里（4-57b）。
+`button.solid.tsx` 的 `aria-*`：`aria-disabled` 在 `loading` 或 `why` 在场时为 `"true"`，`aria-busy` 只在 `loading` 时为 `"true"`，`why` 在场时 `aria-describedby` 指向 `Tip` 的 id。**用 `aria-disabled` 而不是 `disabled`**：控件因此留在 Tab 序列里，键盘到得了它，读屏也读得到它为什么按不动。调用方给了 `name` 时键的可访问名字是 `name`（写成 `aria-label`），面子仍是 `label`：行内动作的面子可以只是动词（「忘掉」），名字仍带行首文字已指出的对象（「忘掉 Firefox · Windows」），因为行的主文字不在键自己的名字里（4-57b）。
 
-`icon_button.svelte` 的 `aria-*`：名字恒为 `aria-label`，取调用方给的 `label`；它的 `Tip` 在键可用时画同一个名字，不可用时画 `why`；`aria-describedby` 只在 `why` 在场时指向 `Tip`，因为可用时提示与名字是同一句，再读一遍只是重复；`aria-disabled` 恰在 `why` 在场时为 `"true"`。名字经 `Tip` 画出而不是写进 `title`，因为 `title` 键盘到不了、触屏看不见（设计 4-18）。键画在 `control-sm` 的方框里；`pointer: coarse` 下命中区由 `::before` 扩到 `--spacing-touch`（44），画出的方框不变（`docs/frontend-method.md` §4-34）。
+`icon_button.solid.tsx` 的 `aria-*`：名字恒为 `aria-label`，取调用方给的 `label`；它的 `Tip` 在键可用时画同一个名字，不可用时画 `why`；`aria-describedby` 只在 `why` 在场时指向 `Tip`，因为可用时提示与名字是同一句，再读一遍只是重复；`aria-disabled` 恰在 `why` 在场时为 `"true"`。名字经 `Tip` 画出而不是写进 `title`，因为 `title` 键盘到不了、触屏看不见（设计 4-18）。键画在 `control-sm` 的方框里；`pointer: coarse` 下命中区由 `::before` 扩到 `--spacing-touch`（44），画出的方框不变（`docs/frontend-method.md` §4-34）。
 
-`field.svelte` 的 `aria-*`：`<label for>` 给名字（`labelling="hidden"` 只把标签移出视线，名字仍在）；`aria-invalid` 恒等于 `error !== undefined`；`aria-describedby` 是调用方的 `describedBy` 与本格说明段 id 的并集，**错误替换说明而不是叠在它上面**，错误段自己带 `role="alert"`。红边有两条权威且说的是两件事：`error` 是城的回答，一到就红；`:user-invalid` 是浏览器读 `type` 与 `pattern` 的结果，失焦后才红。
+`field.solid.tsx` 的 `aria-*`：`<label for>` 给名字（`labelling="hidden"` 只把标签移出视线，名字仍在）；`aria-invalid` 恒等于 `error !== undefined`；`aria-describedby` 是调用方的 `describedBy` 与本格说明段 id 的并集，**错误替换说明而不是叠在它上面**，错误段自己带 `role="alert"`。红边有两条权威且说的是两件事：`error` 是城的回答，一到就红；`:user-invalid` 是浏览器读 `type` 与 `pattern` 的结果，失焦后才红。
 -/
 
 /-!
@@ -66,16 +66,16 @@
 
 | 部件 | 模式 | 键 | 结果 |
 |---|---|---|---|
-| `tip.svelte` | APG Tooltip | Escape | 撤下提示，指针或焦点还停着时也不回来，下一次移入或聚焦再唤回（WCAG 1.4.13）|
-| `dialog.svelte` | APG Modal Dialog | Tab／Shift+Tab | 在对话框内循环，由平台实现 |
+| `tip` | APG Tooltip | Escape | 撤下提示，指针或焦点还停着时也不回来，下一次移入或聚焦再唤回（WCAG 1.4.13）|
+| `dialog` | APG Modal Dialog | Tab／Shift+Tab | 在对话框内循环，由平台实现 |
 | | | Escape | 平台发 `cancel`，本部件 `preventDefault()` 后回调 `onCancel`——默认行为会绕过调用方关掉元素，而 `open` 还说着开着 |
-| `kbd.svelte` 的 `Cheatsheet`（`seat="modal"`） | APG Modal Dialog，原生 `<dialog>` 加 `showModal()` | Tab／Shift+Tab | 在表内循环，由平台实现 |
-| | | Escape | 平台发 `cancel`，本部件 `preventDefault()` 后回调 `onClose`；外壳 `app.svelte` 的按键处理器在同一次 Escape 上也调 `closeSheet`，两条路落到同一个关闭 |
-| `kbd.svelte` 的 `Cheatsheet`（`seat="specimen"`） | 无：`#/gallery` 的标本，`<dialog open>` 留在折页的流里 | 无 | 不取焦、不令页面 `inert`、不收 Escape——那条路由上没有人向它提问，进 top layer 只会盖住每一个折页 |
+| `kbd.ts` 的 `Cheatsheet`（`seat="modal"`） | APG Modal Dialog，原生 `<dialog>` 加 `showModal()` | Tab／Shift+Tab | 在表内循环，由平台实现 |
+| | | Escape | 平台发 `cancel`，本部件 `preventDefault()` 后回调 `onClose`；外壳 `app_controller.ts` 的按键处理器在同一次 Escape 上也调 `closeSheet`，两条路落到同一个关闭 |
+| `kbd.ts` 的 `Cheatsheet`（`seat="specimen"`） | 无：`#/gallery` 的标本，`<dialog open>` 留在折页的流里 | 无 | 不取焦、不令页面 `inert`、不收 Escape——那条路由上没有人向它提问，进 top layer 只会盖住每一个折页 |
 
-`tip.svelte` 的 `aria-*`：提示节点是 `role="tooltip"`，id 交给调用方（调用方也可以经 `id` 自己定这个 id：拆成座位与外观的部件由座位定 id、写进接线包，外观只把同一个 id 交给提示）——控件自己有可见文字时写 `aria-describedby`，这句话就是它唯一的名字时写 `aria-labelledby`。**组件不猜**，因为只有调用点知道控件有没有名字。显示由 `:hover` 与 `:focus-within` 触发，延迟 300 ms；提示自己 `pointer-events-none`，永不取焦。
+`tip` 的 `aria-*`：提示节点是 `role="tooltip"`，id 交给调用方（调用方也可以经 `id` 自己定这个 id：拆成座位与外观的部件由座位定 id、写进接线包，外观只把同一个 id 交给提示）——控件自己有可见文字时写 `aria-describedby`，这句话就是它唯一的名字时写 `aria-labelledby`。**组件不猜**，因为只有调用点知道控件有没有名字。显示由 `:hover` 与 `:focus-within` 触发，延迟 300 ms；提示自己 `pointer-events-none`，永不取焦。
 
-`dialog.svelte` 的 `aria-*`：`aria-labelledby` 指向标题，`aria-describedby` 指向说明段**且仅在 `detail` 在场时才写**。取焦由文档顺序决定：平台取对话框内第一个可聚焦控件，而取消按钮写在确认按钮之前，所以撤不回来的那一问把安全的答案放在手下。**点 `::backdrop` 不关闭**：撤不回来的那一问不该被一次落在外面的点击答掉。
+`dialog` 的 `aria-*`：`aria-labelledby` 指向标题，`aria-describedby` 指向说明段**且仅在 `detail` 在场时才写**。取焦由文档顺序决定：平台取对话框内第一个可聚焦控件，而取消按钮写在确认按钮之前，所以撤不回来的那一问把安全的答案放在手下。**点 `::backdrop` 不关闭**：撤不回来的那一问不该被一次落在外面的点击答掉。
 -/
 
 /-!
@@ -83,24 +83,24 @@
 
 | 部件 | 模式 | 键 | 结果 |
 |---|---|---|---|
-| `segmented.svelte` | APG Radio Group（roving tabindex） | Tab／Shift+Tab | 进出控件；控件在 Tab 序列里只占一站 |
+| `segmented.solid.tsx` | APG Radio Group（roving tabindex） | Tab／Shift+Tab | 进出控件；控件在 Tab 序列里只占一站 |
 | | | → | 移到下一个可选格并选中它，走到末端回到开头 |
 | | | ← | 移到上一个可选格并选中它，走到开头回到末端 |
 | | | ↓／↑ | 同 →／← |
 | | | Space | 选中当前聚焦格；不可选的格上什么都不选 |
 | | | Enter | 由平台的按钮激活走到点击，与点击同一条路；键表不另答它，免得选两次 |
-| `tabs.svelte` | APG Tabs（自动激活） | → | 下一个透镜并立即切换，走到末端回到开头 |
+| `tabs.solid.tsx` | APG Tabs（自动激活） | → | 下一个透镜并立即切换，走到末端回到开头 |
 | | | ← | 上一个透镜并立即切换，走到开头回到末端 |
 | | | Home／End | 第一个／最后一个透镜并立即切换 |
 | | | Space／Enter | 与点击同一条路；因为切换已跟随焦点，它们不额外做事 |
-| `row.svelte` 的 `RowList` | 无 APG 部件模式：一串各自可达的行，加上方向键 | ↓／↑ | 走到下一／上一行，焦点落在那一行第一个可达控件上；**两端不环绕**——一本上千行的账本从末行跳回首行，是把人移到了他看不出自己去过的地方 |
+| `row.solid.tsx` 的 `RowList` | 无 APG 部件模式：一串各自可达的行，加上方向键 | ↓／↑ | 走到下一／上一行，焦点落在那一行第一个可达控件上；**两端不环绕**——一本上千行的账本从末行跳回首行，是把人移到了他看不出自己去过的地方 |
 | | | Home／End | 第一／最后一行的第一个可达控件 |
 | | | 落在文本框、`<select>` 或可编辑区域上的同一批键 | 不接管：那些键在那个控件里已经有意思了 |
 | | | Tab | 照旧逐行走——**每一行仍是一个 Tab 站，方向键是加法不是替换** |
 
-`segmented.svelte` 的 `aria-*`：轨道 `role="radiogroup"` ＋ `aria-label`；每格 `role="radio"`、`aria-checked` 等于「这一格就是 `held`」、`why` 在场时 `aria-disabled="true"` 并 `aria-describedby` 指向 `Tip`。**Tab 序列里的那一站由 `tabStop` 独家决定**：选中格；无选中时第一个可选格；全部被拒时第 0 格（那格的原因还得读得到）；空控件一站都没有。选择跟随焦点，所以不可选的格被 `nextStop` 跳过——落在上面就等于选中它。
+`segmented.solid.tsx` 的 `aria-*`：轨道 `role="radiogroup"` ＋ `aria-label`；每格 `role="radio"`、`aria-checked` 等于「这一格就是 `held`」、`why` 在场时 `aria-disabled="true"` 并 `aria-describedby` 指向 `Tip`。**Tab 序列里的那一站由 `tabStop` 独家决定**：选中格；无选中时第一个可选格；全部被拒时第 0 格（那格的原因还得读得到）；空控件一站都没有。选择跟随焦点，所以不可选的格被 `nextStop` 跳过——落在上面就等于选中它。
 
-`tabs.svelte` 的 `aria-*`：`role="tablist"` ＋ `aria-label`；每个 `role="tab"`、`aria-selected` 等于「这就是 `current`」、`tabindex` 只给当前那个 `0`（`current` 不在透镜里时给第一个，页签带不会没有入口）。每个透镜都有一个 `role="tabpanel"` 包装，`aria-labelledby` 指向它的页签，页签的 `aria-controls` 指回它，两边的 `id` 都按实例加前缀；只有当前那个不带 `hidden`。**显示着的面板里没有 Tab 能到达的元素时，面板自己带 `tabindex="0"`**（APG Tabs 的建议）：一段纯文字的面板仍能被键盘走到并读出；面板里一出现控件，下一站就是那个控件，面板不再占一站。这些取值都由 `tabs.ts` 的 `lookOf` 写进接线包，外观只展开它们。自动激活是 APG 对「面板内容已在本地、切换无可察延迟」的推荐读法，本客户端三个使用者都满足它。
+`tabs.solid.tsx` 的 `aria-*`：`role="tablist"` ＋ `aria-label`；每个 `role="tab"`、`aria-selected` 等于「这就是 `current`」、`tabindex` 只给当前那个 `0`（`current` 不在透镜里时给第一个，页签带不会没有入口）。每个透镜都有一个 `role="tabpanel"` 包装，`aria-labelledby` 指向它的页签，页签的 `aria-controls` 指回它，两边的 `id` 都按实例加前缀；只有当前那个不带 `hidden`。**显示着的面板里没有 Tab 能到达的元素时，面板自己带 `tabindex="0"`**（APG Tabs 的建议）：一段纯文字的面板仍能被键盘走到并读出；面板里一出现控件，下一站就是那个控件，面板不再占一站。这些取值都由 `tabs.ts` 的 `lookOf` 写进接线包，外观只展开它们。自动激活是 APG 对「面板内容已在本地、切换无可察延迟」的推荐读法，本客户端三个使用者都满足它。
 -/
 
 /-!
@@ -108,14 +108,14 @@
 
 | 部件 | 模式 | 键 | 结果 |
 |---|---|---|---|
-| `combobox.svelte` | APG Combobox（listbox 弹层） | ↓／↑ | 游标下移／上移一行，钳在列表两端 |
+| `combobox` | APG Combobox（listbox 弹层） | ↓／↑ | 游标下移／上移一行，钳在列表两端 |
 | | | Home／End | 游标到首行／末行 |
 | | | Enter | 采纳游标行，关闭弹层，焦点回触发器 |
 | | | Escape | 关闭弹层，清空过滤词，焦点回触发器 |
 | | | Tab | 关闭弹层，焦点照常离开 |
 | | | 可打印字符 | 过滤，并把游标复位到第 0 行 |
 | | | 输入法组字时的任何键（`isComposing` 为真） | 归输入法：键表不答、不 `preventDefault`，游标、弹层与生效的值都不动（D99）|
-| `popover.svelte` | 多列 listbox，装在 `role="dialog"` 里 | ↓／↑ | 当前列的游标下移／上移，钳在两端 |
+| `popover` | 多列 listbox，装在 `role="dialog"` 里 | ↓／↑ | 当前列的游标下移／上移，钳在两端 |
 | | | Home／End | 当前列的首行／末行 |
 | | | Tab／Shift+Tab | **换列**（环绕）并把游标复位到第 0 行——本部件在此覆盖平台的 Tab |
 | | | Enter | 应用当前列的游标行，回调 `onApply` |
@@ -123,15 +123,15 @@
 
 这张键表只有一处：`parts/combobox.ts` 的 `answer`。
 
-`combobox.svelte` 的 `aria-*`（规格）：文本框是 `role="combobox"`，带 `aria-expanded`、`aria-controls` 指向列表、`aria-activedescendant` 指向游标行；列表 `role="listbox"` ＋ `aria-label`；每行 `role="option"`，`aria-selected` 只标**已选中的那个值**，不标游标。
+`combobox` 的 `aria-*`（规格）：文本框是 `role="combobox"`，带 `aria-expanded`、`aria-controls` 指向列表、`aria-activedescendant` 指向游标行；列表 `role="listbox"` ＋ `aria-label`；每行 `role="option"`，`aria-selected` 只标**已选中的那个值**，不标游标。
 
-`popover.svelte` 的 `aria-*`：外层 `role="dialog"` ＋ `aria-label`；每列 `<ul role="listbox">` ＋ `aria-label`；每行 `role="option"`。`aria-selected` 表示当前生效的值，游标由持焦元素的 `aria-activedescendant` 承担。**生效的那一行画成更深的底色**（`wash-strong`），游标只在没有生效值的那一行用底色梯级（`bg-raised-hover`）：两者不互相盖过，也不需要确认键或勾选标记。游标另在行首画一道 accent 竖条，落在生效的那一行上也画：强制色去掉一切底色时边框留着，所以游标不只靠颜色可见；`combobox.svelte` 的列表用同一画法。按钮触发时列表取焦，`tabindex` 只给当前列 `0`；文本框触发时调用方经 `bind` 拿走键表，焦点留在文本框，`aria-activedescendant` 写在文本框上。菜单仍存在时，两条路径都在活动行或数据变化，以及键表采纳按键后的 DOM 更新完成后，将该行滚入当前列的视口；能容纳整行时露出整行，行高超过视口时露出行首，不改变持焦元素或外层页面位置。几何规则与证明在 `RefRain/spec/Views/Parts/Popover.lean`。
+`popover` 的 `aria-*`：外层 `role="dialog"` ＋ `aria-label`；每列 `<ul role="listbox">` ＋ `aria-label`；每行 `role="option"`。`aria-selected` 表示当前生效的值，游标由持焦元素的 `aria-activedescendant` 承担。**生效的那一行画成更深的底色**（`wash-strong`），游标只在没有生效值的那一行用底色梯级（`bg-raised-hover`）：两者不互相盖过，也不需要确认键或勾选标记。游标另在行首画一道 accent 竖条，落在生效的那一行上也画：强制色去掉一切底色时边框留着，所以游标不只靠颜色可见；`combobox` 的列表用同一画法。按钮触发时列表取焦，`tabindex` 只给当前列 `0`；文本框触发时调用方经 `bind` 拿走键表，焦点留在文本框，`aria-activedescendant` 写在文本框上。菜单仍存在时，两条路径都在活动行或数据变化，以及键表采纳按键后的 DOM 更新完成后，将该行滚入当前列的视口；能容纳整行时露出整行，行高超过视口时露出行首，不改变持焦元素或外层页面位置。几何规则与证明在 `RefRain/spec/Views/Parts/Popover.lean`。
 -/
 
 /-!
 ### §7-6 表格
 
-`table.svelte` 是一张数据表，**不是 APG Grid**：它不做二维方向键导航，Tab 依次走过排序按钮、勾选框与可改单元格，Enter／Space 在排序按钮上切换方向。
+`table.solid.tsx` 是一张数据表，**不是 APG Grid**：它不做二维方向键导航，Tab 依次走过排序按钮、勾选框与可改单元格，Enter／Space 在排序按钮上切换方向。
 
 `aria-*`：`<caption class="sr-only">` 给表名；**`aria-sort` 只写在可排序的列上**，取 `"ascending"`／`"descending"`／`"none"`；表头勾选框 `aria-label` 取 `allLabel`，行勾选框取 `keyOf(row)`，可改单元格取 `"<列名> <keyOf(row)>"`。表头勾选框在部分选中时必须是 `indeterminate`——说「一个都没选」是一句假话。不可排序的列不写 `aria-sort`：那是一句关于一个排不了序的列的排序陈述。
 -/
@@ -143,17 +143,17 @@
 
 | 谁还 | 部件 | 怎么还 |
 |---|---|---|
-| 平台 | `dialog.svelte` | `close()` 按 HTML 标准把焦点还给 `showModal()` 之前持焦点的元素，本文件因此没有一行取焦代码 |
-| 状态模块 | 检视面（`views/inspect/open.svelte.ts`） | 从检视面之外打开一项时记下当时持焦点的元素；关上检视面或它最后一个页签时，焦点若在检视面里（或因面板卸载落到 `body`），交还给那个元素，它已不在页面上时不还 |
-| 部件自己 | `combobox.svelte`、`popover.svelte` | 前者记住触发按钮的 ref，`shut()` 时还；后者在 `onMount` 记下当时的 `document.activeElement`，`onCleanup` 还（`bind` 模式下焦点从未离开文本框，因此不还）|
-| 外壳 | `kbd.svelte` 的 `Cheatsheet` | `app.svelte` 在打开前记 `opener`，`closeSheet` 时还。表关上时它所在的 `{#if}` 分支连同 `<dialog>` 一起离开页面，平台的 `close()` 落在一个已摘下的元素上，外壳不把还原押在那一步上 |
-| 状态模块与外壳 | 设置面（`views/settings/hosted.svelte.ts`、`app.svelte`） | `hostSettled` 记打开者与关闭请求，路由关闭后由外壳在 `tick()` 完成时还原焦点；打开者已离开页面时不还。面与组的动效由它们自己的 CSS 承担，设置导航不启动 document view transition，避免组切换重叠或延后卸下面板。 浏览器验收先等 `DEFAULT_VIEW` 的 conversation 输入框进入 DOM，再保存并打开实际的 opener 节点，关闭后检查同一节点仍连接且持焦点；地址变化早于 view transition 的 DOM 更新，单独观察地址不能证明打开者已在目标页上。 |
+| 平台 | `dialog` | `close()` 按 HTML 标准把焦点还给 `showModal()` 之前持焦点的元素，本文件因此没有一行取焦代码 |
+| 状态模块 | 检视面（`views/inspect/open.ts`） | 从检视面之外打开一项时记下当时持焦点的元素；关上检视面或它最后一个页签时，焦点若在检视面里（或因面板卸载落到 `body`），交还给那个元素，它已不在页面上时不还 |
+| 部件自己 | `combobox`、`popover` | 前者记住触发按钮的 ref，`shut()` 时还；后者在 `onMount` 记下当时的 `document.activeElement`，`onCleanup` 还（`bind` 模式下焦点从未离开文本框，因此不还）|
+| 外壳 | `kbd.ts` 的 `Cheatsheet` | `app_controller.ts` 在打开前记 `opener`，`closeSheet` 时还。表关上时它所在的 `{#if}` 分支连同 `<dialog>` 一起离开页面，平台的 `close()` 落在一个已摘下的元素上，外壳不把还原押在那一步上 |
+| 状态模块与外壳 | 设置面（`views/settings/hosted.ts`、`app_controller.ts`） | `hostSettled` 记打开者与关闭请求，路由关闭后由外壳在 `tick()` 完成时还原焦点；打开者已离开页面时不还。面与组的动效由它们自己的 CSS 承担，设置导航不启动 document view transition，避免组切换重叠或延后卸下面板。 浏览器验收先等 `DEFAULT_VIEW` 的 conversation 输入框进入 DOM，再保存并打开实际的 opener 节点，关闭后检查同一节点仍连接且持焦点；地址变化早于 view transition 的 DOM 更新，单独观察地址不能证明打开者已在目标页上。 |
 -/
 
 /-!
 ### §7-10 这张表的机器读者
 
-**`#/gallery` 的夹具断言本节的键表**，这是让规格不止有人类读者的那一步：每个收键部件在那条路由上有一份夹具，夹具按「初始焦点 ＋ 一串按键 → 焦点落点、`aria-*` 取值、回调是否发生」逐行断言 7-2 至 7-6。夹具与断言的实现属于 `RefRain/src/views/gallery.svelte` 与 `Tools/xtask/src/render/`，本节只定内容。
+**`#/gallery` 的夹具断言本节的键表**，这是让规格不止有人类读者的那一步：每个收键部件在那条路由上有一份夹具，夹具按「初始焦点 ＋ 一串按键 → 焦点落点、`aria-*` 取值、回调是否发生」逐行断言 7-2 至 7-6。夹具与断言的实现属于 `RefRain/src/views/gallery.solid.tsx` 与 `Tools/xtask/src/render/`，本节只定内容。
 
 今天的 `xtask render` 读的是画出来的盒子与它们的名字（`Tools/xtask/Spec.lean` §8-13），**一次按键都没有进过真引擎**——在这第二个读数落地之前，本节的键表没有机器读者，这一点如实记在 §2 的「未验的」里。
 -/
@@ -294,7 +294,7 @@ theorem dropping_focus_loses_the_opener :
 
 /-! ### 模态：外面的事件从不确认（§7-3）
 
-`dialog.svelte` 取焦由文档顺序决定，取消写在确认之前，所以安全的答案在手下——这是那个文件里的一行顺序，不是这里的一条定理；Escape 由部件拦下交给 `onCancel`，点 `::backdrop` 不关闭。 -/
+`dialog` 取焦由文档顺序决定，取消写在确认之前，所以安全的答案在手下——这是那个文件里的一行顺序，不是这里的一条定理；Escape 由部件拦下交给 `onCancel`，点 `::backdrop` 不关闭。 -/
 
 /-- 一扇撤不回来的模态里的两个答复，按文档顺序。 -/
 inductive Reply where

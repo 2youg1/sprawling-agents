@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { Option, Schema } from "effect";
-import { writable } from "svelte/store";
-import type { Readable, Writable } from "svelte/store";
+import { writable } from "./store";
+import type { Readable, Writable } from "./store";
 
 import type { Key } from "./lang";
 import { reachOf, reaches } from "./staleness";

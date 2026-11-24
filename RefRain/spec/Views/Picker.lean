@@ -8,7 +8,7 @@
 
 规定 `RefRain/src/views/talk/picker.ts` 与 `picker_look.ts`（`docs/frontend-method.md` §7I，`RefRain/Spec.lean` §4-60）。TypeScript 是「怎样守住」的权威，本模型是「必须守住哪些性质」的权威；`RefRain/src/views/talk/picker.test.ts` 在 fixture 的每个可达状态上判读同样的答案。
 
-令牌是一个控件，分三段：模型 · 供应商 · 档位。指针按在哪一段，弹层就把游标放进那一段的那一节；按键激活令牌（没有段在指针下）放进第一层。弹层用 `parts/popover.svelte` 的键表（`Popover.lean` 的 `press`）：↓／↑ 在一节之内走，Tab／Shift+Tab 换节，Enter 应用，Escape 关上并把焦点还给令牌；筛选框一直持焦点，键经 `bind` 交给键表。节的顺序：最近的组合、第一层、第二层、思考档带。
+令牌是一个控件，分三段：模型 · 供应商 · 档位。指针按在哪一段，弹层就把游标放进那一段的那一节；按键激活令牌（没有段在指针下）放进第一层。弹层用 `parts/popover` 的键表（`Popover.lean` 的 `press`）：↓／↑ 在一节之内走，Tab／Shift+Tab 换节，Enter 应用，Escape 关上并把焦点还给令牌；筛选框一直持焦点，键经 `bind` 交给键表。节的顺序：最近的组合、第一层、第二层、思考档带。
 
 **哪一层在前由数量定**：按 `canonical` 合并后的模型数多于供应商数，第一层列供应商、第二层列它的模型；否则第一层列模型、第二层列它的供应商。顺序只是登记的 Endpoint 的函数，所以两次打开之间不会换。
 

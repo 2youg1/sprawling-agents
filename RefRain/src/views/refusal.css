@@ -1,0 +1,20 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+.refusal-composer,
+.refusal-foot {
+  position: fixed;
+}
+
+.refusal-composer {
+  padding-bottom: var(--spacing-snug);
+}
+
+.refusal-foot {
+  bottom: calc(var(--spacing-margin) + 8 * var(--spacing-baseline) + var(--spacing-section) * 2);
+  left: 50%;
+  width: min(var(--container-measure), calc(100vw - 2 * var(--spacing-margin)));
+  translate: -50% 0;
+}

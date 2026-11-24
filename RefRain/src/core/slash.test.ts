@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { describe, expect, test } from "bun:test";
-import { get } from "svelte/store";
+import { get } from "./store";
 
 import table from "../lang.json";
 import { Address, RunId, Seq } from "../wire";
@@ -30,10 +30,6 @@ describe("slash", () => {
     }
   });
 
-  // The defect §4.3 names: the pages label their buttons with command
-  // spellings, and a person who typed one of those labels into the box
-  // got nothing. A label and a verb are the same table or they are two,
-  // and two is how they drifted apart.
   test("every command a button is labelled with is a verb somebody can type", () => {
     for (const [key, phrase] of Object.entries(table)) {
       if (!phrase.en.startsWith("/")) {
@@ -65,8 +61,6 @@ describe("slash", () => {
 
   test("tab completes to the one match, or to the prefix every match shares", () => {
     expect(completed("/dis")).toBe("/dispatch ");
-    // `/steer` and `/stop` share only the letter already typed, so the
-    // line is returned untouched rather than silently shortened.
     expect(completed("/st")).toBe("/st");
     expect(completed("/m")).toBe("/m");
     expect(completed("/mc")).toBe("/mcp ");
@@ -77,16 +71,11 @@ describe("slash", () => {
   test("tab on a prefix it cannot lengthen takes the row the list points at", () => {
     expect(completed("/s", "/stop")).toBe("/st");
     expect(completed("/st", "/stop")).toBe("/stop ");
-    // A row that does not match what is typed is not the person's pick.
     expect(completed("/st", "/new")).toBe("/st");
     expect(completed("/zzz", "/stop")).toBe("/zzz");
   });
 });
 
-// `/new` and `/fork` are one verb with and without an origin: both send
-// the same `OpenSession`, and the difference is what the new session
-// inherits. These cases hold that seam - the picker request, the carry
-// flag, and the one place `from` is built.
 describe("new and fork", () => {
   const MOTHER = RunId.make("00000000-0000-0000-0000-000000000001");
 
@@ -110,8 +99,6 @@ describe("new and fork", () => {
     );
   }
 
-  // Every capability a verb may reach for, recording what it sent and
-  // answering `newest` for the one room named below.
   function hands(
     here: Address | null,
     newest: (room: string) => { run: RunId; at: Seq } | null,
@@ -145,16 +132,12 @@ describe("new and fork", () => {
         tagged: null,
         retag: () => false,
         whenFrozen: () => undefined,
-        // The page's branch door sends the frame and moves main only
-        // once the city opens the session (`slash_session.test.ts`).
         openSession: (room, carry) => command(openSession(room, carry, null)),
         opening: () => false,
       },
     };
   }
 
-  // What the sent frames asked the city to open, or `null` when none
-  // did. One reader, because every case below asks the same question.
   function opened(
     sent: readonly Command[],
   ): { addr: Address; carry: string; from: Origin | null } | null {
@@ -182,8 +165,6 @@ describe("new and fork", () => {
     );
   });
 
-  // A plain "hello" sent with the page's goal became a job whose goal
-  // the model answered by planning; a chat carries the words alone.
   test("a chat states no goal, and every job mode states the one it was given", () => {
     const sentGoal = (mode: "chat" | "work"): string | null => {
       const held = hands(Address.make("hall/mayor"), () => null);
@@ -246,9 +227,6 @@ describe("new and fork", () => {
     expect(held.sent).toHaveLength(0);
     expect(held.written, "the line stays for editing").toHaveLength(0);
   });
-  // Halt and Cancel are two verbs in the glossary, so they are two
-  // spellings here: `/stop` ends the run in front of the person and
-  // nothing wider, and `/halt` is the brake `/release` lifts.
   test("/stop cancels the run in front of the person and never halts", () => {
     const held = hands(Address.make("hall/mayor"), () => null, { run: MOTHER, at: Seq.make(3) });
     verb("/stop").run(held.filled, called("/stop --all"));

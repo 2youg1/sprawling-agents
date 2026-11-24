@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { describe, expect, test } from "bun:test";
-import { get } from "svelte/store";
+import { get } from "../store";
 
 import { createBelief } from "../belief";
 import type { Doing } from "../doing";
@@ -47,14 +47,10 @@ function event(
   };
 }
 
-// One record of a run, which is how this page first hears of a run the
-// city has not listed to it yet.
 function started(run: RunId, at: number): EventRecord {
   return event(run, at, "run_started", { task: "write the report" });
 }
 
-// RefRain/Spec.lean D88: the stream's route and the answer's route to a
-// run stopped at a synchronous `send`.
 describe("a run waiting for a reply", () => {
   const WAIT = { on: Address.make("lab/west"), until: TimeMs.make(90_000) };
   const AWAITING: Doing = { kind: "awaiting_reply", wait: WAIT };
@@ -91,8 +87,6 @@ describe("a run waiting for a reply", () => {
     }
   });
 
-  // A word this build was not taught is answered, and the run stays
-  // where the page last knew it.
   test("an ending this build cannot read leaves the run waiting and names the field", () => {
     const store = waiting();
     expect(

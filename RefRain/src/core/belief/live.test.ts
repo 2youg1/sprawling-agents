@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { expect, test } from "bun:test";
-import { get } from "svelte/store";
+import { get } from "../store";
 
 import { createBelief } from "../belief";
 import { newestWorking, onceFrozen } from "./live";
@@ -14,15 +14,8 @@ import type { CityAnswer, EventKind, EventRecord, RunSummary } from "../../wire"
 import { Address, B3Hash, RunId, Seq, TimeMs } from "../../wire";
 
 const RUNS = 10_000;
-// The runs still working in that city: the concurrency a city drives,
-// not the history it has kept.
 const WORKING = 4;
 const RECORDS = 2_000;
-// What one record folded and one read of the working runs may spend in
-// a city of `RUNS` runs. A read that walks the `$state` table is linear
-// in the city, about 18 ms per record at this size; the fold itself
-// costs tens of microseconds of proxy traffic whatever the city holds,
-// so the budget is set well above that and far below the walk.
 const BUDGET_US = 500;
 
 function runId(index: number): RunId {
@@ -65,8 +58,6 @@ test("reading the working runs costs the working runs, not the city", () => {
     runs: Array.from({ length: RUNS }, (_, index) => listed(index)),
   };
   store.adoptCity(city);
-  // The first half warms the folds up, so the reading is the steady cost
-  // of a record rather than the engine compiling the path.
   const records = Array.from({ length: 2 * RECORDS }, (_, each) =>
     record(each % WORKING, each + 2, "tool_result"),
   );
@@ -88,8 +79,6 @@ test("reading the working runs costs the working runs, not the city", () => {
 
 test("the newest working run of a room costs the working runs, not the city", () => {
   const store = createBelief(() => 0);
-  // Every run of the city stood in the one room, so a reader that walks
-  // the table to find the room's runs walks the whole city.
   const room = Address.make("hall/mayor");
   store.adoptCity({
     active: WORKING,
@@ -121,7 +110,6 @@ test("the newest working run of a room costs the working runs, not the city", ()
 
 test("the runs of a room cost the room, not the city", () => {
   const store = createBelief(() => 0);
-  // A city of `RUNS` runs spread over a hundred rooms under the hall.
   const rooms = 100;
   const roomOf = (index: number): Address => Address.make(`hall/r${String(index % rooms)}`);
   store.adoptCity({
@@ -193,8 +181,6 @@ test("the cancelled count costs one run a record, not the city", () => {
   expect(perRecordUs).toBeLessThanOrEqual(BUDGET_US);
 });
 
-// `/compact` opens the session that carries a run's handoff only once
-// the run has frozen: the waiting is on the record, and it runs once.
 test("what waits on a run's end runs once, when the belief holds it frozen", () => {
   const store = createBelief(() => 0);
   let ran = 0;

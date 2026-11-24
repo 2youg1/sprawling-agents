@@ -1,6 +1,3 @@
-[test]
-preload = ["./scripts/runes.ts"]
-
 # A version published less than three days ago is not resolved by
 # `bun add` or `bun update`. This is the cooldown `.github/dependabot.yml`
 # gives every other ecosystem, and that file gives the reason; it is set

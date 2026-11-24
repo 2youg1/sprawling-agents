@@ -8,6 +8,7 @@ import { Schema } from "effect";
 import {
   Address,
   B3Hash,
+  IdemKey,
   TimeMs,
 } from "./c00";
 
@@ -140,6 +141,9 @@ export const ServerFrame = Schema.Union([
   }),
   Schema.Struct({
     refusal: AxError,
+  }),
+  Schema.Struct({
+    accepted: IdemKey,
   }),
   Schema.Struct({
     delta: Delta,

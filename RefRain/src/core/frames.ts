@@ -3,26 +3,99 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import { Result, Schema, SchemaAST } from "effect";
+import { Result, Schema, SchemaAST, SchemaIssue } from "effect";
 
 import type { ClientFrame, Delta, EventRecord } from "../wire";
 import { Address, B3Hash, EventKind, RunId, ServerFrame } from "../wire";
 
-const readServerFrame = Schema.decodeUnknownResult(ServerFrame);
+const readServerFrame = Schema.decodeUnknownResult(ServerFrame, { reportInput: false });
+const fieldName = /^[a-z][a-z\d_]{0,39}$/i;
+
+interface FieldIssue {
+  readonly keys: readonly PropertyKey[];
+  readonly expected: string;
+}
+
+function fieldIssue(issue: SchemaIssue.Issue, keys: readonly PropertyKey[] = []): FieldIssue {
+  switch (issue._tag) {
+    case "Pointer":
+      return fieldIssue(issue.issue, [...keys, ...issue.path]);
+    case "Filter": {
+      const expected = issue.filter.annotations?.expected;
+      return typeof expected === "string" ? { keys, expected } : fieldIssue(issue.issue, keys);
+    }
+    case "Encoding":
+      return fieldIssue(issue.issue, keys);
+    case "Composite":
+      return fieldIssue(issue.issues[0], keys);
+    case "AnyOf": {
+      const candidates = issue.issues.map((candidate) => fieldIssue(candidate, keys));
+      return (
+        candidates.find((candidate) => candidate.keys.length > keys.length + 1) ??
+        candidates[0] ?? { keys, expected: "ServerFrame" }
+      );
+    }
+    case "Forbidden":
+    case "InvalidType":
+    case "InvalidValue":
+    case "MissingKey":
+    case "OneOf":
+    case "UnexpectedKey":
+      return { keys, expected: SchemaIssue.defaultLeafHook(issue) };
+  }
+}
 
 export function decodeFrame(text: string): ServerFrame | null {
+  const decoded = inspectFrame(text);
+  return Result.getOrNull(decoded);
+}
+
+export type FrameFailure =
+  | { readonly stage: "json"; readonly at: string | null }
+  | {
+      readonly stage: "schema";
+      readonly path: string;
+      readonly expected: string;
+      readonly actual: string;
+    };
+
+export function inspectFrame(text: string): Result.Result<ServerFrame, FrameFailure> {
   const parsed = Result.try((): unknown => JSON.parse(text));
-  if (Result.isFailure(parsed)) return null;
+  if (Result.isFailure(parsed)) {
+    const reason = parsed.failure instanceof Error ? parsed.failure.message : "";
+    const position = /\b(?:position \d+|line \d+ column \d+)\b/i.exec(reason)?.[0];
+    const end = /unexpected end/i.test(reason) ? String(text.length) : null;
+    return Result.fail({ stage: "json", at: position ?? end });
+  }
   const value = parsed.success;
   if (isRecord(value)) {
     if ("event" in value && isEventRecord(value.event)) {
-      return { event: value.event };
+      return Result.succeed({ event: value.event });
     }
     if ("delta" in value && isDelta(value.delta)) {
-      return { delta: value.delta };
+      return Result.succeed({ delta: value.delta });
     }
   }
-  return Result.getOrNull(readServerFrame(value));
+  const decoded = readServerFrame(value);
+  if (Result.isSuccess(decoded)) return Result.succeed(decoded.success);
+  const { keys, expected } = fieldIssue(decoded.failure.issue);
+  const actual = keys.reduce<unknown>((held, key) => {
+    if (isRecord(held) && Object.hasOwn(held, key)) return held[String(key)];
+    if (Array.isArray(held) && typeof key === "number") return held[key];
+    return undefined;
+  }, value);
+  return Result.fail({
+    stage: "schema",
+    path:
+      keys
+        .map((key) => {
+          if (typeof key === "number") return String(key);
+          return typeof key === "string" && fieldName.test(key) ? key : "[key]";
+        })
+        .join(".") || "$",
+    expected,
+    actual: actual === null ? "null" : Array.isArray(actual) ? "array" : typeof actual,
+  });
 }
 
 export function encodeFrame(frame: ClientFrame): string {

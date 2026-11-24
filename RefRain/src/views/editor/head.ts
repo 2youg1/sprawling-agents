@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { Snippet } from "svelte";
+import type { JSX } from "@solidjs/web";
 
 import type { Key } from "../../core/lang";
 import type { Receipt } from "../../core/document_save";
@@ -27,7 +27,7 @@ export interface HeadLook {
   readonly version: string | null;
   readonly receipt: { readonly text: string; readonly alert: boolean } | null;
   readonly wire: ReceiptWire;
-  readonly actions: Snippet;
+  readonly actions: JSX.Element;
 }
 
 export function receiptWord(kind: Receipt["kind"]): ReceiptWord | null {

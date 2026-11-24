@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { describe, expect, test } from "bun:test";
-import { get, writable } from "svelte/store";
-import type { Writable } from "svelte/store";
+import { get, writable } from "./store";
+import type { Writable } from "./store";
 
 import { keepBranches } from "../views/talk/branching";
 import { Address, RunId, Seq, Tag } from "../wire";
@@ -16,8 +16,6 @@ import type { View } from "./route";
 import { find, parse } from "./slash";
 import type { SlashHands } from "./slash_hands";
 
-// The verbs about the session in main: `/compact`, `/tag`, `/untag`, and
-// where `/new` leaves main.
 describe("the session in main", () => {
   const ROOM = Address.make("lab/room1");
   const GOING = RunId.make("00000000-0000-4000-8000-000000000007");
@@ -39,19 +37,14 @@ describe("the session in main", () => {
 
   interface Held {
     readonly hands: SlashHands;
-    // The page's belief, which the test moves as the city would.
     readonly belief: Writable<Belief>;
     readonly sent: Command[];
     readonly went: View[];
     readonly written: string[];
     readonly retagged: SessionTags[];
-    // The run each `whenFrozen` waits on, and what it does then.
     readonly waiting: [Run, () => void][];
   }
 
-  // Hands as a page fills them: `/new` and `/compact` open their session
-  // through the page's one branch door, so main follows once the room
-  // holds a newer session and a refusal keeps it where it was (#120).
   function held(live: boolean, tagged: SessionTags | null = SESSION): Held {
     const sent: Command[] = [];
     const went: View[] = [];

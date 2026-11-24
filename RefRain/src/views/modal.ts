@@ -3,8 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import { createAttachmentKey } from "svelte/attachments";
-import type { Attachment } from "svelte/attachments";
+import type { ElementRef } from "../core/element_ref";
 
 export type Seat = "modal" | "specimen";
 
@@ -18,7 +17,7 @@ export type ModalWire = Named & {
   readonly open: boolean;
   readonly oncancel: (event: Pick<Event, "preventDefault">) => void;
   readonly onclick: (event: Pick<Event, "target" | "currentTarget">) => void;
-  readonly [hold: symbol]: Attachment<HTMLDialogElement>;
+  readonly [hold: symbol]: ElementRef<HTMLDialogElement>;
 };
 
 export interface ModalOrder {
@@ -27,12 +26,12 @@ export interface ModalOrder {
   readonly backdrop: Backdrop;
   readonly onClose: () => void;
 
-  readonly hold: Attachment<HTMLDialogElement>;
+  readonly hold: ElementRef<HTMLDialogElement>;
 }
 
-const HOLD = createAttachmentKey();
+const HOLD = Symbol();
 
-export function modalHold(seat: Seat, first: First = "control"): Attachment<HTMLDialogElement> {
+export function modalHold(seat: Seat, first: First = "control"): ElementRef<HTMLDialogElement> {
   return (node) => {
     if (seat === "specimen") return;
 

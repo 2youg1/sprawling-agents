@@ -32,6 +32,23 @@ import {
   AxError,
 } from "./c04";
 
+import {
+  PrivacyControlEntry,
+  PrivacyHistory,
+  PrivacyHost,
+  PrivacyNotWrittenEntry,
+  PrivacyOutcome,
+} from "./c05";
+
+export const PrivacyAnswer = Schema.Struct({
+  controls: Schema.Array(PrivacyControlEntry),
+  history: PrivacyHistory,
+  host: PrivacyHost,
+  not_written: Schema.Array(PrivacyNotWrittenEntry),
+  outcomes: Schema.Array(PrivacyOutcome),
+}).annotate({ identifier: "PrivacyAnswer" });
+export type PrivacyAnswer = typeof PrivacyAnswer.Type;
+
 export const ShapePart = Schema.Struct({
   bytes: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   hash: Schema.String,

@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import { derived, get, writable } from "svelte/store";
-import type { Readable } from "svelte/store";
+import { derived, get, writable } from "./store";
+import type { Readable } from "./store";
 
 import { EDITORS, type Opening } from "./editor";
 import type { Lang } from "./lang";
@@ -41,6 +41,7 @@ import { readWorkbench, spelledWorkbench, type Workbench } from "./workbench";
 const ROWS = {
   lang: "sprawling.lang",
   welcomed: "sprawling.welcomed",
+  tier: "sprawling.tier",
 
   panel: "sprawling.talk.panel",
   lighting: "sprawling.appearance.lighting",
@@ -87,7 +88,7 @@ const ROWS = {
 export type Tier = WireTier;
 export const TIERS: readonly Tier[] = TierSchema.literals;
 
-const LAUNCH_TIER: Tier = "zen";
+export const SESSION_TIERS: readonly ("zen" | "panorama")[] = ["zen", "panorama"];
 
 export const PROXYING_RULES: readonly Proxying[] = Proxying.members.map((rule) => rule.literal);
 
@@ -109,6 +110,7 @@ export interface Preferences {
 export interface PreferenceDoor {
   readonly held: Readable<Preferences>;
   readonly keeper: Readable<Keeper>;
+  readonly themeUnkept: Readable<boolean>;
 
   readonly adopt: (stated: Preferences, chords: readonly Chord[]) => void;
 
@@ -202,7 +204,7 @@ function readPreferences(rows: Rows, browserLang: string): Preferences {
     lang: readLang(rows.getItem(ROWS.lang), browserLang),
     welcomed: rows.getItem(ROWS.welcomed) === YES,
     panel: rows.getItem(ROWS.panel) !== NO,
-    tier: LAUNCH_TIER,
+    tier: readOne(SESSION_TIERS, rows.getItem(ROWS.tier), "zen"),
     appearance: readAppearance(rows),
     theme: readTheme(rows.getItem(ROWS.theme)),
     proxying: readOne(PROXYING_RULES, rows.getItem(ROWS.proxying), "except_local"),
@@ -247,6 +249,7 @@ export function loadPreferences(rows: Rows, browserLang: string): PreferenceDoor
   return {
     held,
     keeper,
+    themeUnkept: derived(rows.unkept, (unkept) => unkept.has(ROWS.theme)),
     adopt(stated, chords) {
       settle(stated);
       for (const each of chords) writeChord(each.action, each.spelled);
@@ -268,7 +271,9 @@ export function loadPreferences(rows: Rows, browserLang: string): PreferenceDoor
       told({ panel });
     },
     setTier(tier) {
-      held.set({ ...get(held), tier });
+      const density = tier === "blend" ? "zen" : tier;
+      rows.setItem(ROWS.tier, density);
+      held.set({ ...get(held), tier: density });
     },
     setAppearance(appearance) {
       settle({ ...get(held), appearance });

@@ -6,17 +6,40 @@
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { diff, unifiedMergeView } from "@codemirror/merge";
 import { search, searchKeymap } from "@codemirror/search";
-import { Annotation, ChangeSet, Compartment, EditorState, Text } from "@codemirror/state";
+import {
+  Annotation,
+  ChangeSet,
+  Compartment,
+  EditorState,
+  Text,
+  Transaction,
+} from "@codemirror/state";
 import type { Extension } from "@codemirror/state";
 import {
   EditorView,
+  type ViewUpdate,
+  drawSelection,
   highlightActiveLine,
   highlightSpecialChars,
   keymap,
   lineNumbers,
+  rectangularSelection,
 } from "@codemirror/view";
 
 import type { EditorChange } from "../../core/document_pos";
+import { markdownEditing, markdownMode } from "./markdown_editing";
+import type { MarkdownMode, MarkdownOptions } from "./markdown_editing";
+
+export interface TextRange {
+  readonly from: number;
+  readonly to: number;
+}
+
+export interface ContextSelection {
+  readonly range: TextRange;
+  readonly x: number;
+  readonly y: number;
+}
 
 export interface EditorSetup {
   readonly parent: HTMLElement;
@@ -29,13 +52,19 @@ export interface EditorSetup {
   readonly phrases: Readonly<Record<string, string>>;
   readonly onEdit: () => void;
   readonly onSave: () => void;
+  readonly markdown?: MarkdownOptions | undefined;
+  readonly onMarkdownMode?: (mode: MarkdownMode) => void;
+  readonly onSelection?: (range: TextRange | null) => void;
+  readonly onContextSelection?: (selection: ContextSelection) => void;
 }
 
 export interface Editing {
   readonly changes: () => EditorChange[];
+  readonly hasChanges: () => boolean;
 
   readonly editedSinceSent: () => boolean | null;
   readonly text: () => string;
+  readonly slice: (range: TextRange) => string;
 
   readonly sent: () => void;
 
@@ -43,14 +72,19 @@ export interface Editing {
   readonly unsent: () => void;
 
   readonly rebase: (theirs: string) => void;
+  readonly rebaseChange: (theirs: string, change: EditorChange) => void;
   readonly follow: (theirs: string) => void;
 
   readonly diffing: (on: boolean) => void;
+  readonly setMarkdown: (mode: MarkdownMode) => void;
+  readonly typewriter: (on: boolean) => void;
   readonly readOnly: (on: boolean) => void;
   readonly composing: () => boolean;
 
   readonly top: () => number;
   readonly reveal: (at: number) => void;
+  readonly revealRange: (range: TextRange) => void;
+  readonly selection: () => TextRange | null;
 
   readonly scrollTop: (at: number) => void;
 
@@ -114,8 +148,84 @@ export function openEditor(setup: EditorSetup): Editing {
   let sentText: string | null = null;
   let sinceSent: ChangeSet | null = null;
   let showing = false;
+  let composing = false;
+  let awaiting: MarkdownMode | null = null;
+  let typewriter = false;
+  let alive = true;
   const merge = new Compartment();
   const locked = new Compartment();
+  const measureInput =
+    performance.getEntriesByName("sprawling:measure-editor-input", "mark").length > 0;
+
+  function selected(view: EditorView): TextRange | null {
+    const { from, to, empty } = view.state.selection.main;
+    return empty ? null : { from, to };
+  }
+
+  function setMarkdown(mode: MarkdownMode): void {
+    if (setup.markdown === undefined) return;
+    if (composing || view.compositionStarted) {
+      awaiting = mode;
+      return;
+    }
+    view.dispatch({
+      effects: [markdownMode.of(mode), view.scrollSnapshot()],
+      annotations: Transaction.addToHistory.of(false),
+    });
+    setup.onMarkdownMode?.(mode);
+  }
+
+  let selectionHeld = false;
+  function applyInput(update: ViewUpdate, measured = false): void {
+    const started = measured ? performance.now() : 0;
+    const changed = update.docChanged;
+    const selectedOrChanged = update.selectionSet || changed;
+    if (selectedOrChanged && setup.onSelection !== undefined) {
+      const range = selected(update.view);
+      if (range !== null || selectionHeld) setup.onSelection(range);
+      selectionHeld = range !== null;
+    }
+    if (
+      typewriter &&
+      !composing &&
+      selectedOrChanged &&
+      update.transactions.some((tx) => tx.annotation(Transaction.userEvent) !== undefined)
+    ) {
+      queueMicrotask(() => {
+        if (!alive || view.compositionStarted) return;
+        const at = view.state.selection.main.head;
+        view.dispatch({ effects: EditorView.scrollIntoView(at, { y: "center" }) });
+      });
+    }
+    const selectionReady = measured ? performance.now() : 0;
+    const edited = changed && !update.transactions.some((each) => each.annotation(Moved) === true);
+    if (edited) {
+      composed = composed.compose(update.changes);
+      sinceSent = sinceSent?.compose(update.changes) ?? null;
+    }
+    const composedAt = measured ? performance.now() : 0;
+    if (edited) setup.onEdit();
+    if (measured) {
+      const ended = performance.now();
+      performance.measure("sprawling:editor_input_handler", {
+        start: started,
+        end: ended,
+        detail: {
+          selectionMs: selectionReady - started,
+          composeMs: composedAt - selectionReady,
+          notifyMs: ended - composedAt,
+          transactions: update.transactions.length,
+        },
+      });
+    }
+  }
+
+  function receiveInput(update: ViewUpdate): void {
+    applyInput(
+      update,
+      measureInput && update.transactions.some((transaction) => transaction.isUserEvent("input")),
+    );
+  }
 
   const view = new EditorView({
     parent: setup.parent,
@@ -124,6 +234,9 @@ export function openEditor(setup: EditorSetup): Editing {
       extensions: [
         ...common(setup.label, setup.phrases),
         history(),
+        EditorState.allowMultipleSelections.of(true),
+        drawSelection(),
+        rectangularSelection(),
         highlightActiveLine(),
         search({ top: true }),
         keymap.of([
@@ -141,16 +254,45 @@ export function openEditor(setup: EditorSetup): Editing {
         ]),
         merge.of([]),
         locked.of(EditorState.readOnly.of(false)),
-        EditorView.updateListener.of((update) => {
-          if (
-            !update.docChanged ||
-            update.transactions.some((each) => each.annotation(Moved) === true)
-          )
-            return;
-          composed = composed.compose(update.changes);
-          sinceSent = sinceSent?.compose(update.changes) ?? null;
-          setup.onEdit();
+        setup.markdown === undefined ? [] : markdownEditing(setup.markdown),
+        EditorView.domEventHandlers({
+          compositionstart() {
+            composing = true;
+            return false;
+          },
+          compositionend() {
+            composing = false;
+            requestAnimationFrame(() => {
+              if (!alive || awaiting === null) return;
+              const mode = awaiting;
+              awaiting = null;
+              setMarkdown(mode);
+            });
+            return false;
+          },
+          contextmenu(event, editor) {
+            const range = selected(editor);
+            if (range === null || setup.onContextSelection === undefined) return false;
+            const at = editor.coordsAtPos(range.to);
+            const fromKeyboard = event.clientX === 0 && event.clientY === 0;
+            setup.onContextSelection({
+              range,
+              x: fromKeyboard ? (at?.left ?? 0) : event.clientX,
+              y: fromKeyboard ? (at?.bottom ?? 0) : event.clientY,
+            });
+            return true;
+          },
+          keydown(event, editor) {
+            if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10"))
+              return false;
+            const range = selected(editor);
+            if (range === null || setup.onContextSelection === undefined) return false;
+            const at = editor.coordsAtPos(range.to);
+            setup.onContextSelection({ range, x: at?.left ?? 0, y: at?.bottom ?? 0 });
+            return true;
+          },
         }),
+        EditorView.updateListener.of(receiveInput),
       ],
     }),
   });
@@ -159,22 +301,29 @@ export function openEditor(setup: EditorSetup): Editing {
     if (showing) view.dispatch({ effects: merge.reconfigure(compared(base)) });
   };
 
-  const move = (theirs: string, then: (onTheirs: ChangeSet) => ChangeSet): void => {
-    const onTheirs = between(base, theirs);
+  const move = (
+    theirs: string,
+    then: (onTheirs: ChangeSet) => ChangeSet,
+    onTheirs = between(base, theirs),
+  ): void => {
     const kept = then(onTheirs);
     view.dispatch({
       changes: composed.invert(textOf(base)).compose(onTheirs).compose(kept),
-      annotations: Moved.of(true),
+      annotations: [Moved.of(true), Transaction.addToHistory.of(false)],
     });
     base = theirs;
     composed = kept;
     reoriginate();
   };
 
+  const clamp = (at: number): number => Math.min(Math.max(at, 0), view.state.doc.length);
+
   return {
     changes: () => listed(composed),
+    hasChanges: () => !composed.empty,
     editedSinceSent: () => (sinceSent === null ? null : !sinceSent.empty),
     text: () => view.state.doc.toString(),
+    slice: ({ from, to }) => view.state.doc.sliceString(from, to),
     sent: () => {
       sentText = view.state.doc.toString();
       sinceSent = ChangeSet.empty(sentText.length);
@@ -195,6 +344,9 @@ export function openEditor(setup: EditorSetup): Editing {
     rebase: (theirs) => {
       move(theirs, (onTheirs) => composed.map(onTheirs));
     },
+    rebaseChange: (theirs, change) => {
+      move(theirs, (onTheirs) => composed.map(onTheirs), ChangeSet.of(change, base.length));
+    },
     follow: (theirs) => {
       move(theirs, () => ChangeSet.empty(theirs.length));
     },
@@ -202,19 +354,35 @@ export function openEditor(setup: EditorSetup): Editing {
       showing = on;
       view.dispatch({ effects: merge.reconfigure(on ? compared(base) : []) });
     },
-    readOnly: (on) => {
-      view.dispatch({ effects: locked.reconfigure(EditorState.readOnly.of(on)) });
-      view.contentDOM.setAttribute("aria-readonly", String(on));
+    setMarkdown,
+    typewriter: (on) => {
+      typewriter = on;
     },
-    composing: () => view.composing,
+    readOnly: (on) => {
+      if (view.state.readOnly !== on)
+        view.dispatch({ effects: locked.reconfigure(EditorState.readOnly.of(on)) });
+      const spoken = String(on);
+      if (view.contentDOM.getAttribute("aria-readonly") !== spoken)
+        view.contentDOM.setAttribute("aria-readonly", spoken);
+    },
+    composing: () => composing || view.compositionStarted,
     top: () => view.lineBlockAtHeight(view.scrollDOM.scrollTop).from,
     reveal: (at) => {
-      const position = Math.min(Math.max(at, 0), view.state.doc.length);
+      const position = clamp(at);
       view.dispatch({
         selection: { anchor: position },
         effects: EditorView.scrollIntoView(position, { y: "start", yMargin: 24 }),
       });
     },
+    revealRange: (range) => {
+      const from = clamp(range.from);
+      const to = clamp(range.to);
+      view.dispatch({
+        selection: { anchor: from, head: to },
+        effects: EditorView.scrollIntoView(from, { y: "center" }),
+      });
+    },
+    selection: () => selected(view),
     scrollTop: (at) => {
       const position = Math.min(Math.max(at, 0), view.state.doc.length);
       view.dispatch({ effects: EditorView.scrollIntoView(position, { y: "start" }) });
@@ -228,6 +396,7 @@ export function openEditor(setup: EditorSetup): Editing {
       view.requestMeasure();
     },
     destroy: () => {
+      alive = false;
       view.destroy();
     },
   };

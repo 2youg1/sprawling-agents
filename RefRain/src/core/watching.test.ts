@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { describe, expect, test } from "bun:test";
-import { get } from "svelte/store";
+import { get } from "./store";
 
 import { createWatching } from "./watching";
 

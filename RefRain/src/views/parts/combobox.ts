@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import { createAttachmentKey } from "svelte/attachments";
-import type { Attachment } from "svelte/attachments";
-
 import type { Side } from "./layer";
 
 export interface Choice {
@@ -122,22 +119,10 @@ export interface Hands {
   readonly take: (choice: Choice) => void;
 
   readonly leave: (next: EventTarget | null) => void;
-  readonly holds: Holds;
 }
-
-export interface Holds {
-  readonly root: Attachment<HTMLDivElement>;
-  readonly trigger: Attachment<HTMLButtonElement>;
-  readonly layer: Attachment<HTMLDivElement>;
-  readonly search: Attachment<HTMLInputElement>;
-  readonly list: Attachment<HTMLUListElement>;
-}
-
-const HOLD = createAttachmentKey();
 
 export interface RootWire {
   readonly onfocusout: (event: { readonly relatedTarget: EventTarget | null }) => void;
-  readonly [hold: symbol]: Attachment<HTMLDivElement>;
 }
 
 export interface TriggerWire {
@@ -145,12 +130,10 @@ export interface TriggerWire {
   readonly "aria-label": string;
   readonly onclick: () => void;
   readonly onkeydown: (event: Keyed) => void;
-  readonly [hold: symbol]: Attachment<HTMLButtonElement>;
 }
 
 export interface LayerWire {
   readonly inert: boolean;
-  readonly [hold: symbol]: Attachment<HTMLDivElement>;
 }
 
 export interface SearchWire {
@@ -163,7 +146,6 @@ export interface SearchWire {
   readonly value: string;
   readonly oninput: (event: { readonly currentTarget: { readonly value: string } }) => void;
   readonly onkeydown: (event: Keyed) => void;
-  readonly [hold: symbol]: Attachment<HTMLInputElement>;
 }
 
 export interface ListWire {
@@ -172,7 +154,6 @@ export interface ListWire {
   readonly "aria-label": string;
 
   readonly onmousedown: (event: { preventDefault(): void }) => void;
-  readonly [hold: symbol]: Attachment<HTMLUListElement>;
 }
 
 export interface OptionWire {
@@ -233,19 +214,17 @@ export function lookOf(view: ComboboxView, hands: Hands): ComboboxLook {
       onfocusout: (event) => {
         hands.leave(event.relatedTarget);
       },
-      [HOLD]: hands.holds.root,
     },
     trigger: {
       type: "button",
       "aria-label": props.label,
       onclick: hands.toggle,
       onkeydown: keyed("trigger"),
-      [HOLD]: hands.holds.trigger,
     },
     face: chosen?.label ?? props.placeholder,
     faceStyle: chosen?.face,
     unset: chosen === undefined,
-    layer: layer === "unopened" ? undefined : { inert: !open, [HOLD]: hands.holds.layer },
+    layer: layer === "unopened" ? undefined : { inert: !open },
     open,
     side: view.side,
     search: {
@@ -260,7 +239,6 @@ export function lookOf(view: ComboboxView, hands: Hands): ComboboxLook {
         hands.type(event.currentTarget.value);
       },
       onkeydown: keyed("field"),
-      [HOLD]: hands.holds.search,
     },
     list: {
       id: `${uid}-list`,
@@ -269,7 +247,6 @@ export function lookOf(view: ComboboxView, hands: Hands): ComboboxLook {
       onmousedown: (event) => {
         event.preventDefault();
       },
-      [HOLD]: hands.holds.list,
     },
     options: rows.map((choice, index) => ({
       key: choice.value,

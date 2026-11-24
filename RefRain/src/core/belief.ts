@@ -4,8 +4,8 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { Effect } from "effect";
-import { writable } from "svelte/store";
-import type { Readable } from "svelte/store";
+import { writable } from "./store";
+import type { Readable } from "./store";
 
 import { readProbed } from "./probed";
 import { PHASES } from "./doing";
@@ -17,7 +17,7 @@ import type { AxError, CityAnswer, Delta, EventRecord, LogLine, RunId } from "..
 
 import type { Belief, RunBelief } from "./belief/shape";
 import { LOG_WINDOW, merged } from "./belief/shape";
-import { runTable } from "./belief/runs.svelte";
+import { appendRunText } from "./belief/runs";
 import { adopted } from "./belief/adopted";
 import { livened, liveOf } from "./belief/live";
 import { roomed, roomsOf } from "./belief/rooms";
@@ -40,7 +40,7 @@ export interface BeliefStore {
 
 export function createBelief(now: () => number): BeliefStore {
   const empty = (): Belief => ({
-    runs: runTable({}),
+    runs: {},
     live: [],
     rooms: new Map(),
     cancelled: 0,
@@ -94,13 +94,12 @@ export function createBelief(now: () => number): BeliefStore {
       if (listed.has(run)) continue;
       if (was.local) runs[run] = { ...was, local: false };
     }
-    const table = runTable(runs);
     written({
       ...held,
-      runs: table,
-      live: liveOf(table),
-      rooms: roomsOf(table),
-      cancelled: cancelledOf(table),
+      runs,
+      live: liveOf(runs),
+      rooms: roomsOf(runs),
+      cancelled: cancelledOf(runs),
       halted: stated >= held.haltedAt ? [...city.halted] : held.halted,
       haltedAt: stated >= held.haltedAt ? stated : held.haltedAt,
     });
@@ -187,8 +186,8 @@ export function createBelief(now: () => number): BeliefStore {
       );
       return;
     }
-    if ("said" in delta.increment) run.saying += delta.increment.said;
-    else run.thinking += delta.increment.thought;
+    if ("said" in delta.increment) appendRunText(run, "saying", delta.increment.said);
+    else appendRunText(run, "thinking", delta.increment.thought);
   }
 
   function logged(line: LogLine): void {

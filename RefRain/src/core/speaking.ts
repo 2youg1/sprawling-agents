@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import { derived, get, writable } from "svelte/store";
-import type { Readable } from "svelte/store";
+import { derived, get, writable } from "./store";
+import type { Readable } from "./store";
 
 import { bearing } from "./socket";
 

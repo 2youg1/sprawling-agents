@@ -1,0 +1,85 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+.swap-accounts,
+.swap-accounts form,
+.swap-account-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-tight);
+  min-width: 0;
+}
+.swap-accounts {
+  color: var(--color-text);
+  font-size: var(--text-note);
+}
+.swap-account-retries {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-snug);
+  border: 0;
+  padding: 0;
+}
+.swap-account-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-tight);
+}
+.swap-account-row {
+  display: grid;
+  grid-template-columns: var(--spacing-figure) minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--spacing-snug);
+  align-items: center;
+  border-left: var(--spacing-hair) solid var(--color-edge);
+  padding-left: var(--spacing-snug);
+}
+.swap-account-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-tight);
+  grid-column: 1 / -1;
+}
+.swap-account-control {
+  border: var(--spacing-hair) solid var(--color-accent);
+  border-radius: var(--radius-control);
+  padding: 0 var(--spacing-snug);
+  color: var(--color-text);
+  background: var(--color-raised);
+  transition: background-color var(--transition-duration-short) var(--ease-arrive);
+}
+.swap-account-control:hover {
+  background: var(--color-raised-hover);
+}
+.swap-account-control[aria-disabled="true"] {
+  color: var(--color-text-disabled);
+  border-color: var(--color-disabled);
+}
+.swap-account-quiet,
+.swap-accounts small {
+  color: var(--color-text-quiet);
+}
+.swap-account-alert {
+  color: var(--color-alert);
+}
+.swap-accounts input {
+  border: var(--spacing-hair) solid var(--color-edge-input);
+  border-radius: var(--radius-control);
+  padding: 0 var(--spacing-snug);
+  background: var(--color-raised);
+  color: var(--color-text);
+}
+.swap-account-mono,
+.swap-accounts input {
+  font-family: var(--font-mono);
+}
+.swap-account-place {
+  text-align: right;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .swap-account-control {
+    transition: none;
+  }
+}

@@ -9,18 +9,18 @@ import { join, relative } from "node:path";
 import { mergeConfig, normalizePath } from "vite";
 import type { Plugin, UserConfig } from "vite";
 
-import shipped from "./vite.config";
+import shipped from "./vite.config.ts";
 
 const SOURCE = normalizePath(join(import.meta.dirname, "src"));
 const SWAP = normalizePath(join(import.meta.dirname, "swap"));
-const LOOK = ".look.svelte";
+const LOOK = /\.look\.solid(?:\.tsx)?$/u;
 
 const OUT = "../../target/swap-web";
 
 function replacements(dir: string): string[] {
   return readdirSync(dir, { recursive: true, encoding: "utf8" })
     .map((each) => normalizePath(each))
-    .filter((each) => each.endsWith(LOOK));
+    .filter((each) => LOOK.test(each));
 }
 
 function swapLooks(): Plugin {
@@ -30,7 +30,7 @@ function swapLooks(): Plugin {
     name: "sprawling:swap-looks",
     enforce: "pre",
     async resolveId(source, importer, options) {
-      if (importer === undefined || !source.endsWith(LOOK)) return null;
+      if (importer === undefined || !LOOK.test(source)) return null;
       const resolved = await this.resolve(source, importer, { ...options, skipSelf: true });
       if (resolved === null) return null;
       const id = normalizePath(resolved.id);
@@ -43,7 +43,7 @@ function swapLooks(): Plugin {
     buildEnd(failure) {
       if (failure !== undefined) return;
       if (wanted.size === 0) {
-        this.error(`swap/ holds no ${LOOK} file, so this build would replace nothing`);
+        this.error(`swap/ holds no replaceable look file, so this build would replace nothing`);
       }
       for (const path of wanted) {
         if (!swapped.has(path)) {

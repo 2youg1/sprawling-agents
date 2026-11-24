@@ -7,7 +7,7 @@ import { expect, test } from "bun:test";
 import { Result, Schema } from "effect";
 
 import { ServerFrame } from "../wire";
-import { decodeFrame } from "./frames";
+import { decodeFrame, inspectFrame } from "./frames";
 
 const RUN = "01234567-89ab-cdef-0123-456789abcdef";
 const eventText = JSON.stringify({
@@ -30,9 +30,6 @@ const bySchema = (text: string): ServerFrame | null => {
   return Result.getOrNull(Schema.decodeUnknownResult(Schema.fromJsonString(ServerFrame))(text));
 };
 
-// What the hot decoder costs is a reading, not a verdict: the
-// `client_frame_decode` row of Tools/xtask/budgets.toml, taken by
-// RefRain/scripts/frame_cost.ts.
 test("the hot frames read exactly what the schema reads", () => {
   expect(decodeFrame(eventText)).toEqual(bySchema(eventText));
   expect(decodeFrame(deltaText)).toEqual(bySchema(deltaText));
@@ -45,4 +42,29 @@ test("a hot frame the schema refuses is refused", () => {
   for (const text of [badRun, badKind, badDelta, "{", "[]"]) {
     expect(decodeFrame(text)).toBeNull();
   }
+});
+
+test("diagnoses syntax and the first invalid field without copying its input", () => {
+  const secret = "sentinel-credential-not-for-diagnostics";
+  const broken = inspectFrame(`{"delta":{"increment":{"said":"tok"},"run":"${secret}"}}`);
+  expect(Result.isFailure(broken) && broken.failure).toMatchObject({
+    stage: "schema",
+    path: "delta.run",
+    actual: "string",
+  });
+  expect(JSON.stringify(broken)).not.toContain(secret);
+  const wrongType = inspectFrame(
+    JSON.stringify({
+      delta: { increment: { said: { value: secret } }, run: RUN },
+    }),
+  );
+  expect(Result.isFailure(wrongType) && wrongType.failure).toMatchObject({
+    stage: "schema",
+    path: "delta.increment.said",
+    actual: "object",
+  });
+  expect(JSON.stringify(wrongType)).not.toContain(secret);
+  const incomplete = inspectFrame(`{"secret":"${secret}",`);
+  expect(Result.isFailure(incomplete) && incomplete.failure).toMatchObject({ stage: "json" });
+  expect(JSON.stringify(incomplete)).not.toContain(secret);
 });

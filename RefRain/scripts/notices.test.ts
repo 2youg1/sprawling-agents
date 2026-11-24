@@ -11,19 +11,19 @@ describe("third-party notices", () => {
   test("each installed package is named once, scoped and nested ones by their own name", () => {
     expect(
       packagesIn([
-        "/w/RefRain/node_modules/svelte/src/internal/client/index.js",
+        "/w/RefRain/node_modules/solid-js/dist/solid.js",
         "/w/RefRain/node_modules/@lezer/rust/dist/index.js",
         "/w/RefRain/node_modules/@lezer/rust/dist/other.js",
         "/w/RefRain/node_modules/a/node_modules/b/x.js",
         "C:\\w\\RefRain\\node_modules\\effect\\dist\\esm\\Schema.js",
-        "\0" + "/w/RefRain/node_modules/svelte/src/index-client.js",
+        "\0" + "/w/RefRain/node_modules/solid-js/dist/dev.js",
         "/w/RefRain/src/main.ts",
       ]),
     ).toEqual([
       { name: "@lezer/rust", dir: "/w/RefRain/node_modules/@lezer/rust" },
       { name: "b", dir: "/w/RefRain/node_modules/a/node_modules/b" },
       { name: "effect", dir: "C:/w/RefRain/node_modules/effect" },
-      { name: "svelte", dir: "/w/RefRain/node_modules/svelte" },
+      { name: "solid-js", dir: "/w/RefRain/node_modules/solid-js" },
     ]);
   });
 
@@ -51,8 +51,8 @@ describe("third-party notices", () => {
             texts: ["MIT License\r\n\r\nCopyright (c) E\r\n"],
           },
           {
-            name: "svelte",
-            version: "5.57.1",
+            name: "solid-js",
+            version: "2.0.3",
             license: "MIT",
             texts: ["Copyright (c) S\n", "NOTICE text\n"],
           },
@@ -74,7 +74,7 @@ describe("third-party notices", () => {
         "",
         "-".repeat(72),
         "",
-        "svelte 5.57.1 (MIT)",
+        "solid-js 2.0.3 (MIT)",
         "",
         "Copyright (c) S",
         "",

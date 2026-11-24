@@ -1,0 +1,134 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+.editor {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.editor .cm-editor {
+  height: 100%;
+  background: var(--color-page);
+  color: var(--color-text);
+}
+.editor .cm-editor.cm-focused {
+  outline: none;
+}
+.editor .cm-scroller {
+  font-family: var(--font-mono);
+  font-size: var(--text-note);
+  line-height: calc(var(--spacing-baseline) * 3);
+}
+.editor .cm-content {
+  padding: var(--spacing-snug) 0;
+  caret-color: var(--color-accent);
+}
+.editor .cm-cursor {
+  border-left-color: var(--color-accent);
+}
+.editor .cm-gutters {
+  background: var(--color-page);
+  color: var(--color-text-faint);
+  border: none;
+}
+.editor .cm-lineNumbers .cm-gutterElement {
+  padding: 0 var(--spacing-base) 0 var(--spacing-wide);
+}
+.editor .cm-activeLine {
+  background: transparent;
+  box-shadow: inset var(--spacing-hair) 0 0 var(--color-accent);
+}
+.editor .cm-activeLineGutter {
+  background: transparent;
+  color: var(--color-text-quiet);
+}
+.editor .cm-selectionBackground,
+.editor .cm-content ::selection {
+  background: color-mix(in oklch, var(--color-accent) 28%, transparent);
+}
+.editor .cm-searchMatch {
+  background: color-mix(in oklch, var(--color-accent) 18%, transparent);
+  outline: 1px solid color-mix(in oklch, var(--color-accent) 50%, transparent);
+}
+.editor .cm-searchMatch-selected {
+  background: color-mix(in oklch, var(--color-accent) 36%, transparent);
+}
+.editor .cm-specialChar {
+  color: var(--color-alert);
+}
+.editor .cm-panels {
+  background: var(--color-chrome);
+  color: var(--color-text-quiet);
+  border-color: var(--color-edge);
+}
+.editor .cm-panel.cm-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-tight) var(--spacing-snug);
+  padding: var(--spacing-snug) var(--spacing-wide);
+  font-family: var(--font-mono);
+  font-size: var(--text-note);
+}
+.editor .cm-panel.cm-search br {
+  flex-basis: 100%;
+}
+.editor .cm-textfield {
+  height: var(--spacing-control-sm);
+  padding: 0 var(--spacing-snug);
+  border: 1px solid var(--color-edge-input);
+  border-radius: var(--radius-control);
+  background: var(--color-page);
+  color: var(--color-text);
+  font: inherit;
+}
+.editor .cm-button {
+  height: var(--spacing-control-sm);
+  padding: 0 var(--spacing-snug);
+  border: none;
+  border-radius: var(--radius-control);
+  background: var(--color-raised);
+  background-image: none;
+  color: var(--color-text);
+  font: inherit;
+  transition: background-color var(--transition-duration-short) var(--ease-leave);
+}
+.editor .cm-button:hover {
+  background: var(--color-raised-hover);
+  transition-timing-function: var(--ease-arrive);
+}
+.editor .cm-panel.cm-search label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-tight);
+}
+.editor .cm-panel.cm-search [name="close"] {
+  margin-inline-start: auto;
+  color: var(--color-text-faint);
+}
+.editor .cm-editor.cm-merge-b .cm-changedLine {
+  background: color-mix(in oklch, var(--color-accent) 10%, transparent);
+}
+.editor .cm-editor.cm-merge-b .cm-changedText {
+  background: color-mix(in oklch, var(--color-accent) 26%, transparent);
+}
+.editor .cm-editor .cm-deletedChunk {
+  background: color-mix(in oklch, var(--color-alert) 10%, transparent);
+}
+.editor .cm-editor .cm-deletedChunk .cm-deletedText,
+.editor .cm-editor.cm-merge-b .cm-deletedText {
+  background: color-mix(in oklch, var(--color-alert) 26%, transparent);
+}
+.editor .cm-editor.cm-merge-b .cm-changedLineGutter {
+  background: var(--color-accent);
+}
+.editor .cm-editor .cm-deletedLineGutter {
+  background: var(--color-alert);
+}
+@media (forced-colors: active) {
+  .editor .cm-editor.cm-merge-b .cm-changedLine,
+  .editor .cm-editor .cm-deletedChunk {
+    border-inline-start: var(--spacing-hair) solid CanvasText;
+  }
+}

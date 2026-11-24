@@ -46,10 +46,10 @@ export interface BoxWire {
   readonly pattern: string | undefined;
   readonly value: string;
   readonly placeholder: string | undefined;
-  readonly "aria-disabled": boolean;
-  readonly "aria-invalid": boolean;
+  readonly "aria-disabled": "true" | "false";
+  readonly "aria-invalid": "true" | "false";
   readonly "aria-describedby": string | undefined;
-  readonly oninput: (event: Typed) => void;
+  readonly onInput: (event: Typed) => void;
 }
 
 export interface NoteLook {
@@ -109,10 +109,10 @@ export function lookOf(props: FieldProps, uid: string): FieldLook {
       pattern: props.pattern,
       value: props.value,
       placeholder: props.placeholder,
-      "aria-disabled": disabled,
-      "aria-invalid": props.error !== undefined,
+      "aria-disabled": disabled ? "true" : "false",
+      "aria-invalid": props.error !== undefined ? "true" : "false",
       "aria-describedby": describedOf(props, note),
-      oninput: (event) => {
+      onInput: (event) => {
         if (disabled) {
           event.currentTarget.value = props.value;
           return;

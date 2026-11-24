@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The sessions pane as its look receives it (RefRain/Spec.lean §7K): a
-// row's state, its pin and its link, and the tag filter's toggles.
-
 import { describe, expect, test } from "bun:test";
 
 import type { RunBelief } from "../../core/belief";
@@ -51,7 +48,6 @@ const at = (over: Partial<RowContext>): RowContext => ({
   collapsed: false,
   onToggle: () => undefined,
   branch: { kind: "none" },
-  open: () => undefined,
   stop: null,
   ...over,
 });

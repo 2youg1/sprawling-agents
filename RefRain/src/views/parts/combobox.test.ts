@@ -3,14 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The combobox's wiring, without a look: the key table checked against
-// the properties `RefRain/spec/Views/Parts/Combobox.lean` proves, over
-// every cursor and row count in a small range, and the value a look is
-// given checked for what a screen reader is told - which row is the
-// value, which is the cursor, what the search box names. The model
-// says how the cursor walks; it says nothing about attribute values,
-// so those are asserted here.
-
 import { describe, expect, test } from "bun:test";
 
 import { answer, claims, lookOf, matching, rowId } from "./combobox";
@@ -24,7 +16,6 @@ const CHOICES: readonly Choice[] = [
 
 const MOVES = ["ArrowDown", "ArrowUp", "Home", "End"] as const;
 
-// Every key the table answers, and one it leaves to the box.
 const KEYS = [...MOVES, "Enter", "Escape", "Tab", "a"] as const;
 
 const settled = (key: string): Pressed => ({ key, isComposing: false });
@@ -49,13 +40,6 @@ function wired(
     point: (at) => record.pointed.push(at),
     take: (choice) => record.taken.push(choice.value),
     leave: () => undefined,
-    holds: {
-      root: () => undefined,
-      trigger: () => undefined,
-      layer: () => undefined,
-      search: () => undefined,
-      list: () => undefined,
-    },
   };
   const view: ComboboxView = {
     props: {
@@ -76,7 +60,6 @@ function wired(
   return { look: lookOf(view, hands), record };
 }
 
-// Whether an input method is composing when the key is pressed.
 type Typing = "settled" | "composing";
 
 function pressing(
@@ -229,13 +212,6 @@ describe("the value a look is given", () => {
       point: () => undefined,
       take: () => undefined,
       leave: () => undefined,
-      holds: {
-        root: () => undefined,
-        trigger: () => undefined,
-        layer: () => undefined,
-        search: () => undefined,
-        list: () => undefined,
-      },
     };
     const look = lookOf(
       {

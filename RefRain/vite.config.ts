@@ -7,8 +7,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import tailwindcss from "@tailwindcss/vite";
-import { svelte } from "@sveltejs/vite-plugin-svelte";
+import solid from "@solidjs/vite-plugin";
 import { defineConfig } from "vite";
 import type { Plugin } from "vite";
 
@@ -73,12 +72,7 @@ function shippedFace(): Plugin {
 export default defineConfig({
   root: "src",
   base: "./",
-  plugins: [
-    tailwindcss(),
-    svelte({ configFile: "../svelte.config.ts" }),
-    shippedFace(),
-    thirdPartyNotices(declaredLicences()),
-  ],
+  plugins: [solid(), shippedFace(), thirdPartyNotices(declaredLicences())],
   build: {
     outDir: "../../Sprawling/app/web-dist",
     emptyOutDir: true,

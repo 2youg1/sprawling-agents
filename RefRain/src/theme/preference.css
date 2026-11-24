@@ -3,12 +3,6 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  * Copyright (c) 2026 2youg1 and the sprawling contributors */
 
-/* The faces a person may choose instead of the one the page opens in.
- * `paper` is the family this build ships first and `maple` the one the
- * doctor's NF CN build extends with Han glyphs (wire D123); `system` and
- * `custom` are the two ways of naming a face this build does not carry,
- * and a stack somebody typed is the one value the theme cannot hold, so
- * it arrives as `--face-sans` set on the root element itself. */
 :root[data-sans="paper"] {
   --face-sans: var(--face-paper);
 }
@@ -28,32 +22,11 @@
   --face-mono: ui-monospace;
 }
 
-/* Reading text in Libron, the one serif face that ships (wire D52).
- * The stack ends on the generic `serif` and names no CJK family, so Han
- * glyphs fall to whatever serif face the machine has, for the reasons
- * `theme/tokens-type.css` gives for the interface stack. Any element may
- * carry the attribute, not only the root, so a gallery case can show the
- * face without changing the page around it. */
 [data-read="libron"] {
-  --font-read: "Libron", var(--face-fallback,) serif;
+  --font-read: "Libron", var(--face-fallback,) var(--face-cjk), var(--face-math), serif;
   --font-read--font-feature-settings: normal;
 }
 
-/* The bundled faces' own features, as the person turned them on
- * (`Sprawling/wire/spec/Preference.lean` D125).
- *
- * A switch is one word of `wire::TypeFeature` on the root element, and
- * each word either fills the slot the face spells that intent with or
- * leaves it alone. **A tag that is off is left out rather than written
- * as `"tag" 0`**: `--figures` already asks for a slashed zero on a
- * column of numbers through `font-variant-numeric`, and a
- * `font-feature-settings` that named `zero` would overrule it. Every
- * optional slot therefore carries the comma in front of it, so a list
- * with three of six switched on is punctuated exactly as it should be.
- *
- * Paper Mono's six are the ones its name table declares. Maple Mono
- * spells three of the same intents its own way and declares nothing for
- * the other three, so those switches move Paper Mono only. */
 :root[data-features~="coding_ligatures"] {
   --paper-coding-ligatures: , "ss01" 1;
   --maple-calt: 1;
@@ -77,10 +50,6 @@
 }
 
 :root {
-  /* The whole list a role drawn in one of the bundled faces carries.
-   * `calt` is a number in Maple Mono's list rather than a slot because
-   * that face keeps its ligatures in `calt`, which the base list turns
-   * off for the reason `theme/tokens-type.css` gives. */
   --paper-features:
     "liga" 0,
     "calt" 0 var(--paper-coding-ligatures,) var(--paper-duospace,) var(--paper-narrow-space,)
@@ -89,9 +58,6 @@
     "liga" 0, "calt" var(--maple-calt, 0) var(--maple-single-story-a,) var(--maple-slashed-zero,);
 }
 
-/* A role drawn in a bundled face carries that face's list; a role drawn
- * in a face this build does not bundle keeps the base list above, where
- * no tag means anything but "draw the face as its maker drew it". */
 :root[data-sans="paper"] {
   --font-sans--font-feature-settings: var(--paper-features);
 }
@@ -105,12 +71,6 @@
   --font-mono--font-feature-settings: var(--maple-features);
 }
 
-/* Running text stands where the person put it, and the strong steps of
- * the ladder stand two hundred above it, so the hierarchy the page is
- * built on holds at every posture (`Sprawling/wire/spec/Preference.lean`
- * D126). `regular` is the theme's own list, so it has no rule here, for
- * the reason `chroma` has none: the page's posture is the one the tokens
- * already state. */
 :root[data-weight="light"] {
   --font-weight-body: 300;
   --font-weight-note: 300;
@@ -128,42 +88,18 @@
   --font-weight-figure: 700;
 }
 
-/* All the colour, or none of it. The coefficient is already the one
- * place desaturation is expressed; this only says who may set it. */
 :root[data-chroma="off"] {
   --chroma: 0;
 }
 
-/* A page for somebody reading tables rather than prose. One quarter off
- * every spacing step, which is the whole change: type, colour and line
- * height stay where they are, because a compact page is a page with less
- * air in it and not a page with smaller writing in it. */
 :root[data-density="compact"] {
   --density: 0.75;
 }
 
-/* A row in a compact list is its title and nothing else: the line that
- * only elaborates the line above it - a record's payload digest, a
- * discard's way back, a cost row's share bar, a row's second text - is
- * not drawn. `.summary` is the class those lists put on that line; the
- * `<summary>` element of a `<details>` is untouched. The rule sits
- * outside every layer, so it outranks the utility that gave the line
- * its own `display`. */
 [data-density="compact"] .summary {
   display: none;
 }
 
-/* A machine asking for more contrast gets it by moving one token. The
- * faintest text steps up to the tier above it, so every line on the page
- * reaches at least Lc 75; nothing else moves, because nothing else was
- * quiet enough to be the complaint. The value is taken from the quiet
- * token rather than written out, so the step follows whichever way the
- * page is lit.
- *
- * Both selectors are needed and they are not a duplicate: the light page
- * declares this token at `:root[data-theme="light"]`, which outweighs a
- * bare `:root`, so the override has to match that weight to be able to
- * win. */
 @media (prefers-contrast: more) {
   :root,
   :root[data-theme] {
@@ -171,24 +107,13 @@
   }
 }
 
-/* Windows high contrast, and every other forced-colour mode, replaces
- * each background with a system colour. A shape whose entire message is
- * its fill - a badge, a status dot, the chosen pill in a group of them -
- * becomes Canvas on Canvas and disappears. Every pill therefore draws its
- * own edge in the system ink, which is the one colour the mode guarantees
- * is visible against whatever it painted behind. */
 @media (forced-colors: active) {
   .rounded-pill {
     border: 1px solid CanvasText;
   }
-  /* The bar keeps its edge in the system ink for the same reason a
-   * pill does, and it matters more here: this is the mark that says a
-   * person has to decide something. */
   .asks {
     border-inline-start-color: CanvasText;
   }
-  /* Glass becomes the system's own surface, edged in its ink: an
-   * alpha the mode keeps would let the words behind show through. */
   .glass {
     background-color: Canvas;
     border-color: CanvasText;

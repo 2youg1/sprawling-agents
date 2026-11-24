@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { expect, test } from "bun:test";
-import { get } from "svelte/store";
+import { get } from "./store";
 
 import { createBelief } from "./belief";
 import { runInFront } from "./in_front";
@@ -31,9 +31,6 @@ function listed(run: RunId, addr: Address, started: number, frozen: boolean): Ru
   };
 }
 
-// The regression client D16 names: a stop pressed in one room
-// reached the newest run anywhere in the city, and a stop pressed where
-// no run is shown reached one all the same.
 test("the run in front of the person is the one the page shows, never the newest anywhere", () => {
   const shop = runId(1);
   const yard = runId(2);

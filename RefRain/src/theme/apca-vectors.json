@@ -1,0 +1,114 @@
+[
+  {
+    "name": "black on white",
+    "text": [0, 0, 0, 1],
+    "surface": [255, 255, 255, 1],
+    "backdrop": [255, 255, 255],
+    "lc": 106.04067321
+  },
+  {
+    "name": "white on black",
+    "text": [255, 255, 255, 1],
+    "surface": [0, 0, 0, 1],
+    "backdrop": [0, 0, 0],
+    "lc": -107.88473318
+  },
+  {
+    "name": "adjacent mid-gray",
+    "text": [126, 126, 126, 1],
+    "surface": [130, 130, 130, 1],
+    "backdrop": [255, 255, 255],
+    "lc": 0
+  },
+  {
+    "name": "below dark-text rollout",
+    "text": [120, 120, 120, 1],
+    "surface": [139, 139, 139, 1],
+    "backdrop": [255, 255, 255],
+    "lc": 0
+  },
+  {
+    "name": "above dark-text rollout",
+    "text": [120, 120, 120, 1],
+    "surface": [140, 140, 140, 1],
+    "backdrop": [255, 255, 255],
+    "lc": 7.57102527
+  },
+  {
+    "name": "below light-text rollout",
+    "text": [136, 136, 136, 1],
+    "surface": [120, 120, 120, 1],
+    "backdrop": [255, 255, 255],
+    "lc": 0
+  },
+  {
+    "name": "above light-text rollout",
+    "text": [137, 137, 137, 1],
+    "surface": [120, 120, 120, 1],
+    "backdrop": [255, 255, 255],
+    "lc": -7.35435773
+  },
+  {
+    "name": "colored ink on colored paper",
+    "text": [43, 59, 109, 1],
+    "surface": [221, 210, 193, 1],
+    "backdrop": [0, 0, 0],
+    "lc": 69.32834248
+  },
+  {
+    "name": "cool stone PDF at low brightness",
+    "text": [194, 205, 210, 1],
+    "surface": [1, 9, 16, 1],
+    "backdrop": [2, 3, 2],
+    "lc": -75.02734639
+  },
+  {
+    "name": "cool stone PDF at default brightness",
+    "text": [195, 205, 212, 1],
+    "surface": [7, 14, 25, 1],
+    "backdrop": [7, 7, 10],
+    "lc": -75.01464977
+  },
+  {
+    "name": "cool stone PDF at high brightness",
+    "text": [197, 207, 216, 1],
+    "surface": [19, 30, 39, 1],
+    "backdrop": [16, 20, 24],
+    "lc": -74.92753155
+  },
+  {
+    "name": "translucent ink and paper",
+    "text": [31, 53, 61, 0.7],
+    "surface": [225, 190, 149, 0.8],
+    "backdrop": [20, 18, 25],
+    "lc": 34.23261054
+  },
+  {
+    "name": "bright wallpaper under backing",
+    "text": [237, 241, 244, 1],
+    "surface": [25, 24, 26, 0.95],
+    "backdrop": [255, 247, 237],
+    "lc": -95.62123112
+  },
+  {
+    "name": "dark wallpaper under backing",
+    "text": [29, 24, 21, 1],
+    "surface": [249, 244, 237, 0.96],
+    "backdrop": [15, 19, 24],
+    "lc": 92.88098378
+  },
+  {
+    "name": "body meets 90",
+    "text": [231, 231, 231, 1],
+    "surface": [30, 30, 30, 1],
+    "backdrop": [0, 0, 0],
+    "lc": -90.44978743
+  },
+  {
+    "name": "body misses 90",
+    "text": [230, 230, 230, 1],
+    "surface": [30, 30, 30, 1],
+    "backdrop": [0, 0, 0],
+    "lc": -89.81656054
+  }
+]

@@ -19,7 +19,7 @@ import RefRain.spec.Views.Parts
 | 控件 | 模式 | 键 | 结果 |
 |---|---|---|---|
 | 硬币键 | APG Button | Enter／Space | 做朝上那一面：发出框里的字，或对眼前的 run 发 `cancel`（D16）；变淡的发送面一按落进空操作 |
-| 上下文环 | APG Button（同工具行：打开右侧检视，无 `aria-haspopup`），提示同 `tip.svelte`；读数仍在 `aria-valuetext` | Tab | 到达环（硬币键外的环带），提示出现 |
+| 上下文环 | APG Button（同工具行：打开右侧检视，无 `aria-haspopup`），提示同 `tip`；读数仍在 `aria-valuetext` | Tab | 到达环（硬币键外的环带），提示出现 |
 | | | Enter／Space，或点按环带 | 在右侧打开该会话的上下文用量报告（`openContext`）；硬币键仍是发送／停止／转向 |
 | | | Escape | 撤下提示 |
 | 地址行 | APG Button（`aria-haspopup="dialog"`） | Enter／Space，或点按 | 打开命令面板（RefRain/Spec.lean 4-10a）：键盘与鼠标打开时焦点进框，手指或笔按下时焦点落在面板本身（4-64b）；先列这个房间的会话，列表下读「谁在听」（D36）；Escape 关上，焦点回到地址行 |
@@ -28,15 +28,21 @@ import RefRain.spec.Views.Parts
 | | | Escape | 右侧开着这行时收起右侧，焦点留在这行 |
 | | | Tab | 到达这行，提示写出完成（或开始）的本地时刻，到秒 |
 | 未读计数 | APG Button | Enter／Space | 回到末尾并恢复跟随；按钮随计数消失，焦点落在对话列上 |
-| 图层键 | APG Button | Enter／Space | 关上设置面、离开别的页回到对话，换到下一档；一次过渡，焦点落进对话框（client D48） |
-| | | Accel-\ | 同上；按住超过 300 ms 临时进混合档，松开回原来的档 |
-| | | 一栏上（4-52） | Enter／Space 与 Accel-\ 打开或关上世界层的面，按住是临时看一眼那张面；按下不取焦点，软键盘留着 |
-| 世界层的面（一栏） | 带名字的 `<section>`，内含 APG Tabs | 返回键 Enter／Space、浏览器返回、边缘返回 | 退出这张面（`history.back()`），回到对话；焦点丢在 `body` 上时回到开面时持焦的控件 |
-| | | 页签上 ←／→、Home／End | 换一栏显示，同 `parts/tabs.svelte` |
+| 手机操作入口 | APG Disclosure Button | Enter／Space 或短触 | 左下一个入口换成包含四个图标动作的同一弹出菜单，焦点到设置。Esc 还焦并收起，触摸面外收起并把输入留给触点，选定任一动作后收起。 |
+| 设置键 | APG Button | Enter／Space 或点按 | 打开设置本体。关闭后焦点到桌面设置键或手机操作入口。 |
+| 导航键 | APG Disclosure Button | Enter／Space 或点按 | 开合当前主体的文件树或会话列表。打开时焦点进入这一层；关闭后还焦到导航键。 |
+| 文件夹与父目录 | 原生按钮与当前目录路径 | Enter／Space 或点按 | 当前列表只显示直属子项，进入子目录时焦点到路径；返回将焦点送到父目录中的原文件夹。目录深度独立于菜单层数。 |
+| 文件分屏 | APG Window Splitter | 桌面 ←／→、手机 ↑／↓、Home／End、Enter 或拖动 | 桌面在外壳栏线上左右分屏，每边至少两栏。手机上下分屏，首次平分，拖动时每边至少四分之一。Enter 复位。横向栏线和纵向比例分别保存。 |
+| 导航层 | 非模态、有名称的区域 | Escape | 先交给焦点所在的菜单；随后布局、资料库或历史返回列表及原入口；从目录内开始的 Escape 逐级返回并还焦到刚离开的文件夹；列表关闭并还焦到导航键。露出的阅读区可独立滚动。 |
+| 导航层的提交历史 | 原生按钮，按提交显示展开状态 | Enter／Space 或点按 | 由列表头进入历史，行内展开 OID、父提交和时间。有父提交时同时打开差异检视。当前 Session、草稿和阅读坐标保持原值。回到列表时还焦到层标题。 |
+| 文件会话浮层 | APG Disclosure Button | Enter／Space 或点按 | 开合当前 Session 的草稿。打开时焦点进入输入框；文件仍以原页宽和位置显示。已分屏时把焦点送到现有草稿。 |
+| 主体键 | APG Button | Enter／Space 或点按 | 在文件和 Session 之间切换，共用同一个会话与草稿。画布留有自己的几何、滚动与编辑器状态。 |
+| 密度键 | APG Button | Enter／Space 或点按 | 在 Zen 和 Panorama 之间切换。图层、文件和会话不变。 |
+| 密度键 | APG Button | Accel-\ 或指针 | 短按切换密度；按住 300 ms 临时显示当前会话的活动。松开、指针取消或窗口失焦即退出，不触发短按。 |
 | 右侧的面（一栏） | 同检视面 | 关闭键、Escape、浏览器返回、边缘返回 | 关上右侧并退出它的历史格，焦点回到打开它的控件 |
 | 信箱键、设置键 | APG Button | Enter／Space | 打开各自的面；面关上时焦点回到这个键 |
-| 信箱面 | 非模态的一层，带 `aria-label` 的 `<aside>`，画在三个边缘键之下（D60） | Escape | 关上；焦点在面里时回到信箱键 |
-| | | 点面外（包括另两个边缘键） | 关上，焦点留在点到的地方 |
+| 信箱面 | 非模态的一层，带 `aria-label` 的 `<aside>`，画在边缘入口之下（D60） | Escape | 关上；焦点在面里时回到信箱键 |
+| | | 点面外（包括其余边缘入口） | 关上，焦点留在点到的地方 |
 | | | 信箱键、Accel-B | 开着时关上（焦点在面里时回到信箱键），关着时打开，焦点不动 |
 | 信箱面里的条目 | 无 APG 部件模式：一串各自可达的条目，加上 vim 的走法 | j／k | 焦点移到下一个／上一个条目，两端不环绕；条目是一行的链接或一张请决定卡本身 |
 | | | 1–9 | 前九个条目各在行尾画出自己的数字；按下是跟随那一行的链接（信箱随之关上），或把焦点放到那张卡上 |
@@ -48,7 +54,7 @@ import RefRain.spec.Views.Parts
 | | | e（焦点不在文本框里） | 回到 diff，改过的字与勾选留着，直到卡被决定或消失 |
 | | | y（焦点不在文本框里） | 按勾选与改过的字发出；在文本框里打 y 是字，不是答复 |
 | 修改提案卡的「在原文中显示」 | APG Button | Enter／Space | 编辑器的光标落到这一段的开头并滚进视野，焦点进编辑器 |
-| 三键的名字 | APG Tooltip | 单独按住加速键 300 ms | 三个名字一起出现；松开、窗口失焦或开始组合输入即收 |
+| 边缘入口的名字 | APG Tooltip | 单独按住加速键 300 ms | 显示当前可见入口的名字；松开、窗口失焦或开始组合输入即收 |
 | | | Escape | 撤下正在显示的名字 |
 | 检阅三栏的分隔线 | APG Window Splitter | ←／→ | 前一栏宽一栏或窄一栏，钳在每栏至少两栏宽 |
 | | | Home／End | 前一栏到最窄或最宽 |
@@ -80,20 +86,20 @@ import RefRain.spec.Views.Parts
 | | | Home／End | 到 30% 或 90% |
 | 远程组的「配对这台设备」与「锁上门」 | APG Button | Enter／Space | 走那一次握手；进行中 `aria-disabled="true"`，结果写进组里唯一的 `role="status"` |
 | 远程组的种子 | 只读文字，带 `aria-label` 的 `<output>` | 「我记下了」（APG Button）Enter／Space | 种子从页面上拿掉，焦点落到这台设备那一节的标题 |
-| 远程组的「忘掉这台设备」 | APG Button，打开 `parts/dialog.svelte` | Enter／Space | 确认后删掉本地记录，焦点回到组标题；取消时回到这个按钮 |
+| 远程组的「忘掉这台设备」 | APG Button，打开 `parts/dialog` | Enter／Space | 确认后删掉本地记录，焦点回到组标题；取消时回到这个按钮 |
 
-`aria-*`：硬币键的可读名字是朝上那一面的动作——发送（steer 时写出落点）或停止——翻面时名字随之换，而换名不进实时区域，因为它不是新闻；变淡的发送面 `aria-disabled="true"`，`aria-describedby` 指向说明原因的提示。上下文环 `aria-valuemin="0"`、`aria-valuemax` 是窗口、`aria-valuenow` 是用掉的 token，`aria-valuetext` 是提示那一行。房间菜单的列表以「谁在听」那一段为 `aria-describedby`，所以读屏器在列表获得焦点时连同它一起读出；那一段里没有可聚焦的东西，菜单的键全归列表。图层键的名字是「图层 · <当前档>」。设置树是 `<nav>` 加 `aria-label`，页条目是 `<a href>`（中键与新标签页照常可用），组条目是按钮；当前页（设置面下面那一页）`aria-current="page"`，当前组 `aria-current="true"`；有子条目的条目带 `aria-expanded` 与 `aria-controls`；每个枝的列表以枝的标签为 `aria-labelledby`。设置面以当前组的标题为 `aria-labelledby`，打开时焦点落在当前组的条目上。分隔线是 `role="separator"`，带 `aria-orientation`、以栏数计的 `aria-valuenow`／`aria-valuemin`／`aria-valuemax`，`aria-controls` 指向前一栏。右侧编辑器与终端之间的分隔线以行计（一行是三个基线步，24 px）。检视面的页签带是 `role="tablist"`，整条是一个 Tab 站（游走的 `tabindex`），每个页签 `aria-selected` 说它是不是最后碰过的那一项、`aria-controls` 指向它所在的区（编辑器区与终端区各是一个 `role="tabpanel"`）；页签上的关闭记号给指针用，`tabindex="-1"`，键盘走 Delete。「原文」带 `aria-pressed`。混合档滑条的 `aria-valuetext` 写出百分数（画法见 `docs/frontend-method.md` §4-43）。
+`aria-*`：硬币键的可读名字是朝上那一面的动作——发送（steer 时写出落点）或停止——翻面时名字随之换，而换名不进实时区域，因为它不是新闻；变淡的发送面 `aria-disabled="true"`，`aria-describedby` 指向说明原因的提示。上下文环 `aria-valuemin="0"`、`aria-valuemax` 是窗口、`aria-valuenow` 是用掉的 token，`aria-valuetext` 是提示那一行。房间菜单的列表以「谁在听」那一段为 `aria-describedby`，所以读屏器在列表获得焦点时连同它一起读出；那一段里没有可聚焦的东西，菜单的键全归列表。导航键以当前主体的列表命名，带 `aria-expanded` 和 `aria-controls`。设置树是 `<nav>` 加 `aria-label`，页条目是 `<a href>`（中键与新标签页照常可用），组条目是按钮；当前页（设置面下面那一页）`aria-current="page"`，当前组 `aria-current="true"`；有子条目的条目带 `aria-expanded` 与 `aria-controls`；每个枝的列表以枝的标签为 `aria-labelledby`。设置面以当前组的标题为 `aria-labelledby`，打开时焦点落在当前组的条目上。分隔线是 `role="separator"`，带 `aria-orientation`、以栏数计的 `aria-valuenow`／`aria-valuemin`／`aria-valuemax`，`aria-controls` 指向前一栏。右侧编辑器与终端之间的分隔线以行计（一行是三个基线步，24 px）。检视面的页签带是 `role="tablist"`，整条是一个 Tab 站（游走的 `tabindex`），每个页签 `aria-selected` 说它是不是最后碰过的那一项、`aria-controls` 指向它所在的区（编辑器区与终端区各是一个 `role="tabpanel"`）；页签上的关闭记号给指针用，`tabindex="-1"`，键盘走 Delete。「原文」带 `aria-pressed`。混合档滑条的 `aria-valuetext` 写出百分数（画法见 `docs/frontend-method.md` §4-43）。
 -/
 
 /-!
 ## 模型：图层键、硬币键与信箱的走法
 
-规定 §7-11 里三个外壳控件的状态机；分隔线在 `RefRain/spec/Core/Workbench.lean`，检视面的页签带在 `RefRain/spec/Views/Inspect/Open.lean`，请决定卡在 `RefRain/spec/Views/Parts/Decide.lean`。
+规定 §7-11 里的外壳状态机；分隔线在 `RefRain/spec/Core/Workbench.lean`，检视面的页签带在 `RefRain/spec/Views/Inspect/Open.lean`，请决定卡在 `RefRain/spec/Views/Parts/Decide.lean`。
 
-1. **图层键**（`views/edge.svelte`）：按一下按 zen → blend → panorama → zen 循环（三档的名字是 client D17），按三下回到原档（`three_presses_come_home`）；按住超过 300 ms 临时进 blend，松开回到人选定的档，看一眼不改选定的档（`a_peek_keeps_the_chosen_tier`）。每次启动从 zen 开始，存下的档不在启动时读回（`a_launch_opens_in_zen`，client D47）。不论此刻开着设置面还是别的页，按一下都回到对话、换到下一档、焦点落进对话框（`a_press_lands_in_the_conversation`、`a_press_moves_the_tier`，client D48）。
+1. **工作区外壳**：桌面从左下向上常驻设置、当前列表、信箱、主体四个入口。手机初始一个操作入口，展开时替换为同一弹出菜单内的四个图标动作，每项保留完整可及名称。导航键只开合当前主体的列表；主体键只换文件／Session 画法；密度只有 Zen 与 Panorama。按住查看活动不改选定的密度，显式分屏才改变文件画布的布局。冷启动先读显式地址，再读浏览器现场，仍无记录时走首次入口。
 2. **硬币键**（`RefRain/src/views/talk/coin_face.ts` 的 `pressCoin`，client D18）：做朝上那一面，只有没变淡的发送面发出框里的字：变淡的发送面一按落进空操作，停止面只发 `cancel`（`only_the_lit_send_face_sends_words`）。TS 里变淡的发送面叫 `idle`，即这里的 `send true`；`coin_face.test.ts` 在每一面上检查这条定理；点击写在 `coin.ts` 造的接线包里，只按 `pressCoin` 的回答行事，`coin.test.ts` 在每一面上按一次，看停止与提交各自有没有发生。
 3. **信箱的条目**（`RefRain/src/views/mailbox/entries.ts`）：j／k 与 `RowList` 同一种钳住的走法，到最后一条不再走（`k_stops_at_the_last_entry`）；1–9 只落到前九个、且存在的条目上（`a_digit_reaches_only_a_drawn_entry`）。
-4. **信箱面这一层**（`RefRain/src/views/mailbox/layer.ts`，D60）：不论按什么顺序按键，关上的信箱里不留焦点（`no_focus_stays_in_a_closed_mailbox`）；Escape 总是关上它，焦点在面里时回到信箱键（`escape_closes_and_returns_focus`）；信箱键与 Accel-B 是同一个开关，按两下回到原样（`two_presses_come_home`）；点面外——另两个边缘键也在面外——总是关上它（`a_press_outside_closes`）。
+4. **信箱面这一层**（`RefRain/src/views/mailbox/layer.ts`，D60）：不论按什么顺序按键，关上的信箱里不留焦点（`no_focus_stays_in_a_closed_mailbox`）；Escape 总是关上它，焦点在面里时回到信箱键（`escape_closes_and_returns_focus`）；信箱键与 Accel-B 是同一个开关，按两下回到原样（`two_presses_come_home`）；点面外，包括其余边缘入口，总是关上它（`a_press_outside_closes`）。
 5. **信件在右侧**（`RefRain/src/views/mailbox/layer.ts` 的 `stepLetter`，D73）：信件关上时信箱重新打开、焦点回到打开它的那一行，中间信箱收到什么输入都不改（`closing_a_letter_returns_to_its_row`）；信件的开合不让焦点留在关上的信箱里（`letters_hold_mail_focus`）。
 -/
 
@@ -101,80 +107,96 @@ namespace Client.Views.Workspace
 
 open Client.Views.Parts
 
-/-- 三档（client D17）。 -/
-inductive Tier where
+inductive Subject where
+  | files
+  | session
+  deriving DecidableEq, Repr
+
+inductive Density where
   | zen
-  | blend
   | panorama
   deriving DecidableEq, Repr
 
-/-- 按一下图层键。 -/
-def nextTier : Tier → Tier
-  | .zen => .blend
-  | .blend => .panorama
+def nextDensity : Density → Density
+  | .zen => .panorama
   | .panorama => .zen
 
-/-- 图层的状态：人选定的档，与是否正按住看一眼。 -/
-structure Layer where
-  chosen : Tier
-  peeking : Bool
+inductive Navigation where
+  | closed
+  | list
+  | history
+  | layout
+  | library
   deriving DecidableEq, Repr
 
-/-- 画出来的档：按住时是 blend，否则是选定的档。 -/
-def shown (layer : Layer) : Tier := if layer.peeking then .blend else layer.chosen
-
-/-- 按住超过 300 ms。 -/
-def hold (layer : Layer) : Layer := { layer with peeking := true }
-
-/-- 松开。 -/
-def release (layer : Layer) : Layer := { layer with peeking := false }
-
-theorem three_presses_come_home (tier : Tier) : nextTier (nextTier (nextTier tier)) = tier := by
-  cases tier <;> rfl
-
-theorem a_peek_shows_blend (layer : Layer) : shown (hold layer) = .blend := rfl
-
-theorem a_peek_keeps_the_chosen_tier (layer : Layer) :
-    (release (hold layer)).chosen = layer.chosen ∧ shown (release (hold layer)) = layer.chosen :=
-  ⟨rfl, rfl⟩
-
-/-- 启动时的图层：不论这个浏览器或城存下的是哪一档（client D47）。 -/
-def launch (_saved : Tier) : Layer := { chosen := .zen, peeking := false }
-
-theorem a_launch_opens_in_zen (saved : Tier) : shown (launch saved) = .zen := rfl
-
-/-- 对话之上盖着什么：什么都没有、设置面、或别的一页。 -/
-inductive Over where
-  | conversation
+inductive EdgeAction where
+  | launcher
   | settings
-  | page
+  | navigation
+  | mailbox
+  | subject
   deriving DecidableEq, Repr
 
-/-- 焦点落在哪里：对话框，或别处。 -/
-inductive Focus where
-  | composer
-  | elsewhere
-  deriving DecidableEq, Repr
+def edgeActions (narrow expanded : Bool) : List EdgeAction :=
+  if narrow && !expanded then [.launcher]
+  else [.settings, .navigation, .mailbox, .subject]
 
-/-- 外壳：图层、盖在对话之上的东西、焦点。 -/
+theorem compact_edge_has_one_action : edgeActions true false = [.launcher] := rfl
+
+theorem expanded_edge_matches_desktop : edgeActions true true = edgeActions false false := rfl
+
 structure Shell where
-  layer : Layer
-  over : Over
-  focus : Focus
+  subject : Subject
+  density : Density
+  navigation : Navigation
+  peeking : Bool
+  split : Bool
+  file : Option String
+  session : Option String
   deriving DecidableEq, Repr
 
-/-- 按一下图层键（宽屏）：先回到对话，再换档，焦点进对话框（client D48）。 -/
-def pressLayers (shell : Shell) : Shell :=
-  { layer := { shell.layer with chosen := nextTier shell.layer.chosen }
-    over := .conversation
-    focus := .composer }
+def toggleNavigation (shell : Shell) : Shell :=
+  { shell with navigation := if shell.navigation = .closed then .list else .closed }
 
-theorem a_press_lands_in_the_conversation (shell : Shell) :
-    (pressLayers shell).over = .conversation ∧ (pressLayers shell).focus = .composer :=
+def backNavigation (shell : Shell) : Shell :=
+  { shell with navigation := match shell.navigation with
+    | .history | .layout | .library => .list
+    | .list | .closed => .closed }
+
+def toggleSubject (shell : Shell) : Shell :=
+  { shell with
+    subject := match shell.subject with
+      | .files => .session
+      | .session => .files
+    navigation := .closed }
+
+def toggleDensity (shell : Shell) : Shell :=
+  { shell with density := nextDensity shell.density }
+
+def holdPeek (shell : Shell) : Shell := { shell with peeking := true }
+
+def releasePeek (shell : Shell) : Shell := { shell with peeking := false }
+
+theorem navigation_keeps_selected_targets (shell : Shell) :
+    (toggleNavigation shell).file = shell.file ∧
+    (toggleNavigation shell).session = shell.session ∧
+    (toggleNavigation shell).split = shell.split :=
+  ⟨rfl, rfl, rfl⟩
+
+theorem subject_keeps_selected_targets (shell : Shell) :
+    (toggleSubject shell).file = shell.file ∧
+    (toggleSubject shell).session = shell.session ∧
+    (toggleSubject shell).split = shell.split :=
+  ⟨rfl, rfl, rfl⟩
+
+theorem two_density_presses_restore (density : Density) :
+    nextDensity (nextDensity density) = density := by
+  cases density <;> rfl
+
+theorem releasing_peek_keeps_density (shell : Shell) :
+    (releasePeek (holdPeek shell)).density = shell.density ∧
+    (releasePeek (holdPeek shell)).peeking = false :=
   ⟨rfl, rfl⟩
-
-theorem a_press_moves_the_tier (shell : Shell) :
-    (pressLayers shell).layer.chosen = nextTier shell.layer.chosen := rfl
 
 /-- 硬币键朝上的那一面。 -/
 inductive Face where
@@ -214,8 +236,8 @@ theorem a_digit_reaches_only_a_drawn_entry (count digit entry : Nat)
   · cases h; omega
   · cases h
 
-/-! D60 信箱面是一层普通的 fixed 元素，挂在边缘键的 `<nav>` 里、画在三个键之下，点面外与 Escape 由它自己判。
-理由：User 要信箱从左缘推出、贴左对齐、三个边缘键浮在它上面；`popover="auto"` 把面放进 top layer，top layer 之上只能再是 top layer，键要浮上去就得把三个键也做成 popover，而 popover 离开网格，键在宽屏与手机上的位置都得重拼一份。被否决的另一条路正是这个。
+/-! D60 信箱面是一层普通的 fixed 元素，挂在边缘键的 `<nav>` 里、画在边缘入口之下，点面外与 Escape 由它自己判。
+理由：User 要信箱从左缘推出、贴左对齐、可见边缘入口浮在它上面；`popover="auto"` 把面放进 top layer，top layer 之上只能再是 top layer，键要浮上去就得把边缘入口也做成 popover，而 popover 离开网格，键在宽屏与手机上的位置都得重拼一份。被否决的另一条路正是这个。
 代价是平台不再替它判点面外与 Escape：本模型就是那份判定，`layer.ts` 照它写，测试按迹重放同样的性质。
 重新打开的条件：边缘键本身改成 top layer 里的东西（例如整条边缘层进 popover）时，信箱回到 `popover="auto"`。 -/
 
@@ -232,7 +254,7 @@ structure Mail where
   focus : MailFocus
   deriving DecidableEq, Repr
 
-/-- 落到这一层的输入。`toggle` 是信箱键与 Accel-B；`outside` 是面外的一次按下，另两个边缘键也算；`enter` 是焦点走进面里；`follow` 是跟随一行的链接。 -/
+/-- 落到这一层的输入。`toggle` 是信箱键与 Accel-B；`outside` 是面外的一次按下，其余边缘入口也算；`enter` 是焦点走进面里；`follow` 是跟随一行的链接。 -/
 inductive MailInput where
   | toggle
   | escape
@@ -305,7 +327,7 @@ theorem a_press_outside_closes (mail : Mail) (inputs : List MailInput) :
   simp [runMail, List.foldl_append, stepMail]
 
 /-! D73 信件在右侧打开时信箱收起，信件关上时信箱重新打开、焦点回到打开它的那一行。
-理由：右侧在面外，信箱开着时点进信件就是一次 `outside`（`a_press_outside_closes`），所以信件与信箱不能同时开着；而人读完一封信要回到下一封，所以关上信件不能只把焦点交还给一个已经卸下的按钮（`inspect/open.svelte.ts` 的 opener 在信箱收起时已不在页上）。行由信件卡的 `id` 认出，不由元素认出，因为信箱重新挂上时元素是新的。
+理由：右侧在面外，信箱开着时点进信件就是一次 `outside`（`a_press_outside_closes`），所以信件与信箱不能同时开着；而人读完一封信要回到下一封，所以关上信件不能只把焦点交还给一个已经卸下的按钮（`inspect/open.ts` 的 opener 在信箱收起时已不在页上）。行由信件卡的 `id` 认出，不由元素认出，因为信箱重新挂上时元素是新的。
 被否决的另一条路：信件打开时信箱不收，点信件不算面外——那要给 `outside` 开一个例外，信箱就有了两种「面外」。
 重新打开的条件：信箱不再是左缘推出的一层（D60 重开）时，信件可以与它并排。 -/
 

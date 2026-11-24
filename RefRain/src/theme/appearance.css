@@ -1,0 +1,74 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+:root {
+  --refrain-wallpaper-image: none;
+  --reading-level: 0.5;
+  --reading-spread: 0.08;
+  --reading-lightness-delta: calc((var(--reading-level) - 0.5) * var(--reading-spread));
+  --reading-filter: brightness(calc(0.6 + 0.8 * var(--reading-level)));
+  --pdf-upper-level: max(0, calc(var(--reading-level) - 0.5));
+  --pdf-paper-lightness: calc(0.13 + 0.08 * var(--reading-level) + 0.04 * var(--pdf-upper-level));
+  --pdf-ink-lightness: calc(
+    0.8378 + 0.0124 * var(--reading-level) - 0.0036 * var(--pdf-upper-level)
+  );
+  --pdf-paper: oklch(var(--pdf-paper-lightness) 0.023 247);
+  --pdf-ink: oklch(var(--pdf-ink-lightness) 0.01656 247);
+  --pdf-surround: oklch(max(0.08, calc(var(--pdf-paper-lightness) - 0.04)) 0.01035 247);
+  --color-reading-canvas: var(--reading-canvas, var(--color-page));
+  --color-markdown-marker: var(--color-text-quiet);
+}
+
+:root[data-theme="light"] {
+  --reading-spread: 0.04;
+}
+
+@supports (color: oklch(from currentcolor l c h)) {
+  :root {
+    --reading-canvas: oklch(
+      from var(--color-page) clamp(0, calc(l + var(--reading-lightness-delta)), 1) c h / 1
+    );
+  }
+}
+
+[data-refrain-session-shell],
+[data-refrain-wallpaper-preview] {
+  background-color: var(--color-page);
+  background-image: var(--refrain-wallpaper-image);
+  background-position: center;
+  background-size: cover;
+}
+
+[data-refrain-session-content] {
+  background-color: var(--color-page);
+  background-color: oklch(from var(--color-page) l c h / 1);
+}
+
+[data-refrain-reading-canvas] {
+  background-color: var(--color-reading-canvas);
+}
+
+[data-refrain-wallpaper-preview] {
+  min-block-size: var(--wallpaper-preview-size);
+  border: 1px solid var(--color-edge-panel);
+}
+
+:root {
+  --wallpaper-preview-size: 96px;
+}
+
+@media (forced-colors: active) {
+  :root,
+  :root[data-theme="light"] {
+    --reading-canvas: Canvas;
+    --reading-filter: none;
+    --pdf-surround: Canvas;
+  }
+
+  [data-refrain-session-shell],
+  [data-refrain-wallpaper-preview] {
+    background-image: none;
+  }
+}

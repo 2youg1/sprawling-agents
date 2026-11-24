@@ -9,9 +9,15 @@ export type GlyphName =
   | "record"
   | "cost"
   | "setup"
+  | "app-grid"
+  | "folder-tree"
+  | "session-list"
+  | "refresh"
+  | "add"
   | "hand"
   | "search"
   | "chevron"
+  | "go-back"
   | "reveal"
   | "ring"
   | "pulse"
@@ -23,6 +29,7 @@ export type GlyphName =
   | "capped"
   | "send"
   | "layers"
+  | "switch-subject"
   | "inbox"
   | "settings"
   | "gate"
@@ -35,7 +42,13 @@ export type GlyphName =
   | "copy"
   | "door"
   | "key"
-  | "mic";
+  | "mic"
+  | "pdf-crop"
+  | "pdf-magnify"
+  | "pdf-original"
+  | "pdf-brightness"
+  | "pdf-details"
+  | "pdf-reference";
 
 export type Weight = "quiet" | "live" | "alert";
 
@@ -57,4 +70,13 @@ const STATUS: Record<Status, StatusLook> = {
 
 export function statusLook(state: Status): StatusLook {
   return STATUS[state];
+}
+
+export type GlyphSize = "sm" | "md" | "key" | "stop";
+
+export interface GlyphProps {
+  readonly name: GlyphName;
+  readonly size?: GlyphSize | undefined;
+  readonly solid?: boolean | undefined;
+  readonly class?: string | readonly (string | false | null | undefined)[] | undefined;
 }

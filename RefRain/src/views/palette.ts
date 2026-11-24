@@ -10,7 +10,7 @@ import { completed } from "../core/completion";
 import type { View } from "../core/route";
 import { buildingOf, readWorkspace, toFragment, workspaceDestination } from "../core/route";
 import { sessionTree } from "../core/session_tree";
-import { stretchesOf, tailOf } from "../core/stretches";
+import { stretchesOf } from "../core/stretches";
 import type { BuildingProgress } from "../wire";
 import { ago } from "../core/time";
 import type { Address, Origin, Seq, SessionLine } from "../wire";
@@ -118,7 +118,7 @@ export function sessionPlaces(
       to: stretch.current
         ? { kind: "talk", address: at.room }
         : { kind: "talk", address: at.room, session: line.began },
-      origin: stretch.current ? null : tailOf(stretch),
+      origin: null,
     };
   });
 }

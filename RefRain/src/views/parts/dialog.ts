@@ -3,13 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { Snippet } from "svelte";
-import { createAttachmentKey } from "svelte/attachments";
-import type { Attachment } from "svelte/attachments";
+import type { Snippet } from "../../core/snippet";
 
 import type { Cancelling, SheetWire, Stands } from "./sheet";
 
-export interface DialogProps {
+export interface DialogProps<Content = Snippet> {
   readonly open: boolean;
 
   readonly title: string;
@@ -22,7 +20,7 @@ export interface DialogProps {
 
   readonly destructive?: boolean;
 
-  readonly children?: Snippet;
+  readonly children?: Content;
 }
 
 export interface Said {
@@ -36,29 +34,22 @@ export interface Answer {
   readonly onPress: () => void;
 }
 
-export interface DialogLook {
+export interface DialogLook<Content = Snippet> {
   readonly sheet: SheetWire;
   readonly stands: Stands;
   readonly heading: Said;
   readonly detail: Said | undefined;
-  readonly grounds: Snippet | undefined;
+  readonly grounds: Content | undefined;
 
   readonly answers: readonly [Answer, Answer];
 }
 
-const HOLD = createAttachmentKey();
-
-export function lookOf(
-  props: DialogProps,
-  uid: string,
-  hold: Attachment<HTMLDialogElement>,
-): DialogLook {
+export function lookOf<Content>(props: DialogProps<Content>, uid: string): DialogLook<Content> {
   const heading = { id: `${uid}-title`, text: props.title };
   const detail =
     props.detail === undefined ? undefined : { id: `${uid}-detail`, text: props.detail };
   return {
     sheet: {
-      [HOLD]: hold,
       "aria-labelledby": heading.id,
       "aria-describedby": detail?.id,
 

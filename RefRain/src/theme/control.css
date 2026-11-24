@@ -1,0 +1,160 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+:where([data-control]) {
+  transition:
+    background-color var(--transition-duration-short) var(--ease-leave),
+    color var(--transition-duration-short) var(--ease-leave),
+    box-shadow var(--transition-duration-short) var(--ease-leave),
+    scale var(--transition-duration-short) var(--ease-leave);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :where([data-control]:not(:disabled, [aria-disabled="true"], [aria-busy="true"])):hover {
+    transition-timing-function: var(--ease-arrive);
+  }
+
+  :where(
+    [data-control="surface"]:not(:disabled, [aria-disabled="true"], [aria-busy="true"])
+  ):hover {
+    background-color: var(--color-raised-hover);
+  }
+}
+
+:where([data-control]:not(:disabled, [aria-disabled="true"], [aria-busy="true"])):is(
+  :active,
+  [data-control-keydown],
+  [data-control-holding]
+) {
+  scale: var(--scale-press);
+  transition-timing-function: var(--ease-arrive);
+}
+
+:where([data-control="surface"]:not(:disabled, [aria-disabled="true"], [aria-busy="true"])):is(
+  :active,
+  [data-control-keydown],
+  [data-control-holding]
+) {
+  background-color: var(--color-raised-hover);
+}
+
+:where([data-control][data-control-holding]) {
+  box-shadow: inset 0 0 0 var(--spacing-hair) var(--color-edge-input);
+}
+
+:where(
+  [data-control="surface"]:is(
+    [aria-current="true"],
+    [aria-current="page"],
+    [aria-selected="true"],
+    [aria-checked="true"]
+  )
+) {
+  box-shadow: inset var(--spacing-hair) 0 var(--color-accent);
+}
+
+:where([data-control="surface"][aria-pressed="true"]) {
+  box-shadow: inset 0 calc(-1 * var(--spacing-hair)) var(--color-accent);
+}
+
+:where([data-control="surface"][aria-expanded="true"]) {
+  box-shadow: inset calc(-1 * var(--spacing-hair)) 0 var(--color-accent);
+}
+
+:where([data-control][data-control-state="pending"]) {
+  cursor: progress;
+}
+
+:where([data-control][data-control-state="unknown"]:not(:focus-visible)) {
+  outline: var(--spacing-hair) dotted var(--color-text-quiet);
+  outline-offset: calc(-1 * var(--spacing-hair));
+}
+
+:where([data-control][data-control-state="refused"]:not(:focus-visible)) {
+  outline: var(--spacing-hair) dashed var(--color-alert);
+  outline-offset: calc(-1 * var(--spacing-hair));
+}
+
+:where([data-control][data-control-state="success"]:not(:focus-visible)) {
+  outline: var(--spacing-hair) solid var(--color-accent);
+  outline-offset: calc(-1 * var(--spacing-hair));
+}
+
+:where([data-control]:focus-visible) {
+  outline: var(--spacing-hair) solid var(--color-accent);
+  outline-offset: var(--spacing-hair);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="on"]) [data-control] {
+    scale: 1;
+    transition: none;
+  }
+
+  :root:not([data-motion="on"])
+    :where([data-control]:not(:disabled, [aria-disabled="true"], [aria-busy="true"])):is(
+      :active,
+      [data-control-keydown]
+    ) {
+    box-shadow: inset 0 0 0 var(--spacing-hair) var(--color-edge-input);
+  }
+}
+
+[data-motion="off"] [data-control],
+[data-control][data-motion="off"] {
+  scale: 1;
+  transition: none;
+}
+
+:is([data-motion="off"] [data-control], [data-control][data-motion="off"]):where(
+    :not(:disabled, [aria-disabled="true"], [aria-busy="true"])
+  ):is(:active, [data-control-keydown]) {
+  box-shadow: inset 0 0 0 var(--spacing-hair) var(--color-edge-input);
+}
+
+@media (forced-colors: active) {
+  :where([data-control]:focus-visible) {
+    outline-color: Highlight;
+  }
+
+  :where(
+    [data-control="surface"]:is(
+        [aria-pressed="true"],
+        [aria-expanded="true"],
+        [aria-current="true"],
+        [aria-current="page"],
+        [aria-selected="true"],
+        [aria-checked="true"]
+      ):not(:focus-visible)
+  ) {
+    outline: var(--spacing-hair) solid ButtonText;
+    outline-offset: calc(-1 * var(--spacing-hair));
+  }
+
+  :where([data-control][data-control-state]:not(:focus-visible)) {
+    outline-color: ButtonText;
+  }
+
+  :where(
+    [data-control]:not(:disabled, [aria-disabled="true"], [aria-busy="true"]):is(
+        :active,
+        [data-control-keydown],
+        [data-control-holding]
+      ):not(:focus-visible)
+  ) {
+    outline: var(--spacing-hair) dashed ButtonText;
+    outline-offset: calc(-1 * var(--spacing-hair));
+  }
+
+  :where(
+    [data-control]:not(:disabled, [aria-disabled="true"], [aria-busy="true"]):is(
+        :active,
+        [data-control-keydown],
+        [data-control-holding]
+      ):focus-visible
+  ) {
+    outline-style: dashed;
+  }
+}

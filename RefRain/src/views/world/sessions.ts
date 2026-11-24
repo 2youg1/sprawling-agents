@@ -9,11 +9,10 @@ import type { Key, Lang } from "../../core/lang";
 import { roomOf, toFragment } from "../../core/route";
 import type { View } from "../../core/route";
 import type { Pinning, Stretch } from "../../core/stretches";
-import { tailOf } from "../../core/stretches";
 import { PIN } from "../../core/tags";
 import type { Named } from "../../core/tags";
 import { ago, lasted } from "../../core/time";
-import type { Address, Origin, RunId, Tag } from "../../wire";
+import type { Address, RunId, Tag } from "../../wire";
 import type { BranchHere } from "../talk/branching";
 import { noteOf } from "../talk/branch_note";
 import type { BranchNote } from "../talk/branch_note";
@@ -24,7 +23,8 @@ export type Dot = "run" | "ask" | "done";
 
 export function dotOf(stretch: Stretch): Dot {
   const last = stretch.runs.at(-1);
-  if (!stretch.current || last === undefined) return "done";
+  if (last === undefined || (!stretch.current && last.sessionBegan !== stretch.line.began))
+    return "done";
   switch (last.doing.kind) {
     case "frozen":
       return "done";
@@ -135,7 +135,6 @@ export interface RowContext {
   readonly collapsed: boolean;
   readonly onToggle: () => void;
   readonly branch: BranchHere;
-  readonly open: (origin: Origin) => void;
   readonly stop: (() => void) | null;
 }
 
@@ -159,13 +158,8 @@ export function rowOf(stretch: Stretch, at: RowContext): RowLook {
     link: {
       href: hrefOf(stretch),
       "aria-current": at.chosen ? "page" : undefined,
-      "aria-busy": at.branch.kind === "opening",
-      onclick: (event) => {
-        const origin = tailOf(stretch);
-        if (stretch.current || origin === null) return;
-        event.preventDefault();
-        at.open(origin);
-      },
+      "aria-busy": false,
+      onclick: () => undefined,
     },
     chosen: at.chosen,
     dot: at.chosen ? undefined : dot,

@@ -3,25 +3,15 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { Snippet } from "svelte";
-import { createAttachmentKey } from "svelte/attachments";
-import type { Attachment } from "svelte/attachments";
-import type { HTMLAttributes } from "svelte/elements";
+import type { Snippet } from "../../core/snippet";
+import type { ElementRef } from "../../core/element_ref";
+import type { JSX } from "@solidjs/web";
 
 import type { Action } from "../../core/keys";
 import type { GlyphName } from "./glyph";
 
-export type DecideKind = "question" | "ask" | "proposal";
-
-export type Answer = "yes" | "edit" | "no";
-
-export interface Choice {
-  readonly answer: Answer;
-  readonly label: string;
-
-  readonly why?: string | undefined;
-  readonly onPress: () => void;
-}
+import { GLYPH, KEY, ordered, type Answer, type Choice, type DecideKind } from "./decide_model";
+export { answering, KEY, ordered, type Answer, type Choice, type DecideKind } from "./decide_model";
 
 export interface DecideProps {
   readonly kind: DecideKind;
@@ -35,31 +25,6 @@ export interface DecideProps {
   readonly choices: readonly Choice[];
 }
 
-const GLYPH: Readonly<Record<DecideKind, GlyphName>> = {
-  question: "hand",
-  ask: "gate",
-  proposal: "propose",
-};
-
-export const KEY: Readonly<Record<Answer, Action>> = {
-  yes: "decide.yes",
-  edit: "decide.edit",
-  no: "decide.no",
-};
-
-const ORDER: readonly Answer[] = ["yes", "edit", "no"];
-
-export function ordered(choices: readonly Choice[]): readonly Choice[] {
-  return ORDER.flatMap((answer) =>
-    choices.filter((choice) => choice.answer === answer).slice(0, 1),
-  );
-}
-
-export function answering(offered: readonly Choice[], action: Action | null): Choice | undefined {
-  const chosen = offered.find((choice) => KEY[choice.answer] === action);
-  return chosen === undefined || chosen.why !== undefined ? undefined : chosen;
-}
-
 export interface AnswerLook {
   readonly answer: Answer;
   readonly label: string;
@@ -70,7 +35,8 @@ export interface AnswerLook {
 }
 
 export interface DecideWiring {
-  readonly card: HTMLAttributes<HTMLDivElement>;
+  readonly card: JSX.HTMLAttributes<HTMLDivElement> &
+    Readonly<Record<symbol, ElementRef<HTMLDivElement>>>;
   readonly glyph: GlyphName;
   readonly asker: { readonly id: string; readonly text: string };
   readonly at: string;
@@ -83,12 +49,12 @@ export interface DecideLook extends DecideWiring {
 
 export interface Deciding {
   readonly uid: string;
-  readonly hear: Attachment<HTMLDivElement>;
+  readonly hear: ElementRef<HTMLDivElement>;
 
   readonly marksOf: (action: Action) => readonly string[];
 }
 
-const HEAR = createAttachmentKey();
+const HEAR = Symbol();
 
 export function lookOf(props: Omit<DecideProps, "body">, deciding: Deciding): DecideWiring {
   const asker = { id: `${deciding.uid}-asker`, text: props.asker };

@@ -15,5 +15,5 @@ export function sizingOf(text: string): Sizing {
   if (trimmed === "") return { kind: "cleared" };
   if (!/^[0-9]+$/.test(trimmed)) return { kind: "refused" };
   const px = Number.parseInt(trimmed, 10);
-  return px >= BODY_PX.min ? { kind: "sized", px } : { kind: "refused" };
+  return px >= BODY_PX.min && px <= 0xffff_ffff ? { kind: "sized", px } : { kind: "refused" };
 }

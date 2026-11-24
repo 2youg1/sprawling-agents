@@ -8,7 +8,7 @@ import RefRain.spec.Views.Parts
 /-!
 # popover：多列 listbox
 
-规定 `RefRain/src/views/parts/popover.svelte`（多列 listbox，装在 `role="dialog"` 里），键表在 `RefRain/spec/Views/Parts.lean` §7-5。本部件在这里覆盖平台的 Tab：Tab／Shift+Tab 换列（环绕）。
+规定 `RefRain/src/views/parts/popover_view.tsx`（多列 listbox，装在 `role="dialog"` 里），键表在 `RefRain/spec/Views/Parts.lean` §7-5。本部件在这里覆盖平台的 Tab：Tab／Shift+Tab 换列（环绕）。
 
 **一张状态（列号＋游标），一张键表**：↓／↑ 在列内走，←／→ 不被本部件接管，留给调用方的光标。调用方可以用自己的外观（`look`）把同一组列表排成别的样子——设置行的模型选择器（`RefRain/spec/Views/Picker.lean`）把它们从上到下排成几节——键表与焦点规则仍是这里的。调用方经 `bind` 把游标指到某一列时，游标落在那一列生效的一行，没有生效的一行时落在第 0 行。
 
@@ -24,7 +24,7 @@ import RefRain.spec.Views.Parts
 
 列表持焦与 `bind` 文本框持焦共用活动行的可见性规则，滚动不取焦、不移动其他列或外层页面。坐标模型使用有序的非负离散单位；浏览器检查负责 DOM 的实际行高、亚像素坐标、焦点保持与按键到滚动的接线。
 
-`reveal` 与 `opensOn` 这两条几何规则也管 `combobox.svelte` 的单列表：它的游标行按同一个 `reveal` 滚进视野，它的弹层按同一个 `opensOn` 选上下。两个部件读的是同一份实现 `RefRain/src/views/parts/layer.ts`，派生检查是旁边的 `layer.test.ts`。
+`reveal` 与 `opensOn` 这两条几何规则也管 `combobox` 的单列表：它的游标行按同一个 `reveal` 滚进视野，它的弹层按同一个 `opensOn` 选上下。两个部件读的是同一份实现 `RefRain/src/views/parts/layer.ts`，派生检查是旁边的 `layer.test.ts`。
 -/
 
 namespace Client.Views.Parts.Popover

@@ -4,16 +4,13 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { describe, expect, test } from "bun:test";
-import { get } from "svelte/store";
+import { get } from "./store";
 
 import { loadPreferences } from "./prefs";
 import type { Preferences } from "./prefs";
 import { memory } from "./rows";
 import { WORKBENCH, moved } from "./workbench";
 
-// A record that differs from the shipped postures in every field, so a
-// value that failed to travel is visible rather than accidentally
-// equal to the fallback.
 const STATED: Preferences = {
   lang: "zh",
   welcomed: true,
@@ -48,8 +45,6 @@ describe("the cache in front of the city", () => {
   test("a record written by one door is read back whole by the next, the tier as a launch", () => {
     const rows = memory();
     loadPreferences(rows, "en").adopt(STATED, []);
-    // A second door over the same store is the next first paint: it
-    // reads the cache and nothing else, and a launch opens in zen.
     expect(get(loadPreferences(rows, "en").held)).toEqual({ ...STATED, tier: "zen" });
   });
 
@@ -68,11 +63,14 @@ describe("the cache in front of the city", () => {
     expect(get(loadPreferences(rows, "en").held).appearance.lighting).toBe("system");
   });
 
-  test("every launch opens in zen, whatever tier the last visit chose", () => {
+  test("restores panorama and migrates legacy blend to zen", () => {
     const rows = memory();
     rows.setItem("sprawling.tier", "panorama");
-    loadPreferences(rows, "en").setTier("blend");
+    expect(get(loadPreferences(rows, "en").held).tier).toBe("panorama");
+    rows.setItem("sprawling.tier", "blend");
     expect(get(loadPreferences(rows, "en").held).tier).toBe("zen");
+    loadPreferences(rows, "en").setTier("panorama");
+    expect(get(loadPreferences(rows, "en").held).tier).toBe("panorama");
   });
 
   test("a browser asking in Chinese is answered in Chinese before anything is stored", () => {
@@ -86,8 +84,6 @@ describe("who is keeping these", () => {
     const door = loadPreferences(memory(), "en");
     expect(get(door.keeper)).toBe("browser");
     door.setLang("zh");
-    // A change made before the city answers does not promote this
-    // browser to the authority: it is still the only keeper.
     expect(get(door.keeper)).toBe("browser");
     expect(get(door.held).lang).toBe("zh");
   });

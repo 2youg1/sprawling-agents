@@ -27,8 +27,10 @@ export function stretchesOf(
         room: answer.room,
         line,
         current: at === 0,
-        runs: runs.filter(
-          (run) => run.lastSeq >= line.began && (next === undefined || run.lastSeq < next.began),
+        runs: runs.filter((run) =>
+          run.sessionBegan !== undefined
+            ? run.sessionBegan === line.began
+            : run.lastSeq >= line.began && (next === undefined || run.lastSeq < next.began),
         ),
       };
     });

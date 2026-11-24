@@ -3,32 +3,21 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// A headless Chromium-family browser driven over the DevTools protocol,
-// for `walk.ts`: open a page at a window size and a lighting, run a
-// script in it, and keep what it drew as a PNG. Every answer comes back
-// as a value that says whether it failed, so the walk decides what a
-// failure costs.
-
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-// The doctor's Chromium family, the table `xtask render` reads too: one
-// brand per line, its program, and where each platform installs it.
 const FAMILY = join(
   import.meta.dir,
   "..",
   "..",
-  "crates",
-  "sprawling",
+  "Sprawling",
+  "app",
   "src",
   "doctor",
   "family",
   "chromium.tsv",
 );
 
-// The engine to drive: the one `SPRAWLING_BROWSER` names, as for the
-// render gate, or else the first of the family installed here, in the
-// family's order; `null` when there is none.
 export function engine(): string | null {
   const named = process.env.SPRAWLING_BROWSER;
   if (named !== undefined && existsSync(named)) return named;
@@ -45,8 +34,6 @@ export function engine(): string | null {
   return null;
 }
 
-// One window a walk photographs: the size in CSS pixels, the device
-// pixel ratio, and whether it is a phone (touch, coarse pointer).
 export interface Frame {
   readonly name: string;
   readonly width: number;
@@ -104,9 +91,6 @@ export class DevTools {
     };
   }
 
-  // Starts the browser on `profile`, a directory that keeps what the
-  // page stored (the device key a pairing leaves) from one walk to the
-  // next, and attaches to its first page.
   static async open(profile: string, port: number): Promise<Outcome<DevTools>> {
     const program = engine();
     if (program === null) {
@@ -175,7 +159,6 @@ export class DevTools {
     });
   }
 
-  // Resolves when the page says `method`, or after `patience` ms.
   private heard(method: string, patience: number): Promise<void> {
     return Promise.race([
       new Promise<void>((heard) => {
@@ -208,8 +191,6 @@ export class DevTools {
     await this.settle(settle);
   }
 
-  // Waits `ms`, then for the fonts and two frames, so what is kept is
-  // what the page drew once it was still.
   async settle(ms: number): Promise<void> {
     await sleep(ms);
     await this.run(
@@ -217,8 +198,6 @@ export class DevTools {
     );
   }
 
-  // Runs `expression` in the page and waits for the promise it returns;
-  // a page that threw comes back as a failure naming what it said.
   async run(expression: string): Promise<Outcome<unknown>> {
     const answer = await this.send("Runtime.evaluate", {
       expression,
@@ -253,9 +232,6 @@ export class DevTools {
     });
   }
 
-  // A press whose browser default matters, such as Tab moving the focus
-  // or a key activating a button. Chrome performs those only for a raw
-  // key down, so a walk that drives a form needs this beside `key`.
   async raw(key: string, code: string, virtual: number, modifiers = 0): Promise<void> {
     await this.send("Input.dispatchKeyEvent", {
       type: "rawKeyDown",

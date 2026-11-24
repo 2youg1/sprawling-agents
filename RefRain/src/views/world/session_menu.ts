@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { Attachment } from "svelte/attachments";
+import type { ElementRef } from "../../core/element_ref";
 
 import { HOLD } from "./drawn";
 import { opening, popupOf, walking } from "./menu";
@@ -24,7 +24,7 @@ export interface FieldWire {
     event: Event & { readonly currentTarget: EventTarget & HTMLInputElement },
   ) => void;
   readonly onkeydown: (event: KeyPress & Pick<KeyboardEvent, "isComposing">) => void;
-  readonly [hold: symbol]: Attachment<HTMLElement>;
+  readonly [hold: symbol]: ElementRef<HTMLElement>;
 }
 
 export interface NamingLook {
@@ -69,7 +69,7 @@ export interface SessionMenuState {
 export interface SessionMenuHands extends MenuHands {
   readonly type: (typed: string) => void;
   readonly submit: () => void;
-  readonly hold: (key: string) => Attachment<HTMLElement>;
+  readonly hold: (key: string) => ElementRef<HTMLElement>;
 }
 
 export function sessionMenuLookOf(

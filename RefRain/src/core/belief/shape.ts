@@ -19,6 +19,8 @@ export interface RunBelief {
 
   readonly task: string | null;
   readonly goal: string | null;
+  readonly sessionBegan?: Seq | undefined;
+  readonly imageInput?: boolean | undefined;
   readonly lastSeq: Seq;
   readonly doing: Doing;
 
@@ -80,7 +82,8 @@ export interface Notice {
 export const NOTICE_WINDOW = 50;
 
 function noticeKey(error: AxError): string {
-  return `${error.code}\u0000${error.subject}`;
+  const legacy = `${error.code}\u0000${error.subject}`;
+  return error.request == null ? legacy : `${legacy}\u0000${error.request}`;
 }
 
 const readAddress = Schema.decodeOption(Address);

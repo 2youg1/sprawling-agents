@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { describe, expect, test } from "bun:test";
-import { get, readable } from "svelte/store";
+import { get, readable } from "./store";
 
 import { Address, Seq, Tag } from "../wire";
 import type { Answer, Command, SessionTags } from "../wire";

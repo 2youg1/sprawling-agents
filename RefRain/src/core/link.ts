@@ -10,6 +10,7 @@ import type {
   CloseMode,
   Delta,
   EventRecord,
+  IdemKey,
   LiveOutput,
   LogLine,
   Sample,
@@ -20,6 +21,7 @@ import type {
 import type { Key, Lang } from "./lang";
 import { fill, say } from "./lang";
 import { B3Hash, WIRE_HASH, WIRE_V } from "../wire";
+import type { FrameFailure } from "./frames";
 
 const SCHEMA: B3Hash = B3Hash.make(WIRE_HASH);
 
@@ -37,7 +39,7 @@ export type LinkState =
 export type LinkEvent =
   | { readonly kind: "opened"; readonly credential: string | null }
   | { readonly kind: "received"; readonly frame: ServerFrame }
-  | { readonly kind: "undecodable" }
+  | { readonly kind: "undecodable"; readonly failure?: FrameFailure; readonly frame?: number }
   | { readonly kind: "closed" }
   | { readonly kind: "wait_elapsed" }
   | { readonly kind: "retry" }
@@ -50,6 +52,7 @@ export type LinkAction =
   | { readonly kind: "welcomed"; readonly welcome: Welcome }
   | { readonly kind: "deliver"; readonly event: EventRecord }
   | { readonly kind: "answered"; readonly answered: Answered }
+  | { readonly kind: "accepted"; readonly request: IdemKey }
   | { readonly kind: "saying"; readonly delta: Delta }
   | { readonly kind: "logged"; readonly line: LogLine }
   | { readonly kind: "writing"; readonly piece: LiveOutput }
@@ -115,13 +118,42 @@ function outOfOrder(lang: Lang): AxError {
   );
 }
 
-function unreadable(lang: Lang): AxError {
-  return refusal(
+function unreadable(lang: Lang, event?: Extract<LinkEvent, { kind: "undecodable" }>): AxError {
+  const failure = event?.failure;
+  const error = refusal(
     lang,
     "wire_read_frame_action",
     fill(say(lang, "wire_frame_undecodable"), { ours: String(WIRE_V) }),
     "wire_reload_for_client",
   );
+  if (failure === undefined) return error;
+  const subject =
+    failure.stage === "json"
+      ? fill(say(lang, "wire_frame_json"), { frame: String(event?.frame), at: failure.at ?? "?" })
+      : fill(say(lang, "wire_frame_schema"), {
+          frame: String(event?.frame),
+          path: failure.path,
+          expected: failure.expected,
+          actual: failure.actual,
+        });
+  return {
+    ...error,
+    subject: `${error.subject}. ${subject}`,
+    nearby: [
+      `stage = ${JSON.stringify(failure.stage)}`,
+      `frame = ${String(event?.frame)}`,
+      `wire_v = ${String(WIRE_V)}`,
+      ...(failure.stage === "schema"
+        ? [
+            `path = ${JSON.stringify(failure.path)}`,
+            `expected = ${JSON.stringify(failure.expected)}`,
+            `actual_type = ${JSON.stringify(failure.actual)}`,
+          ]
+        : failure.at === null
+          ? []
+          : [`position = ${JSON.stringify(failure.at)}`]),
+    ],
+  };
 }
 
 export function unreadableRecord(lang: Lang, at: string): AxError {
@@ -213,6 +245,9 @@ function received(source: Link, frame: ServerFrame): [Link, LinkAction] {
   if ("refusal" in frame) {
     return refused(link, frame.refusal);
   }
+  if ("accepted" in frame) {
+    return [link, { kind: "accepted", request: frame.accepted }];
+  }
   if ("lagged" in frame) {
     return [link, { kind: "lagged", from: frame.lagged.from, to: frame.lagged.to }];
   }
@@ -253,7 +288,7 @@ export function advance(link: Link, event: LinkEvent): [Link, LinkAction] {
     case "received":
       return received(link, event.frame);
     case "undecodable":
-      return refuse(link, unreadable(link.lang));
+      return refuse(link, unreadable(link.lang, event));
     case "closed":
       return link.closing === null
         ? retreat(link)

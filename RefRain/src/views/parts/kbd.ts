@@ -3,8 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import { createAttachmentKey } from "svelte/attachments";
-import type { Attachment } from "svelte/attachments";
+import type { ElementRef } from "../../core/element_ref";
 
 import type { Cancelling, SheetWire, Stands } from "./sheet";
 
@@ -39,7 +38,7 @@ export interface Sheeting {
   readonly uid: string;
   readonly seat: Seat;
   readonly onClose: () => void;
-  readonly hold: Attachment<HTMLDialogElement>;
+  readonly hold: ElementRef<HTMLDialogElement>;
 }
 
 export interface Words {
@@ -54,7 +53,7 @@ const STANDS: Readonly<Record<Seat, Stands>> = {
   specimen: "in-flow",
 };
 
-const HOLD = createAttachmentKey();
+const HOLD = Symbol();
 
 export function sheetOf(sheeting: Sheeting, words: Words): CheatsheetLook {
   const heading = { id: `${sheeting.uid}-title`, text: words.title };

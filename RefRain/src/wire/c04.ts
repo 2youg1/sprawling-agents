@@ -10,6 +10,7 @@ import {
   Address,
   Align,
   B3Hash,
+  IdemKey,
   Payload,
   ServerLabel,
   Span,
@@ -26,12 +27,14 @@ import {
 } from "./c02";
 
 import {
-  Check,
   Construct,
   Inline,
   type InlineEncoded,
   Window,
 } from "./c03";
+
+export const Check = Schema.Literals(["not_a_task", "open", "done"]).annotate({ identifier: "Check" });
+export type Check = typeof Check.Type;
 
 export interface ListItem { readonly blocks: readonly Block[]; readonly check: typeof Check.Type; readonly span: typeof Span.Type }
 export interface ListItemEncoded { readonly blocks: readonly BlockEncoded[]; readonly check: typeof Check.Encoded; readonly span: typeof Span.Encoded }
@@ -271,6 +274,7 @@ export const AxError = Schema.Struct({
   nearby: Schema.Array(Schema.String),
   provider: Schema.optional(Schema.NullOr(ProviderFailureKind)),
   recovery: Schema.String,
+  request: Schema.optional(Schema.NullOr(IdemKey)),
   retry: Retry,
   retry_after_ms: Schema.optional(Schema.NullOr(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)))),
   subject: Schema.String,
@@ -427,7 +431,4 @@ export type Face = typeof Face.Type;
 
 export const Glass = Schema.Literals(["on", "off"]).annotate({ identifier: "Glass" });
 export type Glass = typeof Glass.Type;
-
-export const Lighting = Schema.Literals(["system", "dark", "light"]).annotate({ identifier: "Lighting" });
-export type Lighting = typeof Lighting.Type;
 

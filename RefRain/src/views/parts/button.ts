@@ -3,6 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
+import type { GlyphName } from "./glyph";
+
+export type ButtonResult = "success" | "refused" | "unknown";
+
 export type Tone = "primary" | "secondary" | "quiet" | "destructive";
 
 export type ButtonState = "idle" | "loading" | "stopped";
@@ -15,6 +19,8 @@ export interface ButtonProps {
   readonly type?: "button" | "submit";
 
   readonly loading?: boolean;
+  readonly glyph?: GlyphName | undefined;
+  readonly result?: ButtonResult | undefined;
 
   readonly why?: string;
   readonly onPress?: () => void;
@@ -33,6 +39,8 @@ export interface ButtonLook {
   readonly label: string;
   readonly tone: Tone;
   readonly state: ButtonState;
+  readonly glyph?: GlyphName | undefined;
+  readonly result?: ButtonResult | undefined;
 
   readonly why: string | undefined;
 
@@ -50,6 +58,8 @@ export function lookOf(props: ButtonProps): ButtonLook {
     label: props.label,
     tone: props.tone ?? "secondary",
     state,
+    glyph: props.glyph,
+    result: props.result,
     why: props.why,
     wire: (hint) => ({
       type: props.type ?? "button",

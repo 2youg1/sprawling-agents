@@ -89,6 +89,8 @@ export interface Dispatch {
   readonly effort: Effort | null;
 
   readonly policy: RunPolicy;
+  readonly resume?: Seq | null;
+  readonly images?: readonly string[];
 }
 
 export function statedGoal(mode: Mode, goal: string): string {
@@ -108,14 +110,16 @@ export function dispatch(d: Dispatch): Command {
       goal: statedGoal(d.policy.mode, d.goal),
       policy: d.policy,
       session: null,
+      ...(d.resume == null ? {} : { resume: d.resume }),
+      ...(d.images === undefined || d.images.length === 0 ? {} : { images: d.images }),
       effort: d.effort,
       idem: mintIdem(),
     },
   };
 }
 
-export function steer(run: RunId, text: string): Command {
-  return { steer: { run, text, idem: mintIdem() } };
+export function steer(run: RunId, text: string, images: readonly string[] = []): Command {
+  return { steer: { run, text, idem: mintIdem(), ...(images.length === 0 ? {} : { images }) } };
 }
 
 export function cancel(run: RunId): Command {

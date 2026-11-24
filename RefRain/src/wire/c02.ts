@@ -10,11 +10,20 @@ import {
   B3Hash,
   SandboxArm,
   Span,
+  TimeMs,
 } from "./c00";
 
 import {
-  DiscardLine,
+  Restoration,
 } from "./c01";
+
+export const DiscardLine = Schema.Struct({
+  at: TimeMs,
+  path: Schema.String,
+  restoration: Schema.optional(Schema.NullOr(Restoration)),
+  restored: Schema.Boolean,
+}).annotate({ identifier: "DiscardLine" });
+export type DiscardLine = typeof DiscardLine.Type;
 
 export const DiscardAnswer = Schema.Struct({
   rows: Schema.Array(DiscardLine),
@@ -402,11 +411,4 @@ export type GenerationSettings = typeof GenerationSettings.Type;
 
 export const ParameterSupport = Schema.Literals(["unknown", "supported", "unsupported"]).annotate({ identifier: "ParameterSupport" });
 export type ParameterSupport = typeof ParameterSupport.Type;
-
-export const GenerationSupport = Schema.Struct({
-  temperature: Schema.optional(Schema.NullOr(ParameterSupport)),
-  top_k: Schema.optional(Schema.NullOr(ParameterSupport)),
-  top_p: Schema.optional(Schema.NullOr(ParameterSupport)),
-}).annotate({ identifier: "GenerationSupport" });
-export type GenerationSupport = typeof GenerationSupport.Type;
 

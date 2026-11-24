@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The card's look value is all a look draws, so these tests hold for
-// any look: which box each changed sentence carries and
-// what pressing it changes, the words a screen reader hears, and why an
-// answer cannot be given now.
-
 import { describe, expect, test } from "bun:test";
 
 import { decideProposals } from "../../core/commands";
@@ -27,8 +22,6 @@ function slice(kind: Slice["kind"], text: string, trail = " "): Slice {
   return { kind, lead: "", text, trail };
 }
 
-// A card that keeps its first sentence and swaps the second for a new
-// one with no space between the two.
 const CARD: ProposalCard = {
   id: B3Hash.make("c".repeat(64)),
   run: RunId.make("11111111-1111-4111-8111-111111111111"),
@@ -44,7 +37,6 @@ const CARD: ProposalCard = {
 const CURRENT: Standing = { kind: "current" };
 const IDLE: Deciding = { kind: "idle" };
 
-// A recorder for the seat's one hand.
 function recorder(): {
   readonly calls: [number, Partial<Take>][];
   readonly retake: (place: number, change: Partial<Take>) => void;
@@ -59,16 +51,10 @@ function recorder(): {
 }
 
 function rowsOf(edit: Edit, hands = recorder()): readonly RowLook[] {
-  const { body } = cardLookOf(
-    CARD,
-    { standing: CURRENT, deciding: IDLE, edit, lead: undefined },
-    "en",
-    hands,
-  );
+  const { body } = cardLookOf(CARD, { standing: CURRENT, deciding: IDLE, edit }, "en", hands);
   return body.kind === "edit" ? body.rows : [];
 }
 
-// The struck row and the written row of the card, which has one of each.
 function changed(rows: readonly RowLook[]): {
   readonly struck: Extract<RowLook, { kind: "struck" }> | undefined;
   readonly written: Extract<RowLook, { kind: "written" }> | undefined;
@@ -115,7 +101,7 @@ describe("the card as its diff", () => {
   test("each changed sentence is announced by its kind, and an insertion touching a removal stands apart", () => {
     const { body } = cardLookOf(
       CARD,
-      { standing: CURRENT, deciding: IDLE, edit: null, lead: undefined },
+      { standing: CURRENT, deciding: IDLE, edit: null },
       "en",
       recorder(),
     );
@@ -144,12 +130,7 @@ describe("the card as its diff", () => {
       subject: DOC,
     };
     const statusOf = (deciding: Deciding): unknown =>
-      cardLookOf(
-        CARD,
-        { standing: CURRENT, deciding, edit: null, lead: undefined },
-        "en",
-        recorder(),
-      ).status;
+      cardLookOf(CARD, { standing: CURRENT, deciding, edit: null }, "en", recorder()).status;
     expect(statusOf(IDLE)).toBeUndefined();
     expect(statusOf(sent)).toEqual({ tone: "faint", text: say("en", "proposal_deciding") });
     expect(statusOf({ kind: "refused", error })).toEqual({ tone: "alert", text: "read it again" });

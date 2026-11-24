@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-export const WIRE_V = 81 as const;
-export const WIRE_HASH = "13c28a66810d6e35a9b477ccd507c25e458a39811c5fa86e6f574ee331dfd593" as const;
+export const WIRE_V = 82 as const;
+export const WIRE_HASH = "0cd623cf7723a33c6da58ef8b20067537171ff33452a13c52f8825c8962ed136" as const;
 export const CITY_RUN = "00000000-0000-0000-0000-000000000000" as const;
 export const BODY_PX = { min: 12 } as const;
 export const LINE_HEIGHT = { min: 1200 } as const;

@@ -71,6 +71,12 @@ export function thirdPartyNotices(licences: readonly string[]): Plugin {
         );
       } else {
         const notices = read.flatMap((entry) => (entry.notice === undefined ? [] : [entry.notice]));
+        notices.push({
+          name: "Tailwind CSS reset and utility selectors",
+          version: "4",
+          license: "MIT",
+          texts: [readFileSync(new URL("../licenses/Tailwind-MIT.txt", import.meta.url), "utf8")],
+        });
         this.emitFile({ type: "asset", fileName: FILE, source: noticesText(notices, licences) });
       }
     },
@@ -120,21 +126,48 @@ function noticeOf(installed: Installed, folders: readonly string[]): Notice | un
   if (!existsSync(manifest)) {
     return undefined;
   }
-  const own = licencesIn(installed.dir);
-  if (own.length === 0) {
-    return undefined;
-  }
-  const texts = [...own, ...folders.flatMap((folder) => licencesIn(join(installed.dir, folder)))];
   const stated: unknown = JSON.parse(readFileSync(manifest, "utf8"));
+  const version = field(stated, "version");
+  let license = field(stated, "license");
+  const own = licencesIn(installed.dir);
+  if (
+    license === "unstated" &&
+    installed.name === "khroma" &&
+    version === "2.1.0" &&
+    own.includes(readFileSync(new URL("../licenses/khroma-2.1.0-MIT.txt", import.meta.url), "utf8"))
+  ) {
+    license = "MIT";
+  }
+  if (
+    own.length === 0 &&
+    version === "2.0.3" &&
+    license === "MIT" &&
+    ["solid-js", "@solidjs/web", "@solidjs/signals"].includes(installed.name)
+  ) {
+    own.push(readFileSync(new URL("../licenses/Solid-2.0.3-MIT.txt", import.meta.url), "utf8"));
+  }
+  if (
+    own.length === 0 &&
+    installed.name === "fastdom" &&
+    version === "1.0.12" &&
+    license === "MIT"
+  ) {
+    const readme = readFileSync(join(installed.dir, "README.md"), "utf8");
+    const section = /^## License\r?\n([\s\S]*?)(?:\r?\n## |(?![\s\S]))/m.exec(readme);
+    const terms = section?.[1]?.trim();
+    if (terms?.includes("THE SOFTWARE IS PROVIDED")) own.push(terms);
+  }
+  if (own.length === 0) return undefined;
+  const texts = [...own, ...folders.flatMap((folder) => licencesIn(join(installed.dir, folder)))];
   return {
     name: installed.name,
-    version: field(stated, "version"),
-    license: field(stated, "license"),
+    version,
+    license,
     texts,
   };
 }
 
-function licencesIn(folder: string): readonly string[] {
+function licencesIn(folder: string): string[] {
   return readdirSync(folder, { withFileTypes: true })
     .filter((entry) => entry.isFile() && LICENCE_FILE.test(entry.name))
     .map((entry) => entry.name)

@@ -1,0 +1,237 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+.pdf-view {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-block-size: 0;
+  min-inline-size: 0;
+}
+
+.pdf-metadata,
+.pdf-brightness {
+  display: grid;
+  gap: var(--spacing-snug);
+  padding: var(--spacing-snug);
+  color: var(--color-text-quiet);
+}
+
+.pdf-feedback {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-tight);
+  z-index: var(--layer-popover);
+  inset: auto var(--spacing-pane) var(--spacing-pane);
+  max-inline-size: var(--spacing-measure);
+  padding: var(--spacing-snug);
+  border: 1px solid var(--color-edge-input);
+  border-radius: var(--radius-panel);
+  background: var(--color-raised);
+}
+
+.pdf-control {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-tight);
+  min-block-size: var(--spacing-control);
+  padding-inline: var(--spacing-snug);
+  border: 1px solid var(--color-edge-input);
+  border-radius: var(--radius-control);
+  background: var(--color-raised);
+  color: var(--color-text);
+}
+
+.pdf-control:is(:hover, [aria-pressed="true"]) {
+  border-color: var(--color-accent);
+}
+
+.pdf-scroll {
+  position: relative;
+  flex: 1;
+  min-block-size: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  overflow-anchor: none;
+  scrollbar-gutter: stable;
+  padding: var(--spacing-pane);
+  background: var(--pdf-surround, var(--color-reading-canvas));
+}
+
+.pdf-pages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-pane);
+}
+
+.pdf-sheet {
+  position: relative;
+  flex: none;
+  inline-size: var(--pdf-page-width, 100%);
+  overflow: clip;
+  background: var(--pdf-paper, var(--color-page));
+}
+
+.pdf-pixels,
+.pdf-pixels > canvas,
+.pdf-text-layer {
+  position: absolute;
+  inset: 0;
+}
+
+.pdf-tone-map {
+  position: absolute;
+  inline-size: 0;
+  block-size: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.pdf-pixels > canvas {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+}
+
+.pdf-clear {
+  filter: var(--pdf-tone-filter, none);
+}
+
+.pdf-view[data-original="true"] .pdf-clear {
+  visibility: hidden;
+}
+
+.pdf-text-layer {
+  text-align: initial;
+  overflow: clip;
+  transform-origin: 0 0;
+  line-height: 1;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --scale-round-x: 1px;
+  --scale-round-y: 1px;
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+
+.pdf-text-layer:is([data-main-rotation="90"]) {
+  transform: rotate(90deg) translateY(-100%);
+}
+
+.pdf-text-layer:is([data-main-rotation="180"]) {
+  transform: rotate(180deg) translate(-100%, -100%);
+}
+
+.pdf-text-layer:is([data-main-rotation="270"]) {
+  transform: rotate(270deg) translateX(-100%);
+}
+
+.pdf-text-layer :is(span, br) {
+  position: absolute;
+  color: transparent;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0 0;
+  user-select: text;
+}
+
+.pdf-text-layer > :not(.markedContent),
+.pdf-text-layer .markedContent span:not(.markedContent) {
+  --font-height: 0;
+  --scale-x: 1;
+  --rotate: 0deg;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+
+.pdf-text-layer .markedContent {
+  display: contents;
+}
+
+.pdf-text-layer ::selection {
+  background: color-mix(in oklch, var(--color-accent) 50%, transparent);
+  color: transparent;
+}
+
+.pdf-selecting .pdf-sheet {
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.pdf-selecting .pdf-text-layer {
+  pointer-events: none;
+}
+
+.pdf-region {
+  position: absolute;
+  inset: var(--pdf-y) auto auto var(--pdf-x);
+  inline-size: var(--pdf-width);
+  block-size: var(--pdf-height);
+  border: 2px solid var(--color-accent);
+  pointer-events: none;
+}
+
+.pdf-reference {
+  background: color-mix(in oklch, var(--color-accent) 25%, transparent);
+}
+
+.pdf-zoom {
+  inset: var(--spacing-pane);
+  inline-size: min(100% - 2 * var(--spacing-pane), 80rem);
+  block-size: calc(100% - 2 * var(--spacing-pane));
+  max-inline-size: none;
+  max-block-size: none;
+  margin: auto;
+  border: 1px solid var(--color-edge-input);
+  border-radius: var(--radius-panel);
+  background: var(--color-page);
+  color: var(--color-text);
+}
+
+.pdf-zoom-back {
+  position: absolute;
+  inset: auto auto var(--spacing-base) var(--spacing-base);
+}
+
+.pdf-zoom[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.pdf-zoom-scroll {
+  overflow: auto;
+  overscroll-behavior: contain;
+  flex: 1;
+  cursor: grab;
+  user-select: none;
+}
+
+.pdf-zoom-scroll:active {
+  cursor: grabbing;
+}
+
+.pdf-page-failure {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 0;
+  padding: var(--spacing-snug);
+  background: var(--color-page);
+  color: var(--color-text);
+}
+
+@media (forced-colors: active) {
+  .pdf-region {
+    border-color: Highlight;
+  }
+
+  .pdf-text-layer ::selection {
+    background: color-mix(in oklch, Highlight 50%, transparent);
+  }
+}

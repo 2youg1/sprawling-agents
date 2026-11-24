@@ -1,0 +1,62 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+.proposal-sentence {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  padding: var(--spacing-tight) var(--spacing-snug);
+  transition: opacity var(--transition-duration-short) var(--ease-arrive);
+}
+
+.proposal-box {
+  display: flex;
+  flex: none;
+  align-items: center;
+  box-sizing: content-box;
+  width: var(--spacing-glyph-sm);
+  height: 1lh;
+  padding-block: var(--spacing-tight);
+  border-block: 1px solid transparent;
+}
+
+.proposal-box input {
+  accent-color: var(--color-accent);
+}
+
+.proposal-removed {
+  background-color: color-mix(in oklch, var(--color-alert) 12%, transparent);
+  color: var(--color-text);
+  text-decoration-color: var(--color-alert);
+}
+
+.proposal-added {
+  background-color: color-mix(in oklch, var(--color-accent) 12%, transparent);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.proposal-field {
+  border-color: var(--color-edge-input);
+  field-sizing: content;
+  resize: none;
+}
+
+.proposal-untaken {
+  opacity: 0.6;
+  transition-timing-function: var(--ease-leave);
+}
+
+.proposal-run {
+  max-height: 16lh;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.proposal-abuts {
+  margin-inline-start: 0.5ch;
+}

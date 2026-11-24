@@ -6,30 +6,30 @@ Copyright (c) 2026 2youg1 and the sprawling contributors
 
 # The browser client
 
-The city's face: a Svelte 5 single-page client, served by the same
-binary that runs the city. It talks exactly one protocol
-(`RefRain/src/wire/`, generated — never edited by hand) and holds no
-state of its own beyond the browser cache behind `core/prefs.ts`.
+The Rust binary serves this client and its offline assets. The file and Session views
+share a workspace and conversation target. The registered directory, file identities,
+revisions and accepted changes belong to the host. The browser remembers layout,
+reading anchors, appearance and drafts.
 
 ## Toolchain
 
 | Tool | Role |
 |---|---|
-| [**bun**](https://github.com/oven-sh/bun) | the one JavaScript runtime: installs, runs `bun test` against `src/core/`, lints, typechecks (`bun check`, the TypeScript 7 checker built into the runtime) and builds. `just check-client` and `just build-web` both go through it; there is no node here. |
-| [**Svelte 5**](https://github.com/sveltejs/svelte) | the view layer: every screen under `src/views/` is a component written with runes (`$props`/`$derived`/`$state`), no legacy `$:` reactivity. |
-| [**Vite 8**](https://github.com/vitejs/vite) | the build, through [`@sveltejs/vite-plugin-svelte`](https://github.com/sveltejs/vite-plugin-svelte). `Sprawling/app/build.rs` embeds `dist/` as it is written, so the output paths are a contract with the binary. |
-| [**Tailwind CSS 4**](https://github.com/tailwindlabs/tailwindcss) | utilities compiled from `@import "tailwindcss"` in `src/theme.css`. Scanning is automatic and covers `.svelte`; do not configure content paths, and keep colour literals out — only the theme files may hold them. |
-| [**typescript-eslint**](https://github.com/typescript-eslint/typescript-eslint) | the lint lane (`bun run lint`, zero warnings). Its type-aware rules read the JS compiler API of `typescript@6`, which is also svelte-check's checking backend; it is never the project's `.ts` checker. |
-| [**effect**](https://github.com/Effect-TS/effect) | schema decoding on the wire: every frame in `src/wire/` decodes through it before a view may touch it, and a frame that fails to decode stops at the boundary. With `svelte`, the only runtime dependency. |
+| Bun 1.4.5 | Installs the locked dependency tree, builds and checks TypeScript, and runs the browser-condition tests. |
+| Solid 2 | Renders the workspace, document editor, conversation, administration, and gallery. |
+| Vite 8 | The official Solid plugin compiles one embedded client. Format engines and their assets load from that same origin. |
+| Native CSS | The theme publishes semantic roles and stylesheets, an explicit cascade, a responsive workspace grid and utility selectors used by existing looks. |
+| Oxlint | Type-aware diagnostics cover the TypeScript modules, Solid views and alternate looks. |
+| Effect 4 | Schemas decode frames before their values reach a view. |
 
 ## Commands
 
 ```bash
 bun install        # once
-bun run lint       # eslint, zero warnings allowed
-bun run typecheck  # two sealed lanes: bun check (.ts) + svelte-check (.svelte)
+bun run lint       # type-aware Oxlint with zero warnings allowed
+bun run typecheck  # TypeScript and Solid JSX
 bun run test [file...]          # the logic next to what it judges
-bun run build      # dist/ for build.rs to embed
+bun run build      # production client for Rust to embed
 ```
 
 `cargo xtask gates` runs the gates that judge this directory from
@@ -42,9 +42,9 @@ See `docs/frontend-method.md` for how a screen is built and accepted.
 
 | Path | What lives there |
 |---|---|
-| `src/core/` | plain `.ts`: the socket, the belief folds, the keymap, the phrase table's reader, preferences. Store-shaped values from `svelte/store`; `bun test` runs against these directly. |
+| `src/core/` | plain `.ts`: the socket, the belief folds, the keymap, the phrase table's reader, preferences. The domain exposes framework-independent readables. Solid views subscribe through `core/solid_store.ts`. |
 | `src/ui.ts` | the one gate out of `core/` to components: `setUi` at startup, `ui()` everywhere else. |
-| `src/views/` | one route or region per file, runes. |
+| `src/views/` | route components, document views and workspace controls. |
 | `src/views/parts/` | the controls this repository draws itself — the only home for a button, a field, a badge, a dialog, a tooltip. Adding one means `RefRain/Spec.lean` §9 first. |
 | `src/views/gallery/` | the fixtures `#/gallery` serves and `cargo xtask render` measures. |
 | `src/theme.css` | the theme's entry: it imports the parts in `src/theme/` in cascade order, and the theme is the only place allowed a colour literal. |

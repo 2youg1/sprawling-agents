@@ -3,18 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What the control decides before anything is drawn: where a track
-// begins and ends, where an arrow key lands, which cell a keyboard
-// arrives at, and the wire bags a look spreads - the key table and the
-// `aria-*` values of RefRain/Spec.lean §7-4, read off the value the seat
-// hands any look (client D95). No look is imported here, so a look
-// swapped for another leaves every one of these cases standing. The
-// drawing itself is measured in a real engine by `cargo xtask render`
-// against the gallery fixtures, because where a box landed is not
-// something a unit test can be told.
-
 import { describe, expect, test } from "bun:test";
-import type { Attachment } from "svelte/attachments";
 
 import {
   bands,
@@ -26,6 +15,7 @@ import {
   type Choice,
   type Group,
   type Hands,
+  type HoldCell,
   type SegmentedLook,
   type SegmentedProps,
 } from "./segmented";
@@ -35,8 +25,6 @@ type Api = "chat" | "responses" | "messages";
 const OPEN_AI: Group = { label: "OpenAI", tone: "plain" };
 const ANTHROPIC: Group = { label: "Anthropic", tone: "alert" };
 
-// The three dialects as the provider form offers them: two from one
-// lab, one from another, and the middle one not yet carried.
 const CHAT: Choice<Api> = { value: "chat", label: "chat", group: OPEN_AI };
 const RESPONSES: Choice<Api> = {
   value: "responses",
@@ -47,7 +35,6 @@ const RESPONSES: Choice<Api> = {
 const MESSAGES: Choice<Api> = { value: "messages", label: "messages", group: ANTHROPIC };
 const DIALECTS: readonly Choice<Api>[] = [CHAT, RESPONSES, MESSAGES];
 
-// The same three values with nothing said about where they come from.
 const PLAIN: readonly Choice<Api>[] = [
   { value: "chat", label: "chat" },
   { value: "responses", label: "responses" },
@@ -143,8 +130,6 @@ describe("a key lands where the APG Radio Group table says", () => {
   });
 });
 
-// A seat with no elements: it records every pick and every focus it is
-// asked for, and hands one attachment per value as the seat does.
 interface Seat {
   readonly picked: Api[];
   readonly focused: Api[];
@@ -154,7 +139,7 @@ interface Seat {
 function seat(): Seat {
   const picked: Api[] = [];
   const focused: Api[] = [];
-  const holds = new Map<Api, Attachment<HTMLElement>>();
+  const holds = new Map<Api, HoldCell>();
   return {
     picked,
     focused,
@@ -165,7 +150,7 @@ function seat(): Seat {
       hold: (value) => {
         const kept = holds.get(value);
         if (kept !== undefined) return kept;
-        const made: Attachment<HTMLElement> = () => undefined;
+        const made: HoldCell = () => undefined;
         holds.set(value, made);
         return made;
       },
@@ -193,8 +178,6 @@ function cells(look: SegmentedLook): readonly CellLook[] {
   return look.bands.flatMap((band) => band.cells);
 }
 
-// A key press the handler can be given, with a record of whether the
-// handler took the key from the platform.
 function press(key: string): {
   readonly event: { key: string; preventDefault: () => void };
   taken: () => boolean;
@@ -221,7 +204,7 @@ describe("the wire bags carry the key table to any look", () => {
   test("an arrow selects the next choosable cell, asks for focus there, and takes the key", () => {
     const at = seat();
     const key = press("ArrowRight");
-    cells(drawn(at, "chat"))[0]?.wire.onkeydown(key.event);
+    cells(drawn(at, "chat"))[0]?.wire.onKeyDown(key.event);
     expect({ picked: at.picked, focused: at.focused, taken: key.taken() }).toEqual({
       picked: ["messages"],
       focused: ["messages"],
@@ -232,7 +215,7 @@ describe("the wire bags carry the key table to any look", () => {
   test("space on a refused cell takes the key and selects nothing", () => {
     const at = seat();
     const key = press(" ");
-    cells(drawn(at, "chat"))[1]?.wire.onkeydown(key.event);
+    cells(drawn(at, "chat"))[1]?.wire.onKeyDown(key.event);
     expect({ picked: at.picked, focused: at.focused, taken: key.taken() }).toEqual({
       picked: [],
       focused: [],
@@ -243,15 +226,15 @@ describe("the wire bags carry the key table to any look", () => {
   test("a key the control does not answer is left to the page", () => {
     const at = seat();
     const key = press("Tab");
-    cells(drawn(at, "chat"))[0]?.wire.onkeydown(key.event);
+    cells(drawn(at, "chat"))[0]?.wire.onKeyDown(key.event);
     expect({ picked: at.picked, taken: key.taken() }).toEqual({ picked: [], taken: false });
   });
 
   test("a click on a refused cell selects nothing, and on a free one selects it", () => {
     const at = seat();
     const look = drawn(at, "chat");
-    cells(look)[1]?.wire.onclick();
-    cells(look)[2]?.wire.onclick();
+    cells(look)[1]?.wire.onClick();
+    cells(look)[2]?.wire.onClick();
     expect(at.picked).toEqual(["messages"]);
   });
 
@@ -276,15 +259,15 @@ describe("the wire bags carry the key table to any look", () => {
         why: cell.why,
       })),
     ).toEqual([
-      { state: "free", checked: false, disabled: false, described: undefined, why: undefined },
+      { state: "free", checked: "false", disabled: "false", described: undefined, why: undefined },
       {
         state: "refused",
-        checked: false,
-        disabled: true,
+        checked: "false",
+        disabled: "true",
         described: "s1-why-1",
         why: { id: "s1-why-1", text: "next version" },
       },
-      { state: "held", checked: true, disabled: false, described: undefined, why: undefined },
+      { state: "held", checked: "true", disabled: "false", described: undefined, why: undefined },
     ]);
   });
 
@@ -302,14 +285,12 @@ describe("the wire bags carry the key table to any look", () => {
     ]);
   });
 
-  test("every cell carries the same attachment on every draw, so a redraw keeps its element", () => {
+  test("every cell carries the same reference callback on every draw, so a redraw keeps its element", () => {
     const at = seat();
-    const symbols = (look: SegmentedLook): readonly unknown[] =>
-      cells(look).flatMap((cell) =>
-        Object.getOwnPropertySymbols(cell.wire).map((key) => cell.wire[key]),
-      );
-    const first = symbols(drawn(at, "chat"));
+    const refs = (look: SegmentedLook): readonly HoldCell[] =>
+      cells(look).map((cell) => cell.wire.ref);
+    const first = refs(drawn(at, "chat"));
     expect(first.length).toBe(3);
-    expect(symbols(drawn(at, "messages"))).toEqual(first);
+    expect(refs(drawn(at, "messages"))).toEqual(first);
   });
 });

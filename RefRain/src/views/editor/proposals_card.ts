@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { Snippet } from "svelte";
-
 import { fill, say } from "../../core/lang";
 import type { Lang } from "../../core/lang";
 import type { ProposalCard, Slice } from "../../wire";
@@ -63,8 +61,6 @@ export interface StatusLook {
 }
 
 export interface CardLook {
-  readonly lead: Snippet | undefined;
-
   readonly stale: string | undefined;
 
   readonly region: { readonly role: "status" };
@@ -76,7 +72,6 @@ export interface Held {
   readonly standing: Standing;
   readonly deciding: Deciding;
   readonly edit: Edit | null;
-  readonly lead: Snippet | undefined;
 }
 
 export interface Hands {
@@ -85,7 +80,6 @@ export interface Hands {
 
 export function cardLookOf(card: ProposalCard, held: Held, lang: Lang, hands: Hands): CardLook {
   return {
-    lead: held.lead,
     stale: staleLine(card, held.standing, lang),
     region: { role: "status" },
     status: statusOf(held.deciding, lang),
@@ -105,7 +99,7 @@ export interface Refusals {
   readonly reject: string | undefined;
 }
 
-export function refusalsOf(held: Omit<Held, "lead">, lang: Lang): Refusals {
+export function refusalsOf(held: Held, lang: Lang): Refusals {
   const busy = held.deciding.kind === "sent" || held.deciding.kind === "pending";
   const stale = held.standing.kind === "stale";
   const busyWhy = busy ? say(lang, "proposal_busy_why") : undefined;
