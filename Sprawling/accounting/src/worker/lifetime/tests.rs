@@ -7,6 +7,37 @@ use crate::worker::RunWorker;
 use std::io::Write;
 
 #[test]
+fn opening_a_workspace_with_independent_projects_leaves_git_to_the_projects() {
+    let workspace = tempfile::tempdir().unwrap();
+    let first = git2::Repository::init(workspace.path().join("first")).unwrap();
+    let second = git2::Repository::init(workspace.path().join("second")).unwrap();
+    let editor_lock = second.path().join("index.lock");
+    std::fs::write(&editor_lock, b"editor").unwrap();
+    let first_config = std::fs::read(first.path().join("config")).unwrap();
+    crate::worker::fixture::init_city(workspace.path()).unwrap();
+    let mut worker = RunWorker::new(
+        workspace.path(),
+        runtime::diagnostics::Diagnostics::off(),
+        crate::worker::fixture::hands(),
+    )
+    .unwrap();
+    worker
+        .open_session(
+            &kernel::Address::parse("hall").unwrap(),
+            wire::Carry::Nothing,
+            None,
+        )
+        .unwrap();
+    assert!(!workspace.path().join(".git").exists());
+    assert_eq!(
+        std::fs::read(first.path().join("config")).unwrap(),
+        first_config
+    );
+    assert_eq!(std::fs::read(editor_lock).unwrap(), b"editor");
+    drop(worker);
+}
+
+#[test]
 fn a_torn_tail_is_told_in_the_startup_scan() {
     let dir = tempfile::tempdir().unwrap();
     crate::worker::fixture::init_city(dir.path()).unwrap();
