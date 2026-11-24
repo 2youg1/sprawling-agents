@@ -450,7 +450,7 @@ D37 **替换测试使用解析后的绝对路径。** `vite.swap.config.ts` 把�
 
 **判据三条**：① 区段的文字等于它的事实当场的读数，不等即红，恢复语是 `cargo xtask docnum --write`；② 区段命名的事实必须在 `FACTS` 数组里，否则红，拒词列出全部已知键；③ 标记不闭合、区段套区段、或多出一个收尾标记，即红——一段读不出来的标记不得被当作没有标记。**`--write` 撞上未知事实时整份文件不写**：跳过它会让文档看起来刚重生过，而其中一个数字仍是旧的。
 
-**权威＝那张数组。** `docnum::FACTS` 的每一行是「键、事实的家、参数、重算函数」。不带参数的：`wire_v`（`wire::WIRE_V`）、`command_frames`／`query_frames`（两张名表的长度）、`command_names`／`query_names`（**线上的 snake_case 标签，取自 `wire::wire_schema()` 而不是由变体名小写而来**——`rename_all` 是 `wire` 的决定，在这里再实现一次就是第二个权威）、`gate_count`（`gates::COUNT`）、`dependency_count`（`Cargo.lock` 的 `[[package]]` 条数）、`kani_harnesses`（`proof::harnesses` 数出的条数）、`compile_fail_cases`、`fuzz_targets`、`citysim_scenarios`、`workspace_version`（根 `Cargo.toml` 的 `[workspace.package] version`，`CHANGELOG.md` 最新一节的标题引它，于是升了版本号却没写新一节的树会红）、`crate_table`（产品 crate 的整张表，§8-40）。**文档想引一个新数字，就往这张数组里加一行**，没有第二张清单需要同步。
+**权威＝那张数组。** `docnum::FACTS` 的每一行是「键、事实的家、参数、重算函数」。不带参数的：`wire_v`（`wire::WIRE_V`）、`command_frames`／`query_frames`（两张名表的长度）、`command_names`／`query_names`（**线上的 snake_case 标签，取自 `wire::wire_schema()` 而不是由变体名小写而来**——`rename_all` 是 `wire` 的决定，在这里再实现一次就是第二个权威）、`gate_count`（`gates::COUNT`）、`kani_harnesses`（`proof::harnesses` 数出的条数）、`compile_fail_cases`、`fuzz_targets`、`citysim_scenarios`、`workspace_version`（根 `Cargo.toml` 的 `[workspace.package] version`，`CHANGELOG.md` 最新一节的标题引它，于是升了版本号却没写新一节的树会红）、`crate_table`（产品 crate 的整张表，§8-40）。**文档想引一个新数字，就往这张数组里加一行**，没有第二张清单需要同步。
 
 **一张图也是一个事实。** `crate_graph` 把 `ARCHITECTURE.md` §3 的 `depmap` 块画成一段 mermaid `flowchart TD`：块里每个 crate 一行，每条允许的边一个箭头（依赖方指向被依赖方），不做传递约简，因为约简掉的边正是 `depmap` 允许、读者要查的那一条。生成函数 `depmap::graph` 与门用同一个 `parse_block` 读块，故图与门不会读出两张依赖表；手画一张依赖图，就是依赖表的第二个权威。值自带 ```` ```mermaid ```` 围栏，标记放在围栏之外，因为 mermaid 不认 HTML 注释。
 
@@ -662,7 +662,7 @@ Bun 的用户仍失败）；只在 JavaScript 中检测 Bun；推断执行 JavaS
 
 **体积是读数，不是门（定规）。** 运行速度先于体积：一个更大却答得更快的二进制是更好的二进制，所以构建产物的字节（`frontend_artifact`、`release_binary`）和依赖数一样，由 `cargo xtask budget` 印出、`docnum` 引进文档，门不拒绝任何体积。这两行写 `budget_bytes`（设计给的上限，供报告与文档的余量读数）与 `best_bytes`（最近记下的读数），不写 `slack_bytes`，`status` 写「reported, not gated」。门仍按 `status = "gated"` 且三键齐全来挑要称的行；今天没有这样的行，所以那段按字节称重的代码不称任何行。
 
-**依赖数是一个读数，不是一道门（定规）。** 这棵树解出多少个包，仍由 `budget::lockfile_packages` 从 `Cargo.lock` 数一次；`docnum` 的 `dependency_count` 事实把它引进 `ARCHITECTURE.md` 与 `docs/third-party.md`，`cargo xtask budget` 的报告在 `[dependency_count]` 那一行印出它。那一行不写预算、最佳读数与余量，门不拒绝任何包数。人的定规是：依赖本身不被反对，依赖多到项目成了黑箱时才值得减；减哪一个，要逐个看它换来的透明度，而一个包数上限回答不了这个问题——余量耗尽时它只会逼人删一个恰好便宜的包，或者把上限调高，两样都不让项目更透明。**被否的备选**：保留棘轮、只把余量放大，那仍是一道门，只是晚一些红。
+**依赖数在读取时从锁文件计算。** `cargo xtask budget` 在 `[dependency_count]` 那一行报告 `Cargo.lock` 中的包数，包括工作区成员。文档指向命令，锁文件的变动随即反映在报告里。包数只说明图的大小，删除哪一个包能提高透明度仍需逐项判断。**被否的备选**：在文档保存计数并用 `docnum` 核对。依赖更新器只改锁文件时，这会把可读取的事实变成合入条件，即使新锁文件生成的读数完全正确。
 
 **一处数，三处读。** 手写的包数在每份文档里会各有一个值，所以它由机器数出来而不由人写下来，且只数一次：报告调的 `measure(root, name)` 与字节行称重调的是同一个函数，报告印出的数与文档引用的数因此是同一次读数。
 

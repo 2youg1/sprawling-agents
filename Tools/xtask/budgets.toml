@@ -637,12 +637,8 @@ status = "measured, not gated: p50 in ms over three bench runs - the empty city 
 # lockfile rather than off any manifest: a manifest states what was
 # asked for, and what a person compiles is what the resolution settled.
 #
-# **One count, three readers.** `budget::lockfile_packages` takes it;
-# `docnum`'s `dependency_count` fact quotes it into `ARCHITECTURE.md`
-# and `docs/third-party.md`; `cargo xtask budget` prints it beside this
-# row. The number used to sit in four documents at four different
-# values, none of them right, which is the whole reason it is measured
-# rather than written.
+# `cargo xtask budget` prints the count beside this row. The documentation
+# points to the command so lockfile updates need no second writer.
 #
 # **Reported, never gated (the person's ruling).** Dependencies are
 # welcome; they are worth cutting where a cut makes the project less of
@@ -650,7 +646,7 @@ status = "measured, not gated: p50 in ms over three bench runs - the empty city 
 # Tools/xtask/Spec.lean section 8-25 holds the reasoning and what would reopen it.
 [dependency_count]
 what = "packages in Cargo.lock once every transitive dependency is resolved, workspace members included"
-measured_by = "cargo xtask budget (budget::lockfile_packages, counting [[package]] in Cargo.lock)"
+measured_by = "cargo xtask budget (counting [[package]] in Cargo.lock)"
 status = "reported, not gated: the dependency count is read and printed, and no count is refused (Tools/xtask/Spec.lean section 8-25)"
 
 # T13: where the two latency tiers are stated. One latency metric in two
