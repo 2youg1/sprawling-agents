@@ -670,3 +670,9 @@ test "a click hit names the visible python card" {
     try std.testing.expectEqual(@as(u16, 3), hits.items[0].card);
     try std.testing.expect(hits.items[0].end > hits.items[0].row);
 }
+
+test "a selection crossing a table column boundary copies in source order after wrapping" {
+    const entry = write.Entry{ .reply = "| A | B |\n| --- | --- |\n| abcdef | uvwxyz |\n| ghijkl | stuvwx |" };
+    try copiedAfterReflow(entry, entry, .{ 19, 12 }, .{ .row = 2, .column = 6 }, .{ .row = 2, .column = 13 }, "ef │ uv");
+    try copiedAfterReflow(entry, entry, .{ 19, 12 }, .{ .row = 3, .column = 13 }, .{ .row = 2, .column = 6 }, "ef │ uvwxyz\nghijkl │ st");
+}
