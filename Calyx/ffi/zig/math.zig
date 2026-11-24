@@ -162,3 +162,9 @@ test "basic inline and display math retain the visible source of unsupported for
     const rendered = line(&buffer, "Area $\\pi r^2$ and $$\\frac{1}{2}$$ beside $\\opaque{x}$").?;
     try std.testing.expectEqualStrings("Area π r² and (1)⁄(2) beside $\\opaque{x}$", rendered);
 }
+
+test "math skips code delimited by a matching run of ticks" {
+    var buffer: [256]u8 = undefined;
+    const rendered = line(&buffer, "``$x^2$` $y^2$`` and $z^2$").?;
+    try std.testing.expectEqualStrings("``$x^2$` $y^2$`` and z²", rendered);
+}

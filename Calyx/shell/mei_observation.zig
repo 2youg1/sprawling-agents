@@ -749,3 +749,19 @@ test "head facts keep a copy of the model after it is replaced" {
     try std.testing.expectEqualStrings("provider/old", entries[0].head.facts[0]);
     try std.testing.expectEqualStrings("provider/new", seen.model);
 }
+
+test "consecutive text fragments form one reply until actual reasoning" {
+    const gpa = std.testing.allocator;
+    var seen = try Seen.init(gpa, "model");
+    defer seen.deinit();
+    var scratch = std.heap.ArenaAllocator.init(gpa);
+    defer scratch.deinit();
+    const line =
+        \\{"role":"assistant","content":[{"type":"text","text":"| A | B |\n"},{"type":"text","text":"| -- | -- |"},{"type":"thinking","thinking":"check"},{"type":"text","text":"seen"},{"type":"text","text":" twice"}]}
+    ;
+    const entries = try seen.line(scratch.allocator(), line, 1);
+    try std.testing.expectEqual(@as(usize, 4), entries.len);
+    try std.testing.expectEqualStrings("| A | B |\n| -- | -- |", entries[1].reply);
+    try std.testing.expectEqualStrings("check", entries[2].reasoning.body);
+    try std.testing.expectEqualStrings("seen twice", entries[3].reply);
+}

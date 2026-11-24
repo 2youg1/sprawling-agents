@@ -301,3 +301,32 @@ test "a result wave animates both failure and success without moving their names
     try std.testing.expect(std.mem.indexOf(u8, settled, "\x1b[38;2;172;172;172m×\x1b[39m python") != null);
     try std.testing.expect(std.mem.indexOf(u8, settled, "\x1b[38;2;172;172;172m✓\x1b[39m python") != null);
 }
+
+test "widening and opening cards above the viewport preserve its reading place" {
+    const gpa = std.testing.allocator;
+    const log = [_]write.Entry{
+        .{ .tool = .{ .at = null, .name = "python", .subject = "", .took_us = null, .outcome = .Answered } },
+        .{ .reply = "segment-00 segment-01 segment-02 segment-03 segment-04 segment-05 segment-06 segment-07 segment-08 segment-09 segment-10 segment-11 segment-12 segment-13 segment-14 segment-15" },
+    };
+    var code = "visible on open".*;
+    var cards = [_]Card{.{ .python = .{ .code = &code, .output = &.{} } }};
+    var hits: std.ArrayList(Hit) = .empty;
+    defer hits.deinit(gpa);
+    var view: View = .{};
+    const region: write.Live = .{ .composer = .{ .typed = "", .cursor = 0, .placeholder = "Mei", .room = "Mei", .offer = "" } };
+    const bottom = try render(gpa, &log, &cards, 0, "", region, 22, 5, &view, &hits);
+    defer gpa.free(bottom);
+    view.scroll(-10);
+    const narrow = try render(gpa, &log, &cards, 0, "", region, 22, 5, &view, &hits);
+    defer gpa.free(narrow);
+    const row = narrow[0..std.mem.indexOfScalar(u8, narrow, '\n').?];
+    const at = std.mem.indexOf(u8, row, "segment-").?;
+    const word = row[at..][0.."segment-00".len];
+    const wide = try render(gpa, &log, &cards, 0, "", region, 31, 5, &view, &hits);
+    defer gpa.free(wide);
+    try std.testing.expect(std.mem.indexOf(u8, wide[0..std.mem.indexOfScalar(u8, wide, '\n').?], word) != null);
+    cards[0].cycle();
+    const open = try render(gpa, &log, &cards, 0, "", region, 31, 5, &view, &hits);
+    defer gpa.free(open);
+    try std.testing.expect(std.mem.indexOf(u8, open[0..std.mem.indexOfScalar(u8, open, '\n').?], word) != null);
+}

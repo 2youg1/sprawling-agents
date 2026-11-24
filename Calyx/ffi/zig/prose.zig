@@ -294,3 +294,48 @@ test "wide characters keep their columns inside a list" {
     try std.testing.expect(std.mem.indexOf(u8, out.buffered(), "中文") != null);
     try std.testing.expect(p.column <= p.limit);
 }
+
+test "formulas preserve the surrounding markdown and the destination of a link" {
+    var buffer: [1024]u8 = undefined;
+    var output: std.Io.Writer = .fixed(&buffer);
+    var painter = paint.Painter.meiFrame(&output, 90);
+    try blocks(&painter, "# A $x^2$ heading\n[docs](https://example.test/$x^2$) gives $x^2$", .{
+        .left = 0,
+        .measure = 89,
+        .style = .plain,
+        .marks = .prose,
+    });
+    const drawn = output.buffered();
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "\x1b[0;1mA") != null);
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "\x1b]8;;https://example.test/$x^2$\x1b\\") != null);
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "gives x²") != null);
+}
+
+test "table escapes are drawn as one cell character" {
+    var buffer: [1024]u8 = undefined;
+    var output: std.Io.Writer = .fixed(&buffer);
+    var painter = paint.Painter.meiFrame(&output, 36);
+    try blocks(&painter, "| regex | value |\n| --- | --- |\n| a\\|b | yes |", .{
+        .left = 0,
+        .measure = 35,
+        .style = .plain,
+        .marks = .prose,
+    });
+    try std.testing.expect(std.mem.indexOf(u8, output.buffered(), "a|b") != null);
+}
+
+test "a narrow Mermaid chart keeps the edge and both node identities" {
+    var buffer: [1024]u8 = undefined;
+    var output: std.Io.Writer = .fixed(&buffer);
+    var painter = paint.Painter.meiFrame(&output, 21);
+    try blocks(&painter, "```mermaid\nflowchart LR\nA[Very long left label here] --> B[Check]\nB --> C[Done]\n```", .{
+        .left = 0,
+        .measure = 20,
+        .style = .plain,
+        .marks = .prose,
+    });
+    const drawn = output.buffered();
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "↓") != null);
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "B: Check") != null);
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "C: Done") != null);
+}

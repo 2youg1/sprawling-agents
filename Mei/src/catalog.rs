@@ -128,6 +128,20 @@ mod tests {
     use super::*;
 
     #[test]
+    fn published_model_identifiers_round_trip_through_the_catalog() {
+        let catalog = serde_json::json!({
+            "first_id": " model/a ",
+            "data": [{"id": "other"}, {"id": " model/a "}]
+        });
+        let discovered = select(&catalog).unwrap();
+        assert_eq!(discovered.model, "model/a");
+        assert_eq!(
+            select_for(&catalog, Some(&discovered.model)).unwrap(),
+            discovered
+        );
+    }
+
+    #[test]
     fn the_preferred_route_carries_context_and_efforts() {
         let catalog = serde_json::json!({
             "first_id": "group/plan-first",

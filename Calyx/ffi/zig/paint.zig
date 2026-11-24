@@ -224,3 +224,18 @@ test "link URI cannot terminate OSC or inject terminal commands" {
     try p.link(.plain, "https://example/\x07\x1b\\\x1b[2J\u{009c}\x7f\xff中文", "open");
     try std.testing.expectEqualStrings("\x1b]8;;https://example/\\[2J中文\x1b\\open\x1b]8;;\x1b\\", out.buffered());
 }
+
+test "selection copies combining marks with their base and includes a visible ellipsis" {
+    var output: std.Io.Writer.Discarding = .init(&.{});
+    var buffer: [16]u8 = undefined;
+    var copy: std.Io.Writer = .fixed(&buffer);
+    const cases = [_][]const u8{ "e\u{0301}", "x", "…" };
+    for (cases, 0..) |wanted, col| {
+        copy.end = 0;
+        var p = Painter.meiFrame(&output.writer, 8);
+        p.selection = Selection.between(.{ .row = 0, .column = col }, .{ .row = 0, .column = col + 1 });
+        p.copy = &copy;
+        try p.fit(.plain, "e\u{0301}xyz", 3);
+        try std.testing.expectEqualStrings(wanted, copy.buffered());
+    }
+}
