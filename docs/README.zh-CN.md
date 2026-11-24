@@ -57,7 +57,7 @@
   </tr>
 </table>
 
-**版本 <!-- xtask:begin workspace_version -->0.17.2<!-- xtask:end -->**：三段数字依次表示成熟度、全仓版本与单独包的版本。版本之间数据格式、wire 协议和界面仍可能调整。
+**版本 <!-- xtask:begin workspace_version -->0.18.0<!-- xtask:end -->**：三段数字依次表示成熟度、全仓版本与单独包的版本。版本之间数据格式、wire 协议和界面仍可能调整。
 
 给介绍本项目的模型读：[LLM.md](../LLM.md) · 改代码之前先读：[AGENTS.md](../AGENTS.md)
 
