@@ -216,15 +216,22 @@ impl ProjectRepository {
             .join(kernel::RESERVED_PREFIX)
             .join("worktrees")
             .join(&name);
-        if root != registered {
+        crate::alias::WriteTarget::within("open the run checkout", city, &registered)?;
+        let physical = |path: &Path| {
+            std::fs::canonicalize(path).map_err(|source| StorageError::Io {
+                op: "resolve the run checkout",
+                path: path.to_owned(),
+                source,
+            })
+        };
+        if root != registered && physical(root)? != physical(&registered)? {
             return Err(StorageError::Checkpoint {
                 op: "open the run checkout",
                 detail: format!("{} does not match {}", root.display(), registered.display()),
             });
         }
-        crate::alias::WriteTarget::within("open the run checkout", city, root)?;
-        repo.set_workdir(root, false)
-            .map_err(source::failed("attach the run checkout", root))?;
+        repo.set_workdir(&registered, false)
+            .map_err(source::failed("attach the run checkout", &registered))?;
         let dir = repo.path().join("indexes");
         Checkpoint::writer(
             repo,

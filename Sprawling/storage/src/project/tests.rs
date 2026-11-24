@@ -90,7 +90,9 @@ fn a_locked_source_and_an_independent_native_commit_do_not_own_a_run_or_its_revi
     .unwrap();
     std::fs::write(lease.path().join("mobile/Handoff.md"), b"private handoff").unwrap();
     commit(&native_run, &["foreign"]);
-    let mut writer = ProjectRepository::run_checkpoint(&city, lease.path(), run, &addr).unwrap();
+    assert!(ProjectRepository::run_checkpoint(&city, &source, run, &addr).is_err());
+    let alternate = lease.path().join("..").join(lease.name().as_str());
+    let mut writer = ProjectRepository::run_checkpoint(&city, &alternate, run, &addr).unwrap();
     let candidate = writer.land(&scopes, TimeMs::new(2), &who, "offer").unwrap();
     writer.close_writer().unwrap();
     let trees = project.trees().unwrap();
