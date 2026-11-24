@@ -211,6 +211,7 @@ fn main() -> ExitCode {
         Some("boundary") => report::finish("boundary", boundary::check(&root)),
         Some("artifact") => report::finish("artifact", artifact::check(&root)),
         Some("packaged") => report::finish("packaged", packaged::check(&root)),
+        Some("crate-size") => report::finish("crate-size", packaged::check_sizes(&root)),
         Some("modmap") => report::finish("modmap", modmap::check(&root)),
         Some("npm") => report::finish("npm", npm::check(&root)),
         Some("depmap") => report::finish("depmap", depmap::check(&root)),
@@ -308,7 +309,7 @@ struct Tool {
     gives: &'static str,
 }
 
-const TOOLS: [Tool; 18] = [
+const TOOLS: [Tool; 19] = [
     Tool {
         call: "ci <plan|run> [--full | --base <rev>] [--scope-base <rev>] [--store <dir>]",
         gives: "the source graph with independent node selection and file-gate scope",
@@ -360,6 +361,10 @@ const TOOLS: [Tool; 18] = [
     Tool {
         call: "sbom",
         gives: "the CycloneDX bill of materials",
+    },
+    Tool {
+        call: "crate-size",
+        gives: "build and measure the compressed crates after building the client",
     },
     Tool {
         call: "package [--target <triple>] [--mei]",

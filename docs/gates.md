@@ -13,6 +13,7 @@ A violation turns the check red with a message naming the rule, the violation an
 | `xtask boundary` | white-box checks in Rust beside the code; stranger-entry checks in Lean under `Tools/adversary/` |
 | `xtask artifact` | nothing written for a test is compiled into the binary a person downloads |
 | `xtask packaged` | files a publishable package compiles in production (`include!`, `include_str!`, `include_bytes!`) lie inside its directory or its build script's `OUT_DIR`, since crates.io carries nothing else |
+| `xtask crate-size` | Cargo's actual compressed packages fit crates.io's upload limit before publication |
 | `xtask depmap` | `pub(crate)` by default; `pub` traits only on the seam list |
 | `xtask unused` | every declared dependency named by its package's code; every workspace dependency inherited by some package |
 | `xtask npm` | client lockfile in step with its manifest; runtime dependencies exactly `RUNTIME` in `Tools/xtask/src/npm.rs`, each admitted with the reason `RefRain/Spec.lean` §7-9 records; every licence on the `deny.toml` list |

@@ -3,7 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
+use std::ffi::OsString;
 use std::path::{Component, Path, PathBuf};
+use std::process::Command;
 
 use syn::punctuated::Punctuated;
 
@@ -41,6 +43,83 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         .into_iter()
         .map(|(_, _, violation)| violation)
         .collect())
+}
+
+const CRATE_UPLOAD_LIMIT: u64 = 10_485_760;
+
+#[expect(clippy::disallowed_methods, reason = "developer tool (child D4)")]
+pub(crate) fn check_sizes(root: &Path) -> Result<Vec<Violation>, XtaskError> {
+    let entry = crate::bundle::dist(root)?.join("index.html");
+    if !entry.is_file() {
+        return Err(XtaskError::Doc {
+            file: entry.display().to_string(),
+            msg: "client bundle is absent. Run just build-web before measuring the crates"
+                .to_owned(),
+        });
+    }
+    let version = crate::package::workspace_package(root, "version")?;
+    let packages: Vec<_> = members::members(root)?
+        .into_iter()
+        .filter(|member| member.publish == Publish::Registry)
+        .map(|member| member.package)
+        .collect();
+    let cargo = std::env::var_os("CARGO").unwrap_or_else(|| OsString::from("cargo"));
+    let target = root.join("target").join("crate-size");
+    let status = Command::new(cargo)
+        .current_dir(root)
+        .args([
+            "package",
+            "--locked",
+            "--no-verify",
+            "--allow-dirty",
+            "--target-dir",
+        ])
+        .arg(&target)
+        .args(packages.iter().flat_map(|name| ["-p", name.as_str()]))
+        .status()
+        .map_err(|source| XtaskError::Io {
+            path: "cargo package".to_owned(),
+            source,
+        })?;
+    if !status.success() {
+        return Err(XtaskError::Cmd {
+            cmd: "cargo package".to_owned(),
+            msg: format!(
+                "{status}. Fix the preceding Cargo error and rerun cargo xtask crate-size"
+            ),
+        });
+    }
+    let mut violations = Vec::new();
+    for package in packages {
+        let archive = target
+            .join("package")
+            .join(format!("{package}-{version}.crate"));
+        if let Some(violation) = check_archive_size(&archive)? {
+            violations.push(violation);
+        }
+    }
+    Ok(violations)
+}
+
+fn check_archive_size(archive: &Path) -> Result<Option<Violation>, XtaskError> {
+    let file = std::fs::File::open(archive)
+        .and_then(|file| file.metadata())
+        .map_err(|source| XtaskError::Io {
+            path: archive.display().to_string(),
+            source,
+        })?;
+    let bytes = file.len();
+    if bytes <= CRATE_UPLOAD_LIMIT {
+        println!("{}: {bytes} bytes", archive.display());
+        return Ok(None);
+    }
+    Ok(Some(Violation {
+        gate: "crate-size",
+        location: archive.display().to_string(),
+        rule: format!("crates.io accepts a compressed crate of at most {CRATE_UPLOAD_LIMIT} bytes"),
+        violation: format!("the compressed crate is {bytes} bytes"),
+        alternative: "reduce the published files and rerun just gates-artifacts".to_owned(),
+    }))
 }
 
 struct Reach<'a> {

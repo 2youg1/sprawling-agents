@@ -1269,6 +1269,10 @@ pub(crate) fn workspace_package(root: &Path, key: &str) -> Result<String, XtaskE
 pub(crate) fn package_field<'a>(manifest: &'a toml::Value, key: &str) -> Option<&'a str>;
 ```
 
+**`crate-size` 判什么**：`cargo xtask crate-size` 在客户端构建之后，由 Cargo 同批打包准备发布的工作区成员。检查读取各个实际 `.crate` 的压缩文件长度，超过 crates.io 的 10,485,760 字节上限时，给出绝对路径、长度及重新打包的命令，退出 1。缺少客户端入口、Cargo 失败或归档不可读时退出 2。CI 的 `gates-artifacts` 跑这条检查，发行的 `publish` 等候该结果。
+
+D48 **包大小从生成的归档读取。** 发布 0.18.0 时 Cargo 打出 12.4 MiB 的主包，crates.io 在另外 19 个包上传后以 HTTP 413 拒绝主包。提前称量每个准备发布的压缩包能在任何渠道上传之前暴露超限。被否的是用前端目录的原始大小估算，因为 Cargo 的归档还含 Rust 源码与清单，不同文件的可压缩性也不同。测试用上限和超出 1 字节的文件验证边界。
+
 **`packaged` 判什么**：
 
 - **哪些包**：`members`（§8-39）里 `publish` 为 `Registry` 的包；`publish = false` 的工具包（xtask、citysim）不判，因为它们不会被打包。
