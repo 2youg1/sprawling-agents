@@ -25,16 +25,63 @@ on:
   schedule:
     - cron: "17 3 * * *"
   workflow_dispatch:
+    inputs:
+      zig_only:
+        description: Run just the two Zig leaf campaigns
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
+  zig-fuzz:
+    name: Zig fuzz (${{ matrix.leaf }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - leaf: desktop
+            directory: Sprawling/desktop/ffi
+          - leaf: calyx
+            directory: Calyx
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: ./.github/actions/zig
+      - name: Restore the last corpus for this leaf and Zig pin
+        id: corpus
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ${{ runner.temp }}/zig-leaf/f
+          key: zig-corpus-v1-${{ matrix.leaf }}-${{ hashFiles('Sprawling/desktop/ffi/zig-version') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            zig-corpus-v1-${{ matrix.leaf }}-${{ hashFiles('Sprawling/desktop/ffi/zig-version') }}-
+      - name: Exercise 100K inputs and verify the corpus
+        working-directory: ${{ matrix.directory }}
+        run: |
+          zig build fuzz --fuzz=100K --summary all --cache-dir "$RUNNER_TEMP/zig-leaf"
+          find "$RUNNER_TEMP/zig-leaf/f" -mindepth 2 -type f -size +0c -print -quit | grep -q .
+      - name: Save the evolved corpus
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ${{ runner.temp }}/zig-leaf/f
+          key: ${{ steps.corpus.outputs.cache-primary-key }}
+      - name: Preserve a replayable failing input
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: zig-crash-${{ matrix.leaf }}
+          path: ${{ runner.temp }}/zig-leaf/f/crash
+          if-no-files-found: ignore
+
   # V4: hostile bytes against the three parse surfaces. A new draw of
   # random input every night is what makes this a schedule rather than a
   # push gate; sixty seconds a target is a smoke length, and a real
   # campaign belongs on a dedicated runner rather than in a CI slot.
   fuzz-smoke:
+    if: ${{ !inputs.zig_only }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -132,7 +179,7 @@ jobs:
   # the nightly verdict, and the advisories beside it are the red that
   # must be read the next morning.
   autoharness:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && !inputs.zig_only
     runs-on: ubuntu-latest
     timeout-minutes: 60
     continue-on-error: true
@@ -237,6 +284,7 @@ jobs:
   # It compiles nothing - it reads Cargo.lock - so it is also the cheapest
   # job in the repository.
   advisories:
+    if: ${{ !inputs.zig_only }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
