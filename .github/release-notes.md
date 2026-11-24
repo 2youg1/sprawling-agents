@@ -1,6 +1,6 @@
-> **sprawling <!-- xtask:begin workspace_version -->0.18.0<!-- xtask:end -->** 将 Wire 从 80 升到 82。升级前请停止城市并验证备份可恢复，升级后请重载已打开的浏览器标签页。事件日志仍为格式 2，配置仍为格式 1。Windows 构建未签名。
+> **sprawling <!-- xtask:begin workspace_version -->0.18.0<!-- xtask:end -->** 将 Wire 从 80 升到 82。升级前请停止城市并验证备份可恢复，升级后请重载已打开的浏览器标签页。账本格式版本仍为 2，配置仍为格式 1。Windows 构建未签名。
 >
-> Wire moves from 80 to 82. Stop the city and verify a restorable backup before upgrading, then reload any open browser tabs. The event log stays at format 2 and configuration stays at format 1. Windows builds are unsigned.
+> Wire moves from 80 to 82. Stop the city and verify a restorable backup before upgrading, then reload any open browser tabs. The Ledger stays at format 2 and configuration stays at format 1. Windows builds are unsigned.
 
 ---
 
@@ -14,7 +14,7 @@
 
 其实这三件事说的是同一件事。回头看 2025 年，很多 Harness 的交互从文件开始，你先打开一份文件，再决定要让 Agent 做什么。到了 2026 年，大家从 Chat 那里吸取了不少灵感，Code 和 Work 也逐渐走到一起，做一件事往往先开一个 Session。但一篇文章可以读几天、改几周，一次任务也可能涉及好几份文件，两边都需要一个能回去的地方。我想在 RefRain 里同时把这两种体验做好。可以从一份文件开始读和改，也可以从一个 Session 开始交代任务，需要看原文的时候就回到原文。
 
-另外，Mei 还在继续开发，接下来一段时间大概会更多地打磨已有的东西，做些优化。Mei 的承诺一直是极简主义，没必要的功能就不加。Calyx 也会一起打磨，它现在是 sprawling 和 Mei 共用的终端界面。以后也许可以让更多 Harness 用上它。
+另外，Mei 还在继续开发，接下来一段时间大概会更多地打磨已有的东西，做些优化。Mei 的承诺一直是极简主义，没必要的功能就不加。Calyx 也会一起打磨，它现在是 sprawling 和 Mei 共用的终端壳。以后也许可以让更多 Harness 用上它。
 
 ---
 
