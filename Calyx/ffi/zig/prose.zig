@@ -7,10 +7,14 @@ const std = @import("std");
 const paint = @import("paint.zig");
 const text = @import("text.zig");
 const flow = @import("flow.zig");
+const table = @import("table.zig");
+const math = @import("math.zig");
+const diagram = @import("diagram.zig");
 
 pub fn blocks(p: *paint.Painter, body: []const u8, column: flow.Column) paint.Error!void {
     if (!needsBlocks(body)) return flow.flow(p, body, column);
     var open: ?Fence = null;
+    var display_math = false;
     var lines = std.mem.splitScalar(u8, body, '\n');
     var first = true;
     while (lines.next()) |raw| {
@@ -20,6 +24,11 @@ pub fn blocks(p: *paint.Painter, body: []const u8, column: flow.Column) paint.Er
         try p.to(column.left);
         const trimmed = std.mem.trimStart(u8, line, " ");
         if (takesFence(open, trimmed)) {
+            if (p.mei and open == null) {
+                const fence = fenceOf(trimmed).?;
+                const info = std.mem.trim(u8, trimmed[fence.len..], " \t");
+                if (std.mem.eql(u8, info, "mermaid") and try diagram.draw(p, &lines, trimmed[0..fence.len], column)) continue;
+            }
             open = if (open == null) fenceOf(trimmed) else null;
             try p.fit(.faint, line, column.measure);
             continue;
@@ -28,10 +37,23 @@ pub fn blocks(p: *paint.Painter, body: []const u8, column: flow.Column) paint.Er
             try codeLine(p, line, column);
             continue;
         }
+        if (p.mei and try table.draw(p, line, &lines, column)) continue;
+        if (p.mei and std.mem.eql(u8, std.mem.trimEnd(u8, trimmed, " \t"), "$$")) {
+            display_math = !display_math;
+            continue;
+        }
+        if (p.mei and (display_math or std.mem.indexOfScalar(u8, line, '$') != null)) {
+            var converted: [4096]u8 = undefined;
+            const shown = if (display_math) math.expression(&converted, trimmed) else math.line(&converted, line);
+            if (shown) |rendered| {
+                try flow.flow(p, rendered, column);
+                continue;
+            }
+        }
         if (heading(trimmed)) |mark| {
             const cut = cutAt(line, trimmed, mark);
-            try p.fit(.faint, line[0..cut], cut);
-            try p.fit(.bold, line[cut..], p.room());
+            if (!p.mei) try p.fit(.faint, line[0..cut], cut);
+            try flow.flow(p, line[cut..], .{ .left = p.column, .measure = p.room(), .style = .bold, .marks = column.marks });
             continue;
         }
         if (std.mem.startsWith(u8, trimmed, ">")) {
@@ -43,7 +65,9 @@ pub fn blocks(p: *paint.Painter, body: []const u8, column: flow.Column) paint.Er
         }
         if (listMark(trimmed)) |mark| {
             const cut = cutAt(line, trimmed, mark);
-            try p.fit(.faint, line[0..cut], cut);
+            if (p.mei and (trimmed[0] == '-' or trimmed[0] == '*')) {
+                try p.cut(.faint, "• ", 2);
+            } else try p.fit(.faint, line[0..cut], cut);
             const rest = flow.Column{ .left = p.column, .measure = p.room(), .style = column.style, .marks = column.marks };
             try flow.flow(p, line[cut..], rest);
             continue;
@@ -71,6 +95,7 @@ fn needsBlocks(body: []const u8) bool {
         if (listMark(line) != null) return true;
         if (std.mem.count(u8, line, "|") >= 2) return true;
         if (std.mem.indexOf(u8, line, "](") != null) return true;
+        if (std.mem.indexOfScalar(u8, line, '$') != null) return true;
     }
     return false;
 }
@@ -190,6 +215,29 @@ test "plain prose stays on the flow path" {
     try blocks(&p, "one `city` two", .{ .left = 0, .measure = 30, .style = .plain, .marks = .prose });
     try std.testing.expect(std.mem.indexOf(u8, out.buffered(), "city") != null);
     try std.testing.expect(std.mem.indexOf(u8, out.buffered(), "`") != null);
+}
+
+test "a Mei transcript lays out tables, math and a Mermaid flowchart" {
+    var buffer: [4096]u8 = undefined;
+    var writer: std.Io.Writer = .fixed(&buffer);
+    var p = paint.Painter.meiFrame(&writer, 70);
+    try blocks(&p,
+        \\| 项目 | 结果 |
+        \\| --- | ---: |
+        \\| 会话 | 12 |
+        \\
+        \\$\pi r^2$
+        \\
+        \\```mermaid
+        \\flowchart LR
+        \\A[读取] --> B[完成]
+        \\```
+    , .{ .left = 0, .measure = 69, .style = .plain, .marks = .prose });
+    const drawn = writer.buffered();
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "┼") != null);
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "π r²") != null);
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "──→") != null);
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "flowchart") == null);
 }
 
 test "headings lists quotes tables and links are marked" {

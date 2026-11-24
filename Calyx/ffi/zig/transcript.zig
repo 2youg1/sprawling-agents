@@ -57,6 +57,18 @@ pub fn bannerChoice(p: *paint.Painter, r: *scene.Reader, web: bool) Error!void {
     const city = try r.text();
     const address = try r.text();
     const url = try r.text();
+    if (p.mei and url.len == 0) {
+        const metadata = text.width(address);
+        const available = p.room();
+        const path_room = @max(available / 3, available -| (metadata + 3));
+        const workspace = if (text.width(city) <= path_room) city else std.fs.path.basename(city);
+        try p.fit(.plain, workspace, path_room);
+        if (metadata != 0 and p.room() > 3) {
+            try p.cut(.faint, " · ", 3);
+            try p.fit(.faint, address, p.room());
+        }
+        return;
+    }
     const instruction = "  Type ";
     const command = "/web";
     const action = " to open the WebUI";
@@ -118,7 +130,8 @@ fn tool(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
     const outcome = try r.outcome();
     var b: format.Buffer = undefined;
     const took = if (micros == scene.no_count) "" else format.took(&b, micros);
-    try lead(p, grid, at, "◇", .faint);
+    const mark = if (!p.mei) "◇" else if (outcome == .Failed) "×" else "✓";
+    try lead(p, grid, at, mark, if (p.mei and (p.just_finished or outcome == .Failed)) .bold else .faint);
     try p.fit(.plain, name, 8);
     try p.to(grid.words + 9);
     const figures = grid.figures();
@@ -128,7 +141,7 @@ fn tool(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
     try p.fit(.faint, took, took_width);
     switch (outcome) {
         .Answered => {},
-        .Failed => {
+        .Failed => if (!p.mei) {
             try p.to(p.column + 2);
             try p.fit(.alert, "failed", 6);
         },
@@ -153,6 +166,7 @@ fn ended(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
         .Done => .{ "done", .faint },
         .Limit => .{ "stopped at a limit", .alert },
         .Cancelled => .{ "cancelled", .faint },
+        .Failed => .{ "failed", .alert },
     };
     try lead(p, grid, at, "■", style);
     try p.fit(style, word, p.room());

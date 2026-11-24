@@ -49,9 +49,11 @@ for line in rx:
     f = tempfile.NamedTemporaryFile("w+b", delete=False, dir=capture_dir)
     os.dup2(f.fileno(), 1)
     os.dup2(f.fileno(), 2)
+    failed = False
     try:
         exec(code, g)
     except BaseException as e:
+        failed = True
         traceback.print_exception(type(e), e, e.__traceback__.tb_next)
     finally:
         current.open = False
@@ -59,6 +61,6 @@ for line in rx:
         sys.stderr.flush()
     name = os.path.basename(f.name)
     f.close()
-    frame = {"capture": name, "images": current.images}
+    frame = {"capture": name, "images": current.images, "failed": failed}
     tx.write(json.dumps(frame, separators=(",", ":")).encode("ascii") + b"\n")
     tx.flush()

@@ -3,20 +3,19 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The private Python response codec and provider-neutral tool-result content.
-
 use serde_json::{Value, json};
 
 use crate::error::{Code, Diagnostic, Error, Result};
 
 pub struct Image {
-    media_type: String,
-    data: String,
+    pub(super) media_type: String,
+    pub(super) data: String,
 }
 
 pub struct Frame {
     pub capture: String,
     pub images: Vec<Image>,
+    pub failed: bool,
 }
 
 fn failure(subject: impl Into<String>, value: impl Into<String>) -> Error {
@@ -24,7 +23,7 @@ fn failure(subject: impl Into<String>, value: impl Into<String>) -> Error {
         Code::Python,
         "parse a Python response frame",
         subject,
-        "keep the private channel limited to {capture, images} with base64 PNG/JPEG/GIF/WebP images",
+        "keep the private channel limited to {capture, images, failed} with base64 PNG/JPEG/GIF/WebP images",
     )
     .with_path("python.response")
     .with_value(value)
@@ -71,6 +70,10 @@ pub fn parse(line: &str) -> Result<Frame> {
     Ok(Frame {
         capture: capture.to_owned(),
         images,
+        failed: value
+            .get("failed")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
     })
 }
 

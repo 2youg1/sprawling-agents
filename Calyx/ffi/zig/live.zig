@@ -127,7 +127,7 @@ fn working(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
     const doing = " is working";
     const since_width = 17;
     try p.to(grid.mark);
-    try p.fit(.accent, "●", 1);
+    try p.fit(if (p.mei and !p.pulse) .faint else .accent, "●", 1);
     try p.to(grid.words);
     const named = @min(text.width(resident), p.room() -| doing.len);
     const timed = since != scene.no_time and p.room() >= named + doing.len + since_width;
@@ -145,7 +145,7 @@ fn calling(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
     const name = try r.text();
     const subject = try r.text();
     try p.to(grid.mark);
-    try p.fit(.faint, "◇", 1);
+    try p.fit(.faint, if (p.mei) "○" else "◇", 1);
     try p.to(grid.words);
     try p.fit(.plain, name, 8);
     try p.to(grid.words + 9);

@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The smallest non-streaming Anthropic HTTP adapter (`Mei/Spec.lean`
-//! §5, §8-§10). No proxy, TLS, compression, redirect, chunked or SSE.
-
 use std::io::{ErrorKind, Read, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::time::{Duration, Instant};
@@ -16,32 +13,20 @@ use crate::catalog::{self, Selection};
 use crate::error::{Code, Diagnostic, Error, Result, protocol};
 use crate::observation;
 
-/// Per-address TCP connect budget. The gateway is normally loopback, so a
-/// handshake with no answer in this long is a dead gateway, not a slow one.
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
-/// Read and write budget for one complete non-streaming response. A model
-/// may legitimately think for minutes, so this stays generous; it exists so
-/// a gateway that accepts a connection and then stalls forever returns a
-/// diagnostic instead of hanging the run.
 const IO_TIMEOUT: Duration = Duration::from_secs(600);
 
-/// How long a blocked read may stay silent before a `mei.obs` pulse line.
 const PULSE_INTERVAL: Duration = Duration::from_secs(5);
 
-/// The completed route is an auxiliary observation taken after the answer
-/// arrived, so it gets its own short budget: a gateway that accepts and stays
-/// silent delays the answer by this long rather than by [`IO_TIMEOUT`].
 const PROBE_TIMEOUT: Duration = Duration::from_secs(2);
 
-/// Connect, IO, and pulse budgets that travel together on one client.
 struct Timeouts {
     connect: Duration,
     io: Duration,
     pulse: Duration,
 }
 
-/// A resolved plain-HTTP Messages client. The API key is never logged.
 pub struct Client {
     authority: String,
     addresses: Vec<SocketAddr>,
@@ -52,11 +37,6 @@ pub struct Client {
 }
 
 impl Client {
-    /// Parses `http://authority` with one optional trailing slash.
-    ///
-    /// # Errors
-    /// Rejects every other URL shape, header-breaking keys, and authorities
-    /// which cannot be resolved.
     pub fn new(base: &str, key: String) -> Result<Client> {
         Client::with_timeouts(
             base,
@@ -118,10 +98,6 @@ impl Client {
         })
     }
 
-    /// Selects Magpie's preferred visible route and enables per-run route observation.
-    ///
-    /// # Errors
-    /// The catalog is unreachable, malformed, or contains no usable chat model.
     pub fn discover(&mut self, now: u64) -> Result<Selection> {
         let answer = self.get("/v1/models", &self.timeouts)?;
         let selection = catalog::select(&answer)?;
@@ -129,13 +105,10 @@ impl Client {
         Ok(selection)
     }
 
-    /// Sends one complete request and reads its complete response to EOF.
-    /// While the read is blocked past [`PULSE_INTERVAL`], writes one
-    /// `mei.obs` pulse line to `pulse` without changing the request.
-    ///
-    /// # Errors
-    /// I/O, non-200, malformed HTTP, chunked transfer, and JSON failures are
-    /// returned without a retry. Non-200 errors carry only the response body.
+    pub fn describe(&self, requested: Option<&str>) -> Result<Selection> {
+        catalog::select_for(&self.get("/v1/models", &self.probe)?, requested)
+    }
+
     pub fn post(&self, request: &Value, pulse: &mut dyn Write) -> Result<Value> {
         let body = serde_json::to_vec(request).map_err(|err| {
             protocol(
@@ -255,7 +228,6 @@ impl Client {
         parse(&response)
     }
 
-    /// Connects to the first gateway address that answers within the budget.
     fn connect(&self, budget: &Timeouts) -> Result<TcpStream> {
         let mut last = None;
         for address in &self.addresses {

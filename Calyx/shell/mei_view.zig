@@ -10,16 +10,31 @@ const viewport = leaf.viewport;
 const menu_mod = @import("menu.zig");
 
 pub const Hit = viewport.Hit;
+pub const View = viewport.View;
+pub const Point = viewport.Point;
+pub const Selection = viewport.Selection;
 
 pub const Fold = enum(u2) { time, source, output, both };
 
-pub const Card = struct {
+pub const ToolCard = struct {
     code: []u8,
     output: []u8,
     fold: Fold = .time,
 
-    pub fn cycle(self: *Card) void {
+    fn cycle(self: *ToolCard) void {
         self.fold = @fromBackingInt(@intCast(@as(u2, @backingInt(self.fold)) +% 1));
+    }
+};
+
+pub const Card = union(enum) {
+    python: ToolCard,
+    reasoning: bool,
+
+    pub fn cycle(self: *Card) void {
+        switch (self.*) {
+            .python => |*python| python.cycle(),
+            .reasoning => |*open| open.* = !open.*,
+        }
     }
 };
 
@@ -33,7 +48,7 @@ const Verb = struct {
 const verbs = [_]Verb{
     .{ .spelling = "/new", .takes = "", .summary = "start a new session", .then = .carry },
     .{ .spelling = "/resume", .takes = "[jsonl]", .summary = "resume a session", .then = .wait },
-    .{ .spelling = "/effect", .takes = "", .summary = "cycle effort for the next run", .then = .carry },
+    .{ .spelling = "/effect", .takes = "", .summary = "choose reasoning effort", .then = .carry },
     .{ .spelling = "/quit", .takes = "", .summary = "leave Mei", .then = .carry },
 };
 
@@ -83,7 +98,7 @@ pub fn render(
     region: write.Live,
     columns: u16,
     rows: u16,
-    dim: bool,
+    view: *View,
     hits: *std.ArrayList(Hit),
 ) ![]u8 {
     var arena_state = std.heap.ArenaAllocator.init(gpa);
@@ -93,19 +108,29 @@ pub fn render(
     var marks: std.ArrayList(u16) = .empty;
     var card_i: usize = 0;
     for (log) |entry| {
-        if (entry == .tool and std.mem.eql(u8, entry.tool.name, "python") and card_i < cards.len) {
-            const card = &cards[card_i];
+        const card_id = std.math.cast(u16, card_i) orelse viewport.no_card;
+        if (entry == .tool and std.mem.eql(u8, entry.tool.name, "python") and card_i < cards.len and cards[card_i] == .python) {
+            const card = &cards[card_i].python;
             var tool = entry.tool;
             tool.subject = foldWord(card.fold, card_i == focus);
             try entries.append(arena, .{ .tool = tool });
-            try marks.append(arena, std.math.cast(u16, card_i) orelse viewport.no_card);
+            try marks.append(arena, card_id);
             if (card.fold == .source or card.fold == .both) {
                 try entries.append(arena, .{ .note = try tail(arena, card.code) });
-                try marks.append(arena, std.math.cast(u16, card_i) orelse viewport.no_card);
+                try marks.append(arena, viewport.no_card);
             }
             if (card.fold == .output or card.fold == .both) {
                 try entries.append(arena, .{ .note = try tail(arena, card.output) });
-                try marks.append(arena, std.math.cast(u16, card_i) orelse viewport.no_card);
+                try marks.append(arena, viewport.no_card);
+            }
+            card_i += 1;
+        } else if (entry == .reasoning and entry.reasoning.body.len != 0 and card_i < cards.len and cards[card_i] == .reasoning) {
+            const open = cards[card_i].reasoning;
+            try entries.append(arena, if (open) .{ .note = "▾ reasoning" } else entry);
+            try marks.append(arena, card_id);
+            if (open) {
+                try entries.append(arena, .{ .note = entry.reasoning.body });
+                try marks.append(arena, viewport.no_card);
             }
             card_i += 1;
         } else {
@@ -117,15 +142,15 @@ pub fn render(
         try entries.append(arena, .{ .reply = draft });
         try marks.append(arena, viewport.no_card);
     }
-    return viewport.draw(gpa, entries.items, marks.items, region, columns, rows, false, dim, hits);
+    return viewport.draw(gpa, entries.items, marks.items, region, columns, rows, false, view, hits);
 }
 
 fn foldWord(fold: Fold, focused: bool) []const u8 {
     return switch (fold) {
-        .time => if (focused) "▸ time" else "time",
-        .source => if (focused) "▸ source" else "source",
-        .output => if (focused) "▸ output" else "output",
-        .both => if (focused) "▸ both" else "both",
+        .time => if (focused) "· ▸" else "  ▸",
+        .source => if (focused) "· ⇥" else "  ⇥",
+        .output => if (focused) "· ⇤" else "  ⇤",
+        .both => if (focused) "· ↔" else "  ↔",
     };
 }
 
@@ -164,7 +189,7 @@ test "a python card defaults to elapsed time and cycles four ways" {
     defer gpa.free(code);
     const output_text = try gpa.dupe(u8, "RESULT");
     defer gpa.free(output_text);
-    var card = Card{ .code = code, .output = output_text };
+    var card = Card{ .python = .{ .code = code, .output = output_text } };
     const log = [_]write.Entry{
         .{ .tool = .{
             .at = null,
@@ -185,28 +210,29 @@ test "a python card defaults to elapsed time and cycles four ways" {
             .offer = "",
         },
     };
-    const timed = try render(gpa, &log, &.{card}, 0, "", region, 80, 24, false, &hits);
+    var view: View = .{};
+    const timed = try render(gpa, &log, &.{card}, 0, "", region, 80, 24, &view, &hits);
     defer gpa.free(timed);
     try std.testing.expect(std.mem.indexOf(u8, timed, "1.5 s") != null);
     try std.testing.expect(std.mem.indexOf(u8, timed, "print(1)") == null);
     try std.testing.expect(std.mem.indexOf(u8, timed, "/web") == null);
     card.cycle();
-    const source = try render(gpa, &log, &.{card}, 0, "", region, 80, 24, false, &hits);
+    const source = try render(gpa, &log, &.{card}, 0, "", region, 80, 24, &view, &hits);
     defer gpa.free(source);
     try std.testing.expect(std.mem.indexOf(u8, source, "print(1)") != null);
     try std.testing.expect(std.mem.indexOf(u8, source, "RESULT") == null);
     card.cycle();
-    const output = try render(gpa, &log, &.{card}, 0, "", region, 80, 24, false, &hits);
+    const output = try render(gpa, &log, &.{card}, 0, "", region, 80, 24, &view, &hits);
     defer gpa.free(output);
     try std.testing.expect(std.mem.indexOf(u8, output, "print(1)") == null);
     try std.testing.expect(std.mem.indexOf(u8, output, "RESULT") != null);
     card.cycle();
-    const both = try render(gpa, &log, &.{card}, 0, "", region, 80, 24, false, &hits);
+    const both = try render(gpa, &log, &.{card}, 0, "", region, 80, 24, &view, &hits);
     defer gpa.free(both);
     try std.testing.expect(std.mem.indexOf(u8, both, "print(1)") != null);
     try std.testing.expect(std.mem.indexOf(u8, both, "RESULT") != null);
     card.cycle();
-    try std.testing.expectEqual(Fold.time, card.fold);
+    try std.testing.expectEqual(Fold.time, card.python.fold);
 }
 
 test "the user line stays in the frame above a long reply" {
@@ -226,9 +252,28 @@ test "the user line stays in the frame above a long reply" {
             .offer = "model · effort high",
         },
     };
-    const bytes = try render(gpa, &log, &.{}, 0, "还在写", region, 80, 24, false, &hits);
+    var view: View = .{};
+    const bytes = try render(gpa, &log, &.{}, 0, "还在写", region, 80, 24, &view, &hits);
     defer gpa.free(bytes);
     try std.testing.expect(std.mem.indexOf(u8, bytes, "用户的问题") != null);
     try std.testing.expect(std.mem.indexOf(u8, bytes, "还在写") != null);
     try std.testing.expect(std.mem.indexOf(u8, bytes, "to Mei…") != null);
+}
+
+test "the visible reasoning card has a click target and discloses its original text" {
+    const gpa = std.testing.allocator;
+    const log = [_]write.Entry{.{ .reasoning = .{ .characters = 6, .body = "原样思考文本" } }};
+    var card: Card = .{ .reasoning = false };
+    var hits: std.ArrayList(Hit) = .empty;
+    defer hits.deinit(gpa);
+    var view: View = .{};
+    const region: write.Live = .{ .composer = .{ .typed = "", .cursor = 0, .placeholder = "Mei", .room = "Mei", .offer = "" } };
+    const closed = try render(gpa, &log, &.{card}, 0, "", region, 80, 24, &view, &hits);
+    defer gpa.free(closed);
+    try std.testing.expect(std.mem.indexOf(u8, closed, "原样思考文本") == null);
+    try std.testing.expectEqual(@as(usize, 1), hits.items.len);
+    card.cycle();
+    const open = try render(gpa, &log, &.{card}, 0, "", region, 80, 24, &view, &hits);
+    defer gpa.free(open);
+    try std.testing.expect(std.mem.indexOf(u8, open, "原样思考文本") != null);
 }

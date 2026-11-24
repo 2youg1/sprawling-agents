@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Permanent city host C ABI: the shell draws and handles keys; the host
-// owns wire/accounting types and projects Committed → scene Entry bytes.
-
 const std = @import("std");
 const leaf = @import("leaf");
 const write = leaf.write;
@@ -61,7 +58,6 @@ pub const Status = enum(i32) {
     buffer_too_small = 2,
 };
 
-/// Packed face payload written into the poll buffer for `.face`.
 pub const FaceBytes = extern struct {
     tag: u32,
     mode: u32,
@@ -69,10 +65,9 @@ pub const FaceBytes = extern struct {
     handoff: u32,
 };
 
-/// Packed live-meta payload for `.live_meta` (strings length-prefixed after header).
 pub const LiveMetaHeader = extern struct {
     waiting_more: u32,
-    working_since: u64, // maxInt = absent
+    working_since: u64,
     calling_count: u32,
     room_len: u32,
     offer_len: u32,
@@ -86,10 +81,9 @@ pub const CityConfig = extern struct {
     city_len: usize,
     token_ptr: ?[*]const u8,
     token_len: usize,
-    surface: u32, // 0=cli, 1=quiet_host
+    surface: u32,
 };
 
-/// In/out buffer pair for host callbacks that copy text into a caller buffer.
 pub const BufIo = extern struct {
     in_ptr: [*]const u8,
     in_len: usize,
@@ -129,7 +123,6 @@ pub fn tokenOf(config: *const CityConfig) ?[]const u8 {
     return ptr[0..config.token_len];
 }
 
-/// Decode host-projected entry list (`u32 count` + write.zig entry encodings).
 pub fn readEntries(arena: std.mem.Allocator, bytes: []const u8) ![]write.Entry {
     if (bytes.len < 4) return error.Malformed;
     var r: reader_mod.Reader = .{ .bytes = bytes };
@@ -166,7 +159,7 @@ fn readOneEntry(arena: std.mem.Allocator, r: *reader_mod.Reader) !write.Entry {
             }
             break :blk .{ .head = .{ .at = at, .resident = resident, .facts = facts } };
         },
-        .Reasoning => .{ .reasoning = try r.long() },
+        .Reasoning => .{ .reasoning = .{ .characters = try r.long() } },
         .Tool => .{ .tool = .{
             .at = absTime(try r.word()),
             .name = try arena.dupe(u8, try r.text()),
@@ -198,7 +191,6 @@ fn absLong(v: u64) ?u64 {
     return if (v == reader_mod.no_count) null else v;
 }
 
-/// Encode a note as host entry-list bytes (for stub hosts and tests).
 pub fn encodeNotes(gpa: std.mem.Allocator, notes: []const []const u8) ![]u8 {
     var list: std.ArrayList(u8) = .empty;
     errdefer list.deinit(gpa);

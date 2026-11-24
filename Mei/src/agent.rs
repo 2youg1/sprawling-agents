@@ -10,7 +10,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use serde_json::{Value, json};
 
 use crate::error::{Error, Result, protocol};
-use crate::python::Py;
+use crate::observation;
+use crate::python::{Execution, Py};
 use crate::steer::{self, Intake};
 use crate::transport::Client;
 
@@ -18,7 +19,7 @@ pub const TOOL_NAME: &str = "python";
 
 pub(crate) trait Ports {
     fn post(&mut self, request: &Value, pulse: &mut dyn Write) -> Result<Value>;
-    fn exec(&mut self, code: &str) -> Result<Value>;
+    fn exec(&mut self, code: &str) -> Result<Execution>;
     fn steer(&mut self) -> Result<Vec<String>>;
 }
 
@@ -35,9 +36,9 @@ impl Ports for Live<'_> {
         self.client.post(request, pulse)
     }
 
-    fn exec(&mut self, code: &str) -> Result<Value> {
+    fn exec(&mut self, code: &str) -> Result<Execution> {
         refuse_if_cancelled(self.cancelled)?;
-        self.python.run(code)
+        self.python.run_observed(code)
     }
 
     fn steer(&mut self) -> Result<Vec<String>> {
@@ -159,13 +160,24 @@ pub(crate) fn run(
                     .into());
                 }
                 let mut results = Vec::with_capacity(calls.len());
+                let mut previews = Vec::new();
                 for call in calls {
+                    observation::write(
+                        trace,
+                        &json!({"type": "mei.obs", "kind": "tool_start", "id": call.id}),
+                        "trace the started Python call",
+                    )?;
                     let output = ports.exec(&call.code)?;
-                    results.push(json!({
-                        "type": "tool_result",
-                        "tool_use_id": call.id,
-                        "content": output,
-                    }));
+                    previews.extend(output.previews);
+                    let mut result = serde_json::Map::from_iter([
+                        ("type".to_owned(), Value::from("tool_result")),
+                        ("tool_use_id".to_owned(), Value::from(call.id)),
+                        ("content".to_owned(), output.content),
+                    ]);
+                    if output.failed {
+                        result.insert("is_error".to_owned(), Value::Bool(true));
+                    }
+                    results.push(Value::Object(result));
                 }
                 let arrived = ports.steer()?;
                 steer::land(&mut results, &arrived);
@@ -175,6 +187,13 @@ pub(crate) fn run(
                     None,
                     trace,
                 )?;
+                for preview in previews {
+                    observation::write(
+                        trace,
+                        &json!({"type": "mei.obs", "kind": "image", "preview": preview}),
+                        "trace an image preview",
+                    )?;
+                }
             }
             "max_tokens" => {
                 return Err(protocol(

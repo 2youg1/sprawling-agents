@@ -124,7 +124,7 @@ Mei 会把工作区顶层普通文件 `AGENTS.md` 注入新会话的首条消息
 | `/new`、`/n` | 新建 JSONL 会话，旧文件保留 |
 | `/resume`、`/r` | 恢复刚离开的非空会话 |
 | `/resume 路径.jsonl`、`/r 路径.jsonl` | 恢复指定的完整日志 |
-| `/e`、`/effect` | 按 Magpie 提供的级别切换下一次任务的思考强度 |
+| `/e`、`/effect` | 打开 Magpie 支持的思考强度菜单，选择下一次任务的设置 |
 | Esc | 清草稿，或停止当前任务及其进程树；绝不退出 Calyx |
 | `/quit`、`/q` | 关闭当前 Calyx 及其进程树，其他会话互不影响 |
 
@@ -135,10 +135,10 @@ Mei 会把工作区顶层普通文件 `AGENTS.md` 注入新会话的首条消息
 composer 示例：
 
 ```text
-actual-model · effort high · Agent Step 2 · 0.05% · 487/1048576
+actual-model · effort high · Agent Step 2 · Input 487
 ```
 
-Magpie 尚未确认路由时，模型和思考强度标记为 `requested`。`Agent Step` 统计本次任务的模型响应数。上下文用量是 `input_tokens + cache_creation_input_tokens + cache_read_input_tokens`，相对模型最大上下文显示，比例固定两位小数；它不是累计账单。
+Magpie 尚未确认路由时，模型和思考强度标记为 `requested`。`Agent Step` 统计全会话的模型响应数。`Input` 累加全会话的输入、缓存创建和缓存读取 token。旧记录缺少用量时，`—` 表示未知，`≥` 表示已有读数的下界。
 
 ### 4. 进行中追加（Steer）与关闭
 

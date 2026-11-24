@@ -2746,6 +2746,8 @@ dependencies = [
 name = "sprawling-mei"
 version = "0.17.2"
 dependencies = [
+ "base64 0.23.1",
+ "image",
  "serde_json",
  "tempfile",
 ]

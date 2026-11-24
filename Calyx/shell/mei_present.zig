@@ -57,7 +57,10 @@ pub fn cloneEntry(allocator: std.mem.Allocator, entry: write.Entry) !write.Entry
             .resident = try allocator.dupe(u8, h.resident),
             .facts = try cloneFacts(allocator, h.facts),
         } },
-        .reasoning => |n| .{ .reasoning = n },
+        .reasoning => |thought| .{ .reasoning = .{
+            .characters = thought.characters,
+            .body = try allocator.dupe(u8, thought.body),
+        } },
         .tool => |t| .{ .tool = .{
             .at = t.at,
             .name = try allocator.dupe(u8, t.name),

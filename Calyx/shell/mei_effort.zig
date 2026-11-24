@@ -5,12 +5,11 @@
 
 const std = @import("std");
 
-pub fn next(current: []const u8, levels: []const []const u8) ?[]const u8 {
-    if (levels.len == 0) return null;
+pub fn currentIndex(current: []const u8, levels: []const []const u8) usize {
     for (levels, 0..) |level, index| {
-        if (std.mem.eql(u8, level, current)) return levels[(index + 1) % levels.len];
+        if (std.mem.eql(u8, level, current)) return index;
     }
-    return levels[0];
+    return 0;
 }
 
 pub fn updatedExtra(gpa: std.mem.Allocator, existing: ?[]const u8, effort: []const u8) ![]u8 {
@@ -35,12 +34,10 @@ pub fn updatedExtra(gpa: std.mem.Allocator, existing: ?[]const u8, effort: []con
     return std.json.Stringify.valueAlloc(gpa, parsed.value, .{});
 }
 
-test "effort cycles only through Magpie's offered levels" {
+test "the effort menu opens on the selected offered level" {
     const levels = [_][]const u8{ "none", "low", "high", "max" };
-    try std.testing.expectEqualStrings("max", next("high", &levels).?);
-    try std.testing.expectEqualStrings("none", next("max", &levels).?);
-    try std.testing.expectEqualStrings("none", next("unknown", &levels).?);
-    try std.testing.expect(next("high", &.{}) == null);
+    try std.testing.expectEqual(@as(usize, 2), currentIndex("high", &levels));
+    try std.testing.expectEqual(@as(usize, 0), currentIndex("unknown", &levels));
 }
 
 test "switching effort preserves the other request fields" {

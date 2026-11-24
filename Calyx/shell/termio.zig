@@ -30,6 +30,7 @@ pub const Code = union(enum) {
     home,
     end,
     click: struct { column: u16, row: u16, button: u16, release: bool },
+    wheel: struct { row: u16, lines: i32 },
     unknown,
 };
 
@@ -64,6 +65,7 @@ var saved_win: if (is_windows) ?WinModes else void = if (is_windows) null else {
 var alternate: bool = false;
 var resize_armed: bool = false;
 var pending_unit: u16 = 0;
+var mouse_held: bool = false;
 var sgr_drop_until: i64 = 0;
 var winch_read: if (is_windows) void else posix.fd_t = if (is_windows) {} else -1;
 var winch_write: if (is_windows) void else posix.fd_t = if (is_windows) {} else -1;
@@ -71,6 +73,7 @@ var winch_write: if (is_windows) void else posix.fd_t = if (is_windows) {} else 
 const WinModes = struct {
     in_mode: u32,
     out_mode: u32,
+    code_page: u32,
 };
 
 const ENABLE_PROCESSED_INPUT: u32 = 0x0001;
@@ -172,11 +175,38 @@ pub fn plainKeyboard() Error!void {
 }
 
 pub fn trackPointer() Error!void {
-    if (inputProtocols(activeInputBackend()).sgr_mouse) try writeAll("\x1b[?1000h\x1b[?1006h");
+    mouse_held = false;
+    if (inputProtocols(activeInputBackend()).sgr_mouse) try writeAll("\x1b[?1002h\x1b[?1006h");
 }
 
 pub fn untrackPointer() Error!void {
-    if (inputProtocols(activeInputBackend()).sgr_mouse) try writeAll("\x1b[?1000l\x1b[?1006l");
+    if (inputProtocols(activeInputBackend()).sgr_mouse) try writeAll("\x1b[?1002l\x1b[?1006l");
+}
+
+pub fn copySelection(gpa: std.mem.Allocator, io: std.Io, environ: *const std.process.Environ.Map, selection: []const u8) !void {
+    if (comptime is_windows) {
+        const root = environ.get("SystemRoot") orelse return error.ClipboardUnavailable;
+        if (!std.fs.path.isAbsolute(root)) return error.ClipboardUnavailable;
+        const clip = try std.fs.path.join(gpa, &.{ root, "System32", "clip.exe" });
+        defer gpa.free(clip);
+        const unicode = try std.unicode.utf8ToUtf16LeAlloc(gpa, selection);
+        defer gpa.free(unicode);
+        var child = try std.process.spawn(io, .{ .argv = &.{clip}, .stdin = .pipe, .stdout = .ignore, .stderr = .ignore, .create_no_window = true });
+        defer child.kill(io);
+        const input = child.stdin orelse return error.ClipboardUnavailable;
+        try input.writeStreamingAll(io, "\xff\xfe");
+        try input.writeStreamingAll(io, std.mem.sliceAsBytes(unicode));
+        input.close(io);
+        child.stdin = null;
+        if (!(try child.wait(io)).success()) return error.ClipboardUnavailable;
+    } else {
+        const encoder = std.base64.standard.Encoder;
+        const encoded = try gpa.alloc(u8, encoder.calcSize(selection.len));
+        defer gpa.free(encoded);
+        const sequence = try std.fmt.allocPrint(gpa, "\x1b]52;c;{s}\x1b\\", .{encoder.encode(encoded, selection)});
+        defer gpa.free(sequence);
+        try writeAll(sequence);
+    }
 }
 
 pub fn setTitle(title: []const u8) Error!void {
@@ -398,12 +428,24 @@ fn readEventWindows() Error!?Event {
     switch (record.kind) {
         WINDOW_BUFFER_SIZE_EVENT => return .{ .resize = size() },
         MOUSE_EVENT => {
-            if (record.event.mouse.flags != 0 or record.event.mouse.button & 1 == 0) return null;
+            const mouse = record.event.mouse;
+            if (mouse.y < 0 or mouse.x < 0) return null;
+            if (mouse.flags == 4) {
+                const delta: i16 = @bitCast(@as(u16, @truncate(mouse.button >> 16)));
+                return .{ .key = .{ .code = .{ .wheel = .{
+                    .row = @as(u16, @intCast(mouse.y)) + 1,
+                    .lines = @divTrunc(-@as(i32, delta), 40),
+                } } } };
+            }
+            const held = mouse.button & 1 != 0;
+            const dragging = mouse.flags == 1 and held and mouse_held;
+            if (!dragging and (mouse.flags != 0 or held == mouse_held)) return null;
+            mouse_held = held;
             return .{ .key = .{ .code = .{ .click = .{
-                .column = @intCast(record.event.mouse.x + 1),
-                .row = @intCast(record.event.mouse.y + 1),
-                .button = 0,
-                .release = false,
+                .column = @as(u16, @intCast(mouse.x)) + 1,
+                .row = @as(u16, @intCast(mouse.y)) + 1,
+                .button = if (dragging) 32 else 0,
+                .release = !held,
             } } } };
         },
         KEY_EVENT => {
@@ -663,6 +705,8 @@ fn parseSgr(input: []const u8, used: *usize) ?Event {
         if (c != 'M' and c != 'm') return .{ .key = .{ .code = .unknown } };
         if (saw and ni < nums.len) nums[ni] = current;
         if (ni < 2) return .{ .key = .{ .code = .unknown } };
+        if (c == 'M' and nums[0] & 0x63 == 64) return .{ .key = .{ .code = .{ .wheel = .{ .row = nums[2], .lines = -3 } } } };
+        if (c == 'M' and nums[0] & 0x63 == 65) return .{ .key = .{ .code = .{ .wheel = .{ .row = nums[2], .lines = 3 } } } };
         return .{ .key = .{ .code = .{ .click = .{
             .button = nums[0],
             .column = if (ni >= 1) nums[1] else 0,
@@ -728,6 +772,8 @@ const WinApi = if (is_windows) struct {
     extern "kernel32" fn GetStdHandle(nStdHandle: DWORD) callconv(.winapi) HANDLE;
     extern "kernel32" fn GetConsoleMode(hConsoleHandle: HANDLE, lpMode: *DWORD) callconv(.winapi) BOOL;
     extern "kernel32" fn SetConsoleMode(hConsoleHandle: HANDLE, dwMode: DWORD) callconv(.winapi) BOOL;
+    extern "kernel32" fn GetConsoleOutputCP() callconv(.winapi) u32;
+    extern "kernel32" fn SetConsoleOutputCP(code_page: u32) callconv(.winapi) BOOL;
     extern "kernel32" fn WriteFile(
         hFile: HANDLE,
         lpBuffer: [*]const u8,
@@ -764,11 +810,15 @@ fn enableRawWindows() Error!void {
         var out_mode: u32 = 0;
         if (!WinApi.GetConsoleMode(in_h, &in_mode).toBool()) return error.NotATerminal;
         if (!WinApi.GetConsoleMode(out_h, &out_mode).toBool()) return error.NotATerminal;
-        saved_win = .{ .in_mode = in_mode, .out_mode = out_mode };
+        const code_page = WinApi.GetConsoleOutputCP();
+        if (code_page == 0) return error.NotATerminal;
+        saved_win = .{ .in_mode = in_mode, .out_mode = out_mode, .code_page = code_page };
+        errdefer disableRawWindows() catch {};
         const new_in = windowsRawInputMode(in_mode);
         const new_out = out_mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING;
         if (!WinApi.SetConsoleMode(in_h, new_in).toBool()) return error.NotATerminal;
         if (!WinApi.SetConsoleMode(out_h, new_out).toBool()) return error.NotATerminal;
+        if (code_page != 65001 and !WinApi.SetConsoleOutputCP(65001).toBool()) return error.NotATerminal;
         resize_armed = true;
     }
 }
@@ -782,6 +832,7 @@ fn disableRawWindows() Error!void {
         if (WinApi.stdHandle(WinApi.STD_OUTPUT_HANDLE)) |out_h| {
             _ = WinApi.SetConsoleMode(out_h, previous.out_mode);
         } else |_| {}
+        if (previous.code_page != 65001) _ = WinApi.SetConsoleOutputCP(previous.code_page);
         saved_win = null;
     }
 }

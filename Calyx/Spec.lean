@@ -33,12 +33,12 @@ Calyx 通过 `MEI_CAPTURE_CREATED=1` 把空目录交给 Mei。成功段保留 se
 
 - 交互：`calyx` 在工作区打开 Mei 后端；`MEI_BIN`、同目录 sibling、或 PATH 名 `mei` 解析无头核；
   `/new`/`/n`、`/resume [jsonl]`/`/r [jsonl]`、`/quit`/`/q`、Esc 保持 Console §8-174 的会话边界；
-  无参 `/resume` 恢复刚离开的非空会话。`/e`/`/effect` 按 Magpie `reasoning_levels` 循环切换下一次请求的 effort。
-  横幅为 cwd；composer 显示实际或 requested model/effort、`Agent Step`、已用上下文/最大上下文及两位小数百分比；
+  无参 `/resume` 恢复刚离开的非空会话。`/e`/`/effect` 打开 Magpie `reasoning_levels` 的二级选单，选择下一次请求的 effort。
+  横幅显示 cwd、已有 Git 分支和已加载的 `AGENTS.md`；composer 显示实际或 requested model/effort、会话累计 `Agent Step` 和会话累计输入 token；
   已用量是 `input_tokens + cache_creation_input_tokens + cache_read_input_tokens`，不是累计多轮账单。
   状态行在当前列宽内排版：room 名保留可见，过长 offer 以省略号截断；不得为画不下的 offer 预留空白挤掉 room。
   运行中显示 working；`mei.obs` pulse/model/route/usage 不落成 Note；图片块只显示简短图片提示，不显示 base64；Esc 在 Windows 上结束子树。
-  Mei 视口在进入时清屏并立刻画出贴底的 composer；转写（含用户自己的每一轮）整帧重画，长答复向上滚动，输入框留在窗口底部；终端尺寸变化（含 Windows 轮询）按新的列宽重排。`/ ` 打开 Mei 自己的命令菜单。方向键只在输入的最前／最后（或正在翻历史时）召回历史，否则在多行间移动，宽字符按列对齐。Python 调用默认只显示耗时，可在源码、输出、两者与仅耗时之间切换。Mei 横幅不写 WebUI 提示。城的主屏增量帧不变。
+  Mei 视口在进入时清屏并立刻画出贴底的 composer；转写（含用户自己的每一轮）整帧重画，长答复向上滚动，输入框留在窗口底部；终端尺寸变化按新的列宽重排。`/ ` 打开 Mei 自己的命令菜单。方向键只在输入的最前／最后（或正在翻历史时）召回历史，否则在多行间移动，宽字符按列对齐。Python 调用默认折叠，显示状态与耗时，可展开输入、输出或两者。Mei 横幅不写 WebUI 提示。城的主屏增量帧不变。
   Esc 仅清草稿或停止当前 run，空闲时不动作，绝不退出 Calyx；只有 `/quit`/`/q` 关闭终端面并回收其子树。
   `/resume <jsonl>` 拒绝空文件与无法解析为 JSON 对象的损坏行，诊断为 `E_MEI_SESSION` toml 块；无参 `/resume` 在无非空前会话时提示明示路径。
   任务进行中提交的普通文本是 Steer：写入该 run 的 `MEI_STEER_PATH` JSONL，不启新进程、不杀组；
@@ -102,7 +102,35 @@ stdin）。理由：一次完成要求无参 TTY 与显式 `calyx` 均可进交�
 旗标，不得被面吞掉；「Mei 不含壳」约束的是核进程不内嵌 TUI，不是拒绝同归档并列二进制。被否：
 只发无头核、强制人另装 `sprawling` 并手写 `MEI_BIN`；把 Calyx 链进 `mei` 进程；TTY 上把
 `--resume`／`--acp` 交给只认 `--replay` 的 `calyx`。 -/
-/-! D5 Mei 状态行：cwd、实际/requested model 与 effort、Agent Step、上下文两位小数百分比及 used/max；pulse/model/route/usage 观测吞掉不刷 Note。 -/
+/-! D5 Mei 状态行采用会话累计值。每条助手响应加一步，provider 返回的输入、缓存创建和缓存读取 token 求和后计入同一会话。部分缺失的历史用量显示为未知或下界。恢复重放已保存的统计观测，`/new` 清零。每次请求的窗口比例省去，同一段历史被多次读取时确实产生多份会话输入 token。理由：提交新任务与运行模型工具只改变会话内的计数，单次请求读数不能满足会话累计口径。 -/
+
+namespace Calyx.SessionTotals
+
+structure Totals where
+  steps : Nat := 0
+  input : Nat := 0
+  missing : Nat := 0
+  deriving DecidableEq
+
+def response (totals : Totals) (tokens : Option Nat) : Totals :=
+  ⟨totals.steps + 1, totals.input + tokens.getD 0,
+    totals.missing + if tokens.isNone then 1 else 0⟩
+
+theorem response_counts_without_usage (totals : Totals) :
+    response totals none = ⟨totals.steps + 1, totals.input, totals.missing + 1⟩ := by
+  simp [response]
+
+theorem response_accumulates_across_submissions (totals : Totals) (first second : Nat) :
+    (response (response totals (some first)) (some second)).input =
+      totals.input + first + second := rfl
+
+end Calyx.SessionTotals
+
+/-! D17 Mei 的退出显示由结束结果与诊断决定。进程失败投影 `Failed`，服务端截断在诊断中写明 `max_tokens`。理由：通用错误标作 `Limit` 混淆传输、协议、启动和截断，误导恢复操作；城仍以账本 `Completion::Limit` 表示确实发生的上限。 -/
+
+/-! D18 Mei 使用通栏和终端前景、浅淡、粗体来形成层级。文本区滚动按转写锚点阅读，回到尾部才跟进新活动。Python 折叠、输入、输出、两者用固定宽单色符号，思考在原位展开可显示正文。运行区只改变指示符亮度，正文和操作提示在固定位置。输入光标由终端持有。理由：固定阅读列、跳动标点和重复快捷键提示占用阅读注意力。被否：独立详情列会挤占正文，固定形状光标覆盖宿主配置。 -/
+
+/-! D19 Windows 控制台使用 UTF-8 输出代码页。`termio` 与控制台模式一起记录并恢复代码页，部分初始化失败亦恢复。理由：同一帧的宽字符依赖 UTF-8 解码，默认代码页会令实际终端列数偏离帧的测量。 -/
 /-! D5a Calyx 拥有交互 session 的 spilled captures，并按 run 回收未提交目录。理由：只有 Calyx 持有正式日志的追加结果，能区分成功、确认未写入与回滚后不确定；Mei 在进程边界前无法作出最终保留决定。路径可跨 Python 进程与 resume 使用；Python 退出不等于 session 所有权结束。目录由 Calyx 独占创建，只有这个创建事实授权失败、取消与析构时的递归删除；回滚失败的追加视为"可能已写盘"，不删除任何捕获文件。被否：由 Mei 在解释器退出时决定交互 session 的最终保留（看不到其后的日志追加结果），以及只凭进程号、时间和计数生成的路径删除既有目录（可能删除其他 run 的内容）。 -/
 /-! D6 `calyx` 二进制是壳的装配根；墙钟采样在进入壳时注入，库面仍可接收宿主提供的时刻。 -/
 /-! D7 整壳 Zig；Rust 只做城/线/核宿主
@@ -144,7 +172,7 @@ Rust 是宿主边界，不是壳实现。
 再把剩余列（扣去间距）交给 offer；`paint.fit` 对超长 offer 画省略号。offer 画不下时
 不得按完整 offer 宽度从 room 侧扣留空白。宽度矩阵（20/40/60/80/120/200）下每一行
 视觉列数不超过窗口列宽，且 room 名仍可见。理由：窄终端上完整
-`model · effort · Agent Step · % · tokens` 会挤掉 room 或留下空白带；截断保留可辨认的
+`model · effort · Agent Step · Input` 会挤掉 room 或留下空白带；截断保留可辨认的
 状态片段。被否：①offer 放不下就整段省略却仍按全宽占位——空白浪费且 room 被挤；
 ②整行换行折到多行——composer 合同是单行状态；③缩短 offer 字符串生成逻辑——排版属叶。
 -/
@@ -216,7 +244,9 @@ python 调用允许的图片总量与 JSON 信封。被否：①加大固定缓�
 
 /-! D16 Mei 视口整帧重画，城的主屏增量帧不动
 
-决定：Mei 交互面进入备用屏（失败时仍每帧清可见区域），把保留的转写、未提交草稿和贴底的 composer 画成一帧。窗口装不下时只保留转写的尾部，composer 锚在底行；尺寸变化后按新的列宽重排，宽字符仍按叶的列宽折行。用户每轮写入转写并在下一帧重画，跟踪回显的同一句不画第二次。方向键在光标位于文本起点时向上召回历史；正在翻历史且光标已在首行时，向上召回更早的一条。位于末尾或正在翻历史时向下召回，其余时候按视觉列在行间移动。键入 `/` 且仍在命令词内时打开 Mei 的 `/new`、`/resume`、`/effect`、`/quit` 菜单（含短写过滤）。Python 调用保存源码与输出，默认只画耗时（与叶的 `took` 同一格式）；`ctrl-o` 在仅耗时、仅源码、仅输出、两者之间循环，指针点击该行同样循环。Mei 横幅不画「Type /web to open the WebUI」。进行中的草稿仍不写入保留转写，只在当帧尾部画出。尺寸变化在 Unix 上由 `SIGWINCH` 唤醒，在 Windows 控制台上由 `ReadConsoleInputW` 的 `WINDOW_BUFFER_SIZE_EVENT` 唤醒；这两条都装上时不再轮询尺寸。只有创建唤醒管道失败的 Unix 才退到一秒一次的尺寸比较。一次明显的尺寸变化先画一帧只有横幅和输入区的淡帧，约 80 毫秒后再画出转写。淡帧只在至少 40 列且至少 12 行时出现；列与行的变化都小于 2 时不做这一帧。Python 卡片的源码与输出超过 12000 字节时只保留尾部，并在前面画 `…`。保留的转写深拷贝在 Mei 面持有的 `log_arena`。城控制台继续用主屏增量帧，横幅提示与斜杠菜单保持原合同，方向键仍按城的方式召回历史。Mei 的方向键才在行内移动。
+决定：Mei 保留转写并在备用屏按终端列宽整帧重画，composer 锚在底部。默认随尾，正文区域滚轮将阅读位置固定在条目与行偏移，Ctrl+End 恢复随尾。拖选由转写绘制记录可见字符，松开复制，软折行保留原有间隔。Unix 与 Windows 尺寸事件立即重排正文，只有没有事件源时回退到尺寸比较。方向键在多行输入内按视觉列移动，在文本开始、末尾或正在翻历史时召回历史。斜杠菜单选中 `/effect` 后进入可用强度选单。Python 卡片的四种显示为折叠、输入、输出与两者，状态与折叠用分立的单色符号，思考卡片则单击展开正文。运行区的点定期改变亮度，工作文字位置固定。Mei 使用终端的光标配置。横幅保留工作区、Git HEAD 和 Mei 已加载的 AGENTS.md 标记。
+
+窗口依照现有安全范围显示 Python 文字。进行中的助手草稿只在当帧尾部画出。已保存的转写深拷贝在 Mei 面持有的 `log_arena`。城控制台使用主屏增量帧、主机自己的回滚与原有斜杠菜单。
 
 理由：增量帧把新行写进上一次活动区的位置，再用绝对坐标把活动区贴到可见窗口底部。窗口变高、答复变长或宽字符把行数算偏时，活动区盖住已经画出的用户句和上一段答复，而且旧行不会按新宽度重折。Mei 是一轮轮的对话，需要的是锚住的输入和会滚动的转写；城的日志仍然要终端自己的回滚。
 

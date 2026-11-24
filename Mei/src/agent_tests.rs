@@ -51,7 +51,7 @@ impl Ports for Script {
         Ok(self.answers.pop_front().unwrap())
     }
 
-    fn exec(&mut self, code: &str) -> Result<Value> {
+    fn exec(&mut self, code: &str) -> Result<Execution> {
         self.steered_during_exec.set(self.drained.get() > 0);
         if self.fail_exec {
             return Err(Error::from(protocol(
@@ -61,7 +61,11 @@ impl Ports for Script {
             )));
         }
         self.executed.push(code.to_owned());
-        Ok(Value::String(format!("out:{code}")))
+        Ok(Execution {
+            content: Value::String(format!("out:{code}")),
+            failed: false,
+            previews: Vec::new(),
+        })
     }
 
     fn steer(&mut self) -> Result<Vec<String>> {
@@ -151,7 +155,13 @@ fn a_wave_runs_in_order_and_preserves_thinking() {
     assert_eq!(results[0]["content"], "out:x = 40");
     assert_eq!(results[1]["tool_use_id"], "b");
     assert_eq!(results[1]["content"], "out:x += 2; print(x)");
-    assert_eq!(trace.lines().count(), 4);
+    assert_eq!(
+        trace
+            .lines()
+            .filter(|line| line.contains("\"kind\":\"tool_start\""))
+            .count(),
+        2
+    );
 }
 
 #[test]
@@ -221,7 +231,14 @@ fn an_execution_failure_does_not_invent_a_complete_result_message() {
     let result = run(&mut request, &mut ports, &mut trace);
     assert!(result.is_err());
     assert_eq!(request["messages"].as_array().unwrap().len(), 2);
-    assert_eq!(String::from_utf8(trace).unwrap().lines().count(), 2);
+    let trace = String::from_utf8(trace).unwrap();
+    assert_eq!(
+        trace
+            .lines()
+            .filter(|line| !line.contains("\"type\":\"mei.obs\""))
+            .count(),
+        2
+    );
 }
 
 #[test]

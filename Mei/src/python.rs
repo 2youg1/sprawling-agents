@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The persistent python adapter (`Mei/Spec.lean` §6, §10-§12).
-//! Small UTF-8 captures are returned whole; large captures stay at their paths.
-
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::time::Duration;
@@ -15,6 +12,7 @@ use crate::doctor::Environment;
 use crate::error::{Code, Diagnostic, Error, Result};
 
 mod frame;
+mod preview;
 
 pub use crate::capture::INLINE_BYTES;
 
@@ -22,14 +20,9 @@ const BOOT: &str = include_str!("boot.py");
 
 const INLINE_KIB: u64 = INLINE_BYTES / 1024;
 
-/// The pictures one python call may attach and the bytes one picture may carry.
-/// `boot.py` enforces both and names them in the message the model reads; this
-/// copy is the number the tool description states, and a test keeps the two
-/// equal.
 pub const IMAGE_CALL_LIMIT: usize = 2;
 pub const IMAGE_MIB: usize = 5;
 
-/// Describes the python tool with the selected runtime versions and output budget.
 pub fn tool_description(environment: &Environment) -> String {
     format!(
         concat!(
@@ -61,7 +54,12 @@ fn failure(
     Error::Diagnostic(Diagnostic::new(Code::Python, action, subject, recovery))
 }
 
-/// The direct child and its private one-line JSON channel.
+pub(crate) struct Execution {
+    pub content: serde_json::Value,
+    pub failed: bool,
+    pub previews: Vec<String>,
+}
+
 pub struct Py {
     child: Child,
     input: Option<ChildStdin>,
@@ -70,18 +68,10 @@ pub struct Py {
 }
 
 impl Py {
-    /// Starts `python3`/`python` with BOOT, preserving an existing `HARNESS`.
-    ///
-    /// # Errors
-    /// The interpreter cannot be started or its private pipes cannot be opened.
     pub fn spawn() -> Result<Py> {
         Py::with_boot(BOOT, None)
     }
 
-    /// Starts the doctor-selected interpreter with uv available to descendants.
-    ///
-    /// # Errors
-    /// The selected interpreter cannot be started or its environment is invalid.
     pub fn spawn_in(environment: &Environment) -> Result<Py> {
         Py::with_boot(BOOT, Some(environment))
     }
@@ -152,11 +142,11 @@ impl Py {
         })
     }
 
-    /// Executes one code string and returns its observable tool result.
-    ///
-    /// # Errors
-    /// Channel, frame, capture-file and process failures.
     pub fn run(&mut self, code: &str) -> Result<serde_json::Value> {
+        Ok(self.run_observed(code)?.content)
+    }
+
+    pub(crate) fn run_observed(&mut self, code: &str) -> Result<Execution> {
         let frame = serde_json::to_vec(code).map_err(|err| {
             failure(
                 "serialize a Python control frame",
@@ -167,7 +157,21 @@ impl Py {
         self.write_frame(&frame)?;
         let frame = self.read_frame()?;
         let text = self.captures.observe(frame.capture)?;
-        Ok(frame::content(text, frame.images))
+        let previews = if std::env::var_os("MEI_CAPTURE_CREATED").is_some_and(|value| value == "1")
+        {
+            frame
+                .images
+                .iter()
+                .filter_map(|image| preview::thumbnail(&image.media_type, &image.data))
+                .collect()
+        } else {
+            Vec::new()
+        };
+        Ok(Execution {
+            content: frame::content(text, frame.images),
+            failed: frame.failed,
+            previews,
+        })
     }
 
     fn write_frame(&mut self, frame: &[u8]) -> Result<()> {
@@ -217,10 +221,6 @@ impl Py {
         frame::parse(&line)
     }
 
-    /// Closes control input and reaps within [`CLOSE_GRACE`], else kills.
-    ///
-    /// # Errors
-    /// Waiting on or killing/reaping the interpreter fails.
     pub fn close(&mut self) -> Result<()> {
         self.close_within(CLOSE_GRACE)?;
         if let Err(err) = self.captures.complete() {
@@ -263,10 +263,6 @@ impl Py {
         }
     }
 
-    /// Kills the interpreter and reaps it.
-    ///
-    /// # Errors
-    /// Kill or wait failed.
     pub fn kill_and_wait(&mut self) -> Result<()> {
         let process = self.terminate_process();
         let captures = self.captures.discard();

@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// Screen state for the Calyx shell: erase row, previous part, and the
-// last frame buffer. Builds scenes with write.zig and draws them through
-// the leaf export; termio carries the resulting bytes to stdout.
-
 const std = @import("std");
 const leaf = @import("leaf");
 const write = leaf.write;
@@ -50,13 +46,21 @@ pub const Screen = struct {
     }
 
     pub fn take(self: *Screen) Written {
+        return self.open(.steady_bar);
+    }
+
+    pub fn takeMei(self: *Screen) Written {
+        return self.open(null);
+    }
+
+    fn open(self: *Screen, style: ?termio.CursorStyle) Written {
         termio.enableRaw() catch |err| {
             std.debug.print("Calyx terminal initialization failed: {s}\n", .{@errorName(err)});
             self.lost = true;
             return .lost;
         };
         self.writeAll("\x1b]2;sprawling · closing this window stops it\x07") catch return self.fail();
-        self.setStyle(.steady_bar) catch return self.fail();
+        if (style) |value| self.setStyle(value) catch return self.fail();
         termio.enhanceKeyboard() catch return self.fail();
         return .shown;
     }

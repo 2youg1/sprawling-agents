@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Magpie's model catalog and completed route, without transport concerns.
-
 use serde_json::Value;
 
 use crate::error::{Code, Diagnostic, Error, Result, protocol};
@@ -63,11 +61,22 @@ fn model(entry: &Value) -> Option<Selection> {
 }
 
 pub fn select(catalog: &Value) -> Result<Selection> {
+    select_for(catalog, None)
+}
+
+pub fn select_for(catalog: &Value, requested: Option<&str>) -> Result<Selection> {
     let entries = catalog
         .get("data")
         .and_then(Value::as_array)
         .ok_or_else(|| invalid_catalog("data is missing or is not an array", catalog))?;
     let preferred = catalog.get("first_id").and_then(Value::as_str);
+    if let Some(id) = requested {
+        return entries
+            .iter()
+            .find(|entry| entry.get("id").and_then(Value::as_str) == Some(id))
+            .and_then(model)
+            .ok_or_else(|| invalid_catalog(format!("the catalog has no entry for {id}"), catalog));
+    }
     let entry = preferred
         .and_then(|id| {
             entries
