@@ -7,8 +7,8 @@ A violation turns the check red with a message naming the rule, the violation an
 | workspace lints, `-D warnings` | the Rust rules in [AGENTS.md](../AGENTS.md#rust) and the hardening contract in [ARCHITECTURE.md](ARCHITECTURE.md#10-determinism-and-hardening); during migration, legacy `unsafe` remains only in `Sprawling/desktop/ffi` and `Calyx/ffi` |
 | `xtask header` | the MPL-2.0 notice, then the copyright line, atop every `.rs` file |
 | `xtask lexicon` | one name per concept, from the glossary |
-| `xtask modmap`, `xtask length` | production modules in the module map; Rust, TypeScript and Svelte source files within 500 lines; production functions within 200 lines and 4 parameters |
-| `xtask comments` | zero comment-bearing lines after the exact MPL header is stripped, across changed Rust, TypeScript, Svelte, Zig, Python, JavaScript and CSS sources; untouched legacy violations remain in the full-tree inventory |
+| `xtask modmap`, `xtask length` | production modules in the module map; Rust, TypeScript and TSX source files within 500 lines; production functions within 200 lines and 4 parameters |
+| `xtask comments` | zero comment-bearing lines after the exact MPL header is stripped, across changed Rust, TypeScript, TSX, Zig, Python, JavaScript and CSS sources; untouched legacy violations remain in the full-tree inventory |
 | `xtask unsafe` | zero real `unsafe` tokens in changed Rust sources, including macro token trees; untouched legacy violations remain in the full-tree inventory |
 | `xtask boundary` | white-box checks in Rust beside the code; stranger-entry checks in Lean under `Tools/adversary/` |
 | `xtask artifact` | nothing written for a test is compiled into the binary a person downloads |

@@ -9,8 +9,9 @@ import {
   openRemoteDoor,
   replaceCityKey,
 } from "../../core/commands";
+import type { CommandReceipt } from "../../core/socket";
 import type { Key } from "../../core/lang";
-import type { AxCode, Command } from "../../wire";
+import type { AxCode, Command, IdemKey } from "../../wire";
 import type { GlyphName } from "../parts/glyph";
 
 export type Opener = "door" | "key";
@@ -20,6 +21,11 @@ export type Phase =
   | { readonly kind: "requesting"; readonly opener: Opener }
   | { readonly kind: "awaiting"; readonly opener: Opener }
   | { readonly kind: "confirming"; readonly opener: Opener }
+  | {
+      readonly kind: "unknown";
+      readonly opener: Opener;
+      readonly during: "requesting" | "confirming";
+    }
   | { readonly kind: "refused"; readonly opener: Opener; readonly code: AxCode };
 
 export type Focus =
@@ -46,6 +52,8 @@ export type DoorEvent =
   | { readonly kind: "refusal"; readonly code: AxCode }
   | { readonly kind: "unsent" }
   | { readonly kind: "settled" }
+  | { readonly kind: "timed_out" }
+  | { readonly kind: "checked" }
   | { readonly kind: "type"; readonly text: string }
   | { readonly kind: "submit" }
   | { readonly kind: "escape" };
@@ -68,7 +76,8 @@ export function step(door: Door, event: DoorEvent): Stepped {
           ]
         : same;
     case "pending":
-      return phase.kind === "requesting"
+      return phase.kind === "requesting" ||
+        (phase.kind === "unknown" && phase.during === "requesting")
         ? [
             {
               phase: { kind: "awaiting", opener: phase.opener },
@@ -99,7 +108,7 @@ export function step(door: Door, event: DoorEvent): Stepped {
           ]
         : same;
     case "refusal":
-      return phase.kind === "requesting" || phase.kind === "confirming"
+      return phase.kind === "requesting" || phase.kind === "confirming" || phase.kind === "unknown"
         ? [
             {
               phase: { kind: "refused", opener: phase.opener, code: event.code },
@@ -116,8 +125,27 @@ export function step(door: Door, event: DoorEvent): Stepped {
             null,
           ]
         : same;
+    case "timed_out":
+      return phase.kind === "requesting" || phase.kind === "confirming"
+        ? [
+            {
+              phase: { kind: "unknown", opener: phase.opener, during: phase.kind },
+              typed: "",
+              focus: { kind: "opener", opener: phase.opener },
+            },
+            null,
+          ]
+        : same;
+    case "checked":
+      return phase.kind === "unknown"
+        ? [
+            { phase: { kind: "idle" }, typed: "", focus: { kind: "opener", opener: phase.opener } },
+            null,
+          ]
+        : same;
     case "settled":
-      return phase.kind === "confirming"
+      return phase.kind === "confirming" ||
+        (phase.kind === "unknown" && phase.during === "confirming")
         ? [
             { phase: { kind: "idle" }, typed: "", focus: { kind: "opener", opener: phase.opener } },
             null,
@@ -159,7 +187,11 @@ export const LASTINGS: readonly (readonly [string, number])[] = [
 ];
 export const LASTING_DEFAULT = "12h";
 
-export function doorCommand(sent: DoorSent | "close", lastingMs: number): Command {
+export function doorCommand(
+  sent: DoorSent | "close",
+  lastingMs: number,
+  approval: IdemKey | null = null,
+): Command | null {
   if (sent === "close") return closeRemoteDoor();
   switch (sent.kind) {
     case "open":
@@ -167,8 +199,25 @@ export function doorCommand(sent: DoorSent | "close", lastingMs: number): Comman
     case "replace":
       return replaceCityKey();
     case "confirm":
-      return confirmRemoteDoor(sent.code);
+      return approval === null ? null : confirmRemoteDoor(sent.code, approval);
   }
+}
+
+export function requestOf(command: Command): IdemKey | null {
+  if ("open_remote_door" in command) return command.open_remote_door.idem;
+  if ("replace_city_key" in command) return command.replace_city_key.idem;
+  if ("confirm_remote_door" in command) return command.confirm_remote_door.idem;
+  if ("close_remote_door" in command) return command.close_remote_door.idem;
+  return null;
+}
+
+export function receiptOf(
+  request: IdemKey | null,
+  receipts: ReadonlyMap<IdemKey, CommandReceipt>,
+): DoorEvent | null {
+  const receipt = request === null ? undefined : receipts.get(request);
+  if (receipt === undefined) return null;
+  return receipt.kind === "accepted" ? { kind: "settled" } : answerOf(receipt.error.code);
 }
 
 export interface DoorKeyLook {

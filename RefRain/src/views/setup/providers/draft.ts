@@ -7,7 +7,7 @@ import { WIRE_APIS, dialectOf } from "../../../core/commands";
 import type { Endpoint, Pair, Tuning, WireApi } from "../../../core/commands";
 import { referenceFor, referenceText } from "../../../core/enrol";
 import type { Key } from "../../../core/lang";
-import { get } from "svelte/store";
+import { get } from "../../../core/store";
 import { PROXYING_RULES, preferences } from "../../../core/prefs";
 import type { Proxying, TuningDefaults } from "../../../wire";
 import type { Choice, Group } from "../../parts/segmented";

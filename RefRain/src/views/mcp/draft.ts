@@ -124,6 +124,7 @@ function reached(label: string, draft: Draft, over: "http" | "sse"): Encoded {
 export interface Intake {
   readonly taken: () => readonly string[];
   readonly offer: (server: McpServer) => boolean;
+  readonly offerMany: (servers: readonly McpServer[]) => boolean;
 
   readonly why: () => string | null;
 }

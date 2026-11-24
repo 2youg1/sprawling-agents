@@ -3,8 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { HTMLButtonAttributes } from "svelte/elements";
-
 import { fill, say } from "../../core/lang";
 import type { Key, Lang } from "../../core/lang";
 import type { Address, SessionLine } from "../../wire";
@@ -28,7 +26,12 @@ export interface ForkKey {
   readonly name: string;
 
   readonly why: string | undefined;
-  readonly wire: Pick<HTMLButtonAttributes, "type" | "aria-label" | "aria-disabled" | "onclick">;
+  readonly wire: {
+    readonly type: "button";
+    readonly "aria-label": string;
+    readonly "aria-disabled": boolean;
+    readonly onclick: (event: MouseEvent) => void;
+  };
 }
 
 export interface Shown {

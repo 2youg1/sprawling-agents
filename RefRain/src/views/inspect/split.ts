@@ -3,8 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import { createAttachmentKey } from "svelte/attachments";
-import type { Attachment } from "svelte/attachments";
+type Hold = (element: HTMLElement) => void | (() => void);
 
 export interface SplitProps {
   readonly lines: number;
@@ -25,7 +24,7 @@ export interface Grip {
 
 export interface SplitHands {
   readonly capture: (pointer: number) => void;
-  readonly hold: Attachment<HTMLElement>;
+  readonly hold: Hold;
   readonly grip: { from: Grip | null };
 }
 
@@ -46,10 +45,10 @@ export interface SplitWire {
   readonly onpointermove: (event: PointerPress) => void;
   readonly onpointerup: () => void;
   readonly onpointercancel: () => void;
-  readonly [hold: symbol]: Attachment<HTMLElement>;
 }
 
 export interface SplitLook {
+  readonly hold: Hold;
   readonly wire: SplitWire;
 }
 
@@ -85,11 +84,10 @@ export function dragged(
   return clamped(props, from.lines + Math.round((y - from.y) / props.step));
 }
 
-const HOLD = createAttachmentKey();
-
 export function lookOf(props: SplitProps, label: string, hands: SplitHands): SplitLook {
   const { grip } = hands;
   return {
+    hold: hands.hold,
     wire: {
       role: "separator",
       tabindex: 0,
@@ -120,7 +118,6 @@ export function lookOf(props: SplitProps, label: string, hands: SplitHands): Spl
       onpointercancel: () => {
         grip.from = null;
       },
-      [HOLD]: hands.hold,
     },
   };
 }

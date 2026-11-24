@@ -1,0 +1,21 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+.run-trace-hunk {
+  line-height: 1.65;
+}
+.run-trace-line-number {
+  inline-size: 4.5ch;
+}
+.run-trace-sign {
+  inline-size: 2.5ch;
+}
+.run-trace-text {
+  padding-inline-start: 2ch;
+  text-indent: -2ch;
+}
+.run-trace-side {
+  flex-grow: 1.4;
+}

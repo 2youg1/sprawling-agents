@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { Snippet } from "svelte";
-import type { HTMLFormAttributes, HTMLTextareaAttributes } from "svelte/elements";
-
 import type { Belief, RunBelief } from "../../core/belief";
 import { heldIn } from "../../core/belief/rooms";
 import { configureCity, selectModel } from "../../core/commands";
@@ -30,6 +27,8 @@ import type { View } from "../../core/route";
 import type { PopoverColumn } from "../parts/popover";
 import { offersOf } from "./picker";
 import type { PickerFacts } from "./picker_scene";
+import type { DrawerProps } from "./attachment_drawer";
+import type { SpeechFeedbackProps } from "./speech_feedback";
 
 export const SPELLING: Record<Sending, Key> = {
   dispatch: "talk_send",
@@ -48,13 +47,19 @@ export interface Served extends Names {
 
 export function sessionModel(held: readonly RunBelief[], began: Seq | null): string | null {
   return (
-    held.filter((run) => (began === null || run.lastSeq > began) && run.model !== null).at(-1)
-      ?.model ?? null
+    held
+      .filter(
+        (run) =>
+          run.sessionBegan === undefined &&
+          (began === null || run.lastSeq > began) &&
+          run.model !== null,
+      )
+      .at(-1)?.model ?? null
   );
 }
 
 export function startedIn(held: readonly RunBelief[], began: Seq | undefined): boolean {
-  return held.some((run) => run.lastSeq > (began ?? 0));
+  return held.some((run) => run.sessionBegan === undefined && run.lastSeq > (began ?? 0));
 }
 
 export type ModelMove =
@@ -262,20 +267,31 @@ export function boxKey(pressed: KeyPressed, box: BoxState): BoxKey {
   return "type";
 }
 
+type BoxEvent<E extends Event> = E & { readonly currentTarget: HTMLTextAreaElement };
+type FormDrag = DragEvent & { readonly currentTarget: HTMLFormElement };
+
 export interface ComposerLook {
-  readonly form: HTMLFormAttributes;
+  readonly form: {
+    readonly "aria-label"?: string;
+    readonly onsubmit?: (event: SubmitEvent) => void;
+    readonly ondragover?: (event: FormDrag) => void;
+    readonly ondragleave?: (event: FormDrag) => void;
+    readonly ondrop?: (event: FormDrag) => void;
+  };
   readonly over: boolean;
-  readonly box: HTMLTextareaAttributes;
-
-  readonly menu: Snippet | undefined;
-
-  readonly door: Snippet | undefined;
-
-  readonly band: Snippet | undefined;
-
-  readonly keys: Snippet;
-
-  readonly line: Snippet;
-
-  readonly under: Snippet;
+  readonly box: {
+    readonly rows?: number;
+    readonly placeholder?: string | undefined;
+    readonly autofocus?: boolean;
+    readonly "aria-label"?: string;
+    readonly "aria-activedescendant"?: string | null | undefined;
+    readonly "aria-controls"?: string | undefined;
+    readonly onkeydown?: (event: BoxEvent<KeyboardEvent>) => void;
+    readonly oninput?: (event: BoxEvent<Event>) => void;
+    readonly onfocus?: (event: BoxEvent<FocusEvent>) => void;
+    readonly onblur?: (event: BoxEvent<FocusEvent>) => void;
+  };
+  readonly attachBox?: ((node: HTMLTextAreaElement) => () => void) | undefined;
+  readonly attachments?: DrawerProps | undefined;
+  readonly speech?: SpeechFeedbackProps | undefined;
 }

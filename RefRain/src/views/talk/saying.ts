@@ -3,19 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { Snippet } from "svelte";
-
-export interface SayingLook {
-  readonly who: string;
-
-  readonly laid: Snippet;
-
-  readonly settled: string;
-  readonly edge: string;
-}
-
 const EDGE = 10;
 
-export function faded(open: string): Pick<SayingLook, "settled" | "edge"> {
+export function faded(open: string): { readonly settled: string; readonly edge: string } {
   return { settled: open.slice(0, -EDGE), edge: open.slice(-EDGE) };
 }

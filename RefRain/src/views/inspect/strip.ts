@@ -3,8 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import { createAttachmentKey } from "svelte/attachments";
-import type { Attachment } from "svelte/attachments";
+type Hold = (element: HTMLElement) => void | (() => void);
 
 export interface StripTab {
   readonly key: string;
@@ -34,7 +33,7 @@ export interface StripHands {
   readonly close: (at: number) => void;
   readonly closeAll: () => void;
   readonly focus: (at: number) => void;
-  readonly hold: (key: string) => Attachment<HTMLElement>;
+  readonly hold: (key: string) => Hold;
 }
 
 export type KeyPress = Pick<KeyboardEvent, "key" | "preventDefault">;
@@ -53,7 +52,6 @@ export interface TabWire {
   readonly tabindex: 0 | -1;
   readonly onclick: (event: Press) => void;
   readonly onkeydown: (event: KeyPress) => void;
-  readonly [hold: symbol]: Attachment<HTMLElement>;
 }
 
 export interface CloseWire {
@@ -70,6 +68,7 @@ export interface CloseAllWire {
 }
 
 export interface TabLook {
+  readonly hold: Hold;
   readonly key: string;
   readonly label: string;
   readonly terminal: boolean;
@@ -107,8 +106,6 @@ export function landing(count: number, at: number, key: string): number | undefi
   }
 }
 
-const HOLD = createAttachmentKey();
-
 export function lookOf(tabs: readonly StripTab[], words: StripWords, hands: StripHands): StripLook {
   const stop = tabStop(tabs);
 
@@ -129,6 +126,7 @@ export function lookOf(tabs: readonly StripTab[], words: StripWords, hands: Stri
   return {
     list: { role: "tablist", "aria-label": words.tabs },
     tabs: tabs.map((tab, at) => ({
+      hold: hands.hold(tab.key),
       key: tab.key,
       label: tab.label,
       terminal: tab.terminal,
@@ -147,7 +145,6 @@ export function lookOf(tabs: readonly StripTab[], words: StripWords, hands: Stri
         onkeydown: (event) => {
           keys(event, at);
         },
-        [HOLD]: hands.hold(tab.key),
       },
       close: {
         type: "button",

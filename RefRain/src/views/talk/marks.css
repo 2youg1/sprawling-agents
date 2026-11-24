@@ -1,0 +1,152 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+@property --typed {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+.typed-line {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    var(--color-text-faint) 0,
+    var(--color-text-faint) var(--typed),
+    transparent calc(var(--typed) + var(--spacing-typed-fade))
+  );
+  opacity: 0.55;
+  pointer-events: none;
+  transition:
+    --typed var(--transition-duration-panel) var(--ease-arrive),
+    opacity var(--transition-duration-short) var(--ease-arrive);
+}
+.typed-line[data-lit] {
+  opacity: 1;
+}
+
+@media (forced-colors: active) {
+  .typed-line {
+    background: linear-gradient(
+      to right,
+      CanvasText 0,
+      CanvasText var(--typed),
+      transparent calc(var(--typed) + var(--spacing-typed-fade))
+    );
+  }
+}
+
+.steer-pin {
+  display: inline-block;
+  inline-size: 0;
+  block-size: 0;
+  border-block: calc(var(--spacing-dot) / 2) solid transparent;
+  border-inline-end: calc(var(--spacing-dot) * 3 / 4) solid var(--color-accent);
+  vertical-align: middle;
+}
+
+.talk-caret {
+  display: inline-block;
+  width: var(--spacing-caret);
+  height: var(--spacing-caret);
+  margin-inline-start: var(--spacing-tight);
+  vertical-align: baseline;
+}
+
+.wear-track {
+  opacity: 0.6;
+  transition:
+    opacity var(--transition-duration-short) var(--ease-leave),
+    padding-inline var(--transition-duration-short) var(--ease-leave);
+}
+.wear-track:hover {
+  opacity: 0.85;
+  padding-inline: 1px;
+  transition-timing-function: var(--ease-arrive);
+}
+.wear-line,
+.wear-worn {
+  position: absolute;
+  right: var(--spacing-tight);
+  width: 1px;
+}
+.wear-track:hover .wear-line,
+.wear-track:hover .wear-worn {
+  right: calc(var(--spacing-tight) - 1px);
+  width: var(--spacing-wear);
+}
+.wear-line {
+  inset-block: 0;
+}
+.wear-tick {
+  position: absolute;
+  right: calc(var(--spacing-tight) - 1px);
+  width: var(--spacing-wear);
+  min-height: var(--spacing-wear);
+  border-radius: var(--radius-pill);
+  z-index: 1;
+}
+.wear-track:hover .wear-tick {
+  right: calc(var(--spacing-tight) - var(--spacing-hair));
+  width: calc(var(--spacing-wear) + var(--spacing-hair));
+}
+.wear-thumb {
+  position: absolute;
+  right: calc(var(--spacing-tight) - 1px);
+  width: var(--spacing-wear);
+  min-height: var(--spacing-wear);
+  border-radius: var(--radius-pill);
+  z-index: 2;
+  transition:
+    background-color var(--transition-duration-short) var(--ease-leave),
+    width var(--transition-duration-short) var(--ease-leave),
+    right var(--transition-duration-short) var(--ease-leave);
+}
+.wear-track:hover .wear-thumb {
+  right: calc(var(--spacing-tight) - var(--spacing-hair));
+  width: calc(var(--spacing-wear) + var(--spacing-hair));
+  background-color: var(--color-text-quiet);
+  transition-timing-function: var(--ease-arrive);
+}
+
+.talk-gauge-checkpoint {
+  position: absolute;
+  width: var(--spacing-checkpoint);
+  height: var(--spacing-checkpoint);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 0 0 var(--spacing-checkpoint-halo) var(--color-page);
+  pointer-events: none;
+}
+.talk-gauge-first {
+  background-color: var(--color-reminder-first);
+}
+.talk-gauge-second {
+  background-color: var(--color-reminder-second);
+}
+.talk-gauge-ring {
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  transform: rotate(calc(var(--at) * 3.6deg)) translateY(calc(var(--spacing-key) * -0.45));
+}
+.talk-gauge-line {
+  left: calc(var(--at) * 1%);
+  top: 50%;
+  translate: -50% -50%;
+}
+
+@media (forced-colors: active) {
+  .talk-gauge-checkpoint {
+    background-color: CanvasText;
+  }
+}
+
+.talk-gauge-arc {
+  transition:
+    stroke-dasharray var(--transition-duration-page) var(--ease-arrive),
+    stroke-dashoffset var(--transition-duration-page) var(--ease-arrive);
+}

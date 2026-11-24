@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import { get } from "svelte/store";
+import { get } from "../../core/store";
 
 import { onceFrozen } from "../../core/belief/live";
 import type { SessionHands } from "../../core/slash_hands";

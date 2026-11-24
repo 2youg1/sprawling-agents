@@ -34,7 +34,7 @@ describe("splitPercents", () => {
       shares
         .filter((row) => row.bytes > 0)
         .map((row) => row.share)
-        .sort(),
+        .sort((a, b) => a - b),
     ).toEqual([33, 33, 34]);
   });
 
@@ -146,8 +146,6 @@ describe("reportOf", () => {
   });
 
   test("does not trip the handoff when only the rounded display reaches it", () => {
-    // 64.6% rounds to 65 for the header figure, but the raw share is still
-    // below the 65% handoff — only the earlier filling line may sound.
     const look = reportOf("en", RUN, prefix, shape, {
       used: 165_376,
       window: 256_000,

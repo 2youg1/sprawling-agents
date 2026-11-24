@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import { createAttachmentKey } from "svelte/attachments";
-import type { Attachment } from "svelte/attachments";
-import type { Snippet } from "svelte";
-
 import { fill, say } from "../../core/lang";
 import type { Lang } from "../../core/lang";
 import { count } from "../../core/time";
@@ -65,7 +61,6 @@ export interface PaneWire {
   readonly onwheel: () => void;
   readonly ontouchmove: () => void;
   readonly onkeydown: (press: KeyPress) => void;
-  readonly [hold: symbol]: Attachment<HTMLElement>;
 }
 
 export interface JumpLook {
@@ -85,11 +80,6 @@ export interface MonitorWiring {
   readonly record: PaneWire | undefined;
 }
 
-export interface MonitorLook extends MonitorWiring {
-  readonly column: Snippet;
-  readonly printed: Snippet;
-}
-
 export interface MonitorState {
   readonly following: Following;
   readonly terminal: Pane;
@@ -100,14 +90,10 @@ export interface Hands {
   readonly follow: (next: Following) => void;
   readonly fold: (next: Pane) => void;
   readonly jump: (path: string) => void;
-  readonly holdCode: Attachment<HTMLElement>;
-  readonly holdRecord: Attachment<HTMLElement>;
 }
 
-const HOLD = createAttachmentKey();
-
 export function lookOf(state: MonitorState, lang: Lang, hands: Hands): MonitorWiring {
-  const paneOf = (label: string, hold: Attachment<HTMLElement>): PaneWire => ({
+  const paneOf = (label: string): PaneWire => ({
     role: "region",
     "aria-label": label,
     tabindex: 0,
@@ -120,7 +106,6 @@ export function lookOf(state: MonitorState, lang: Lang, hands: Hands): MonitorWi
     onkeydown: (press) => {
       if (scrolls(press)) hands.follow("paused");
     },
-    [HOLD]: hold,
   });
   const following = state.following === "following";
   const open = state.terminal === "open";
@@ -167,7 +152,7 @@ export function lookOf(state: MonitorState, lang: Lang, hands: Hands): MonitorWi
             },
           })),
         },
-    code: paneOf(say(lang, "mon_code"), hands.holdCode),
-    record: open ? paneOf(say(lang, "mon_terminal"), hands.holdRecord) : undefined,
+    code: paneOf(say(lang, "mon_code")),
+    record: open ? paneOf(say(lang, "mon_terminal")) : undefined,
   };
 }

@@ -3,10 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { Attachment } from "svelte/attachments";
-import { createAttachmentKey } from "svelte/attachments";
-
-export const HOLD = createAttachmentKey();
+export const HOLD = Symbol();
+export type Reference = (node: HTMLElement) => void;
 
 export type KeyPress = Pick<KeyboardEvent, "key" | "preventDefault" | "stopPropagation">;
 
@@ -20,10 +18,10 @@ export interface TriggerWire {
   readonly "aria-expanded": boolean;
   readonly "aria-controls"?: string | undefined;
   readonly onclick: () => void;
-  readonly [hold: symbol]: Attachment<HTMLElement>;
+  readonly [hold: symbol]: Reference;
 }
 
 export interface FrameWire {
   readonly onfocusout: (event: Left) => void;
-  readonly [hold: symbol]: Attachment<HTMLElement>;
+  readonly [hold: symbol]: Reference;
 }

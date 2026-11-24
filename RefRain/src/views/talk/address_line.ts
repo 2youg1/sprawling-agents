@@ -6,7 +6,7 @@
 import { fill, say } from "../../core/lang";
 import type { Lang } from "../../core/lang";
 import type { Seq } from "../../wire";
-import type { Arrival } from "../palette_door.svelte";
+import type { Arrival } from "../palette_door";
 
 export type At = "head" | "box";
 

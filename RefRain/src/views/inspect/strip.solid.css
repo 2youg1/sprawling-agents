@@ -1,0 +1,42 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+.inspect-tabs-strip {
+  height: calc(6 * var(--spacing-baseline));
+}
+
+.inspect-tabs-strip .name {
+  max-width: calc(24 * var(--spacing-baseline));
+}
+
+.inspect-tabs-strip .front::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: -1px;
+  height: 1px;
+  background-color: var(--color-page);
+}
+
+.inspect-tabs-strip .tab,
+.inspect-tabs-strip .mark,
+.inspect-tabs-strip .key {
+  transition:
+    color var(--transition-duration-short) var(--ease-leave),
+    background-color var(--transition-duration-short) var(--ease-leave);
+}
+.inspect-tabs-strip .tab:hover,
+.inspect-tabs-strip .tab:focus-within,
+.inspect-tabs-strip .mark:hover,
+.inspect-tabs-strip .key:hover {
+  transition-timing-function: var(--ease-arrive);
+}
+
+@media (forced-colors: active) {
+  .inspect-tabs-strip .front .name {
+    text-decoration: underline;
+    text-underline-offset: var(--spacing-tight);
+  }
+}

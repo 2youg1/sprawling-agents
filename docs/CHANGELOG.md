@@ -1786,7 +1786,7 @@ rather than a component tree. The client speaks only the WebSocket protocol in
 - A notice's way out acts on the composer's room; a refused line goes back
   into the composer. (RefRain/src/views/notice_recovery.ts:82)
 - Without a main model, the welcome leads with the provider. A dispatch to a
-  building is followed to the room its run started in. (RefRain/src/views/welcome.svelte:38)
+  building is followed to the room its run started in. (RefRain/src/views/welcome.solid.tsx:38)
 - The address bar decodes a room named in any script; a fork shows where it
   went and whom it came from. (RefRain/src/core/route.ts:143)
 - A question the city could not answer is drawn as unavailable, with a way to
@@ -1821,7 +1821,7 @@ rather than a component tree. The client speaks only the WebSocket protocol in
 - Grey text a person reads takes the faint ink or darker; the disabled ink
   appears only on a disabled control. (xtask/src/color.rs:37)
 - The cost page tells an unpriced city from an idle one. (crates/memory/src/attribution/report.rs:68)
-- A timeout's heading names the question the page asked. (RefRain/src/views/parts/combobox.svelte:48)
+- A timeout's heading names the question the page asked. (RefRain/src/views/parts/combobox_view.tsx:48)
 <!-- lexicon-ok: a released entry names the shell of its own version -->
 - A narrow screen keeps the risk readings, the palette and the rail in bounds. (RefRain/src/views/palette.svelte:96)
 - The Mayor is 市长 on a Chinese screen; an empty list says where its contents

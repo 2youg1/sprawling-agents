@@ -9,7 +9,7 @@ import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { join } from "node:path";
 import words from "../../RefRain/src/lang.json";
-import { DEFAULT_VIEW, toFragment } from "../../RefRain/src/core/route.ts";
+import { DEFAULT_VIEW, SETUP_GROUPS, toFragment } from "../../RefRain/src/core/route.ts";
 import { TREE } from "../../RefRain/src/views/settings/tree.ts";
 import { HEADING } from "../../RefRain/src/views/setup/groups.ts";
 import { observeModalFocus } from "./acceptance-focus.mjs";
@@ -34,7 +34,19 @@ const evidence = {
   screens: [],
   errors: [],
 };
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({
+  headless: true,
+  executablePath: process.env.REFRAIN_BROWSER_BINARY,
+});
+const context = await browser.newContext({ locale: "en-US" });
+const origin = `http://127.0.0.1:${port}`;
+let opening;
+if (process.env.REFRAIN_OPEN_URL_FILE) {
+  opening = new URL((await readFile(process.env.REFRAIN_OPEN_URL_FILE, "utf8")).trim());
+  if (opening.origin !== origin || !opening.hash.startsWith("#open=")) {
+    throw new Error("the one-use opening must belong to the disposable city");
+  }
+}
 let activePage;
 evidence.browser = browser.version();
 const english = (key) => {
@@ -45,15 +57,13 @@ const english = (key) => {
 try {
   for (const width of [1440, 1920]) {
     for (const colorScheme of ["dark", "light"]) {
-      const context = await browser.newContext({
-        viewport: { width, height: 1080 },
-        colorScheme,
-        locale: "en-US",
-      });
       const page = await context.newPage();
+      await page.setViewportSize({ width, height: 1080 });
+      await page.emulateMedia({ colorScheme });
       activePage = page;
       page.on("pageerror", (error) => evidence.errors.push(error.message));
-      await page.goto(`http://127.0.0.1:${port}/${toFragment({ kind: "welcome" })}`);
+      await page.goto(opening?.href ?? `${origin}/${toFragment({ kind: "welcome" })}`);
+      opening = undefined;
       const putOff = page.getByRole("button", { name: english("guide_put_off_rest"), exact: true });
       await putOff.waitFor();
       await putOff.click();
@@ -62,6 +72,8 @@ try {
         toFragment(DEFAULT_VIEW),
       );
       await page.locator("main textarea").waitFor();
+      const navigation = page.locator("#workspace-navigation-key");
+      await navigation.click();
       const opener = page.getByRole("link", { name: english("nav_settings"), exact: true });
       await opener.waitFor();
       const openerElement = await opener.elementHandle();
@@ -71,7 +83,7 @@ try {
       await page.keyboard.press("Enter");
       const dialog = page.getByRole("dialog");
       await dialog.waitFor();
-      for (const group of ["you", "accounts", "advanced"]) {
+      for (const group of SETUP_GROUPS) {
         const branch = TREE.find((item) =>
           [...item.entries, ...item.more].some(
             (entry) => entry.kind === "group" && entry.group === group,
@@ -95,7 +107,9 @@ try {
           (fragment) => location.hash === fragment,
           toFragment({ kind: "setup", group }),
         );
-        await dialog.getByRole("heading", { name: english(HEADING[group]), exact: true }).waitFor();
+        await dialog
+          .getByRole("heading", { level: 2, name: english(HEADING[group]), exact: true })
+          .waitFor();
         await page.evaluate(async () => {
           await Promise.allSettled(
             document
@@ -115,7 +129,9 @@ try {
           focus,
         };
         evidence.screens.push(screen);
-        await observeModalFocus(page, dialog, focus);
+        if (["you", "accounts", "advanced"].includes(group)) {
+          await observeModalFocus(page, dialog, focus);
+        }
         await page.screenshot({ path: join(output, screenshot) });
         const geometry = await dialog.evaluate((element) => {
           const box = element.getBoundingClientRect();
@@ -136,7 +152,7 @@ try {
         (element) => element?.isConnected && element === document.activeElement,
         openerElement,
       );
-      await context.close();
+      await page.close();
       activePage = undefined;
     }
   }

@@ -1,0 +1,55 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+.privacy-swap {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--spacing-tight);
+  border: 1px solid var(--color-edge-input);
+  border-radius: var(--radius-card);
+  padding: var(--spacing-snug) var(--spacing-base);
+  font-size: var(--text-note);
+  color: var(--color-text);
+  transition: border-color var(--transition-duration-panel) var(--ease-arrive);
+}
+.privacy-swap:hover {
+  border-color: var(--color-accent);
+}
+.privacy-swap .swap-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-snug);
+}
+.privacy-swap .swap-title {
+  min-width: 0;
+  font-size: var(--text-label);
+}
+.privacy-swap .swap-presses {
+  display: flex;
+  gap: var(--spacing-tight);
+}
+.privacy-swap .swap-facts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-tight);
+}
+.privacy-swap .swap-quiet {
+  color: var(--color-text-quiet);
+}
+.privacy-swap .swap-strong {
+  color: var(--color-text);
+}
+.privacy-swap .swap-alert {
+  color: var(--color-alert);
+}
+.privacy-swap .swap-break {
+  overflow-wrap: anywhere;
+}
+.privacy-swap .swap-more summary {
+  cursor: pointer;
+  color: var(--color-text-quiet);
+}

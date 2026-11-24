@@ -3,8 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { Snippet } from "svelte";
-import type { Attachment } from "svelte/attachments";
+import type { Snippet } from "../../core/snippet";
+import type { ElementRef } from "../../core/element_ref";
 
 import type { Lang } from "../../core/lang";
 import type { LinkState } from "../../core/link";
@@ -34,7 +34,7 @@ export interface LinkLook {
   readonly recovery: Press | undefined;
 }
 
-export type ScrollerWire = Readonly<Record<symbol, Attachment<HTMLElement>>>;
+export type ScrollerWire = Readonly<Record<symbol, ElementRef<HTMLElement>>>;
 
 export function linkOf(
   link: LinkState,

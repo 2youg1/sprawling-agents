@@ -3,14 +3,14 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { HTMLAnchorAttributes } from "svelte/elements";
-
 import { initialTyped, lineWalker } from "../../core/lines";
 import { pressedOf } from "../../core/press";
 
-export type EntryLink = Pick<HTMLAnchorAttributes, "href" | "onclick"> & {
+export interface EntryLink {
+  readonly href: string;
+  readonly onclick?: (event: MouseEvent) => void;
   readonly "data-entry": "";
-};
+}
 
 const DIGITS = 9;
 

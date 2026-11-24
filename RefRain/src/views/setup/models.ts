@@ -8,9 +8,6 @@ import type { ModelFact } from "../../core/probed";
 import type { ModelTag } from "../../wire";
 import type { TableAbout, TableState } from "./model_rows";
 
-export { default as ModelChoice } from "./models.svelte";
-export { default as ModelTable } from "./model_table.svelte";
-
 export interface ModelRow {
   readonly id: string;
   readonly stated: Stated;

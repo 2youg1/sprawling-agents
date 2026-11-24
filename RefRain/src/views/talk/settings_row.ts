@@ -3,11 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { Snippet } from "svelte";
-
 import type { PopoverBinding } from "../parts/popover";
-import type { PickerLook } from "./picker_look";
-import type { PermissionsLook } from "./policy";
 
 export type RowDraws = "everything" | "notice";
 
@@ -35,14 +31,4 @@ export function sameBinding(held: PopoverBinding | null, next: PopoverBinding): 
     held.pointColumn === next.pointColumn &&
     held.controls.join(" ") === next.controls.join(" ")
   );
-}
-
-export interface SettingsRowLook {
-  readonly catalog: Snippet | undefined;
-
-  readonly facts: Snippet | undefined;
-
-  readonly notLive: string | undefined;
-  readonly model: PickerLook | undefined;
-  readonly permissions: PermissionsLook | undefined;
 }

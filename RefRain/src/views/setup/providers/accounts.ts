@@ -3,15 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// What one account editor gives its look: every word
-// translated, every press wired to `./account_editor`, every control
-// that cannot be used now with the reason why. This value is the whole
-// contract between the wiring and a look, so another look - one built
-// from a component library - draws the same editor by taking it
-// (client D93).
-
-import type { Attachment } from "svelte/attachments";
-
 import { fill, say } from "../../../core/lang";
 import type { Key } from "../../../core/lang";
 import type { AccountRetries, AxError, KeyState } from "../../../wire";
@@ -32,23 +23,20 @@ import type { Editor, Hands, Roster, Step } from "./account_editor";
 
 export type Control = "up" | "down" | "edit" | "remove";
 
+type ElementHold = (element: HTMLElement) => void | (() => void);
+
 export interface ControlLook {
   readonly key: Control;
   readonly label: string;
-  // Present means the control cannot be used now, and says why.
   readonly why: string | undefined;
   readonly press: () => void;
-  // Put on the element that holds the control, so focus can be put back
-  // on it after the row moved; absent on controls focus never returns to.
-  readonly hold: Attachment<HTMLElement> | undefined;
+  readonly hold: ElementHold | undefined;
 }
 
 export interface RowLook {
   readonly id: string;
   readonly place: number;
   readonly key: string;
-  // The key is not there or cannot be used, which is what the person
-  // has to act on.
   readonly wanting: boolean;
   readonly controls: readonly ControlLook[];
 }
@@ -63,13 +51,10 @@ export interface FieldLook {
   readonly mono: boolean;
   readonly disabled: boolean;
   readonly help: string | undefined;
-  // Folded under `more` rather than standing in the form.
   readonly folded: boolean;
   readonly input: (value: string) => void;
 }
 
-// The per-account retry count: one choice of two, with the city's own
-// figure said beside it while nothing is chosen.
 export interface RetriesLook {
   readonly label: string;
   readonly options: readonly {
@@ -84,12 +69,10 @@ export interface RetriesLook {
 
 export interface AccountsLook {
   readonly heading: string;
-  readonly holdHeading: Attachment<HTMLElement>;
+  readonly holdHeading: ElementHold;
   readonly order: string;
   readonly legacy: string | undefined;
   readonly rows: readonly RowLook[];
-  // Present only for an owner that has the count and lists two or more
-  // accounts, because with one account the count is never read.
   readonly retries: RetriesLook | undefined;
   readonly title: string;
   readonly fields: readonly FieldLook[];
@@ -102,18 +85,15 @@ export interface AccountsLook {
     readonly press: () => void;
   };
   readonly cancel: { readonly label: string; readonly press: () => void } | undefined;
-  // Offered right after an account whose key the vault holds was
-  // removed: the key stays in the vault unless this is pressed.
   readonly forget:
     { readonly text: string; readonly label: string; readonly press: () => void } | undefined;
   readonly note: string | undefined;
   readonly refused: AxError | undefined;
 }
 
-// Where the look puts focus back to.
 export interface Holds {
-  readonly heading: Attachment<HTMLElement>;
-  readonly control: (id: string, step: Step) => Attachment<HTMLElement>;
+  readonly heading: ElementHold;
+  readonly control: (id: string, step: Step) => ElementHold;
 }
 
 const KEY_WORDS: Record<KeyState, Key> = {
@@ -139,8 +119,6 @@ const RETRY_WORDS: Record<AccountRetries, Key> = {
   two: "setup_account_retries_two",
 };
 
-// What the city said about one account's key. An account the answer
-// does not list yet - one just sent - has not been looked at.
 function keyOf(roster: Roster, id: string): KeyState {
   return roster.keys.find((status) => status.id === id)?.key ?? "unread";
 }
@@ -159,7 +137,7 @@ export function lookOf(editor: Editor, hands: Hands, holds: Holds): AccountsLook
     key: Control,
     why: Key | null,
     press: () => void,
-    hold?: Attachment<HTMLElement>,
+    hold?: ElementHold,
   ): ControlLook => ({
     key,
     label: say(lang, `setup_account_${key}`),
@@ -266,8 +244,6 @@ export function lookOf(editor: Editor, hands: Hands, holds: Holds): AccountsLook
         help: keyHelp === null ? undefined : say(lang, keyHelp),
       }),
       field("reference", "setup_account_reference", { folded: true }),
-      // A search supplier's key reaches the service only as the value of
-      // the header its account names, so there the name stands.
       field("header", "setup_account_header", { folded: roster.kind === "provider" }),
     ],
     more: say(lang, "setup_account_more"),

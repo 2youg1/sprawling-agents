@@ -3,15 +3,13 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { Attachment } from "svelte/attachments";
-
 import { ADMISSIONS, FIRST_POLICY, LANDINGS, WRITE_LIMITS } from "../../core/commands";
 import type { Key, Lang } from "../../core/lang";
 import { say } from "../../core/lang";
 import type { RunPolicy } from "../../wire";
 import type { PopoverColumn } from "../parts/popover";
 import { HOLD } from "./fact";
-import type { FrameWire, KeyPress, TriggerWire } from "./fact";
+import type { FrameWire, KeyPress, Reference, TriggerWire } from "./fact";
 
 export const POLICY_SWITCHES = {
   mode: { off: "chat", on: "work" },
@@ -71,7 +69,7 @@ export interface SwitchWire {
   readonly role: "switch";
   readonly checked: boolean;
   readonly onchange: (event: { readonly currentTarget: { readonly checked: boolean } }) => void;
-  readonly [hold: symbol]: Attachment<HTMLElement>;
+  readonly [hold: symbol]: Reference;
 }
 
 export interface SwitchLook {
@@ -119,10 +117,10 @@ export interface PermissionsHands {
   readonly close: (focus: "opener" | "leave") => void;
   readonly inside: (target: EventTarget | null) => boolean;
   readonly hold: {
-    readonly frame: Attachment<HTMLElement>;
-    readonly trigger: Attachment<HTMLElement>;
+    readonly frame: Reference;
+    readonly trigger: Reference;
 
-    readonly first: Attachment<HTMLElement>;
+    readonly first: Reference;
   };
 }
 

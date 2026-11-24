@@ -3,16 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The one door every branch goes through: main moves when the belief
-// holds the room's new session and not when the frame leaves the page,
-// a refusal stays with the branch that met it, and a second press while
-// one is opening sends nothing. The trace vectors are the ones `#eval`
-// prints in RefRain/spec/Views/Talk/Branching.lean, replayed through
-// `keepBranches`; a difference between the model and the code turns
-// the last test red.
-
 import { describe, expect, test } from "bun:test";
-import { get, writable } from "svelte/store";
+import { get, writable } from "../../core/store";
 
 import { createBelief } from "../../core/belief";
 import type { Belief } from "../../core/belief/shape";
@@ -30,10 +22,6 @@ const ORIGIN: Origin = {
 const BRANCH: Opening = { kind: "branch", origin: ORIGIN };
 const EMPTY: Belief = get(createBelief(() => 0).belief);
 
-// The two facts of the model's `Seen`: the room's current session and
-// the arrival number of the newest refusal, 0 for none. One refusal
-// object per arrival number, because the page tells refusals apart by
-// identity.
 const refusals = new Map<number, AxError>();
 function refusalNumbered(n: number): AxError {
   const held = refusals.get(n);
@@ -60,8 +48,6 @@ function seen(session: number, refusal: number): Belief {
 
 type Act = "send" | "go";
 
-// A page with one belief, a socket that takes or drops the frame as the
-// test says, and an address bar that remembers where it was sent.
 function page(start: Belief) {
   const belief = writable(start);
   const acts: Act[] = [];
@@ -102,7 +88,6 @@ describe("branching, then going", () => {
   test("main stays until the belief holds the room's new session", () => {
     const at = page(seen(3, 0));
     at.press(true);
-    // The idem is minted afresh per frame, so the frame is read without it.
     expect(
       at.sent.map((command) =>
         "open_session" in command ? { ...command.open_session, idem: null } : command,
@@ -162,8 +147,6 @@ describe("branching, then going", () => {
     expect(at.acts).toEqual([]);
   });
 
-  // Each vector: the events, the phase the model ends in, and what it
-  // did on the way, as `#eval vectors.map …` printed them.
   type Event =
     | { readonly press: readonly [number, number, boolean] }
     | { readonly arrive: readonly [number, number] };

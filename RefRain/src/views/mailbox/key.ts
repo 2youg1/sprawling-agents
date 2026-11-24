@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { Attachment } from "svelte/attachments";
+import type { ElementRef } from "../../core/element_ref";
 
 import { fill, say } from "../../core/lang";
 import type { Lang } from "../../core/lang";
@@ -19,7 +19,7 @@ export interface Waiting {
 }
 
 export type MailboxWire = Pick<ButtonWire, "aria-expanded" | "aria-controls" | "onclick"> &
-  Readonly<Record<symbol, Attachment<HTMLElement>>>;
+  Readonly<Record<symbol, ElementRef<HTMLElement>>>;
 
 export function mailboxKey(
   waiting: Waiting,

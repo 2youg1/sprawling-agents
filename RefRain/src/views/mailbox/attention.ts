@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import type { Readable } from "svelte/store";
+import type { Readable } from "../../core/store";
 
 import type { Attention, Box } from "../../core/deferral";
 import type { Conversing } from "../talk/handing";
