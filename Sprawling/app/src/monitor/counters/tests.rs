@@ -59,7 +59,7 @@ fn a_beat_reads_the_platform_exactly_as_often_as_its_watchers_ask() {
 
 #[test]
 #[ignore = "a wall-clock instrument; just bench runs it"]
-fn instrument_monitor_beat() {
+fn instrument_monitor_beat() -> Result<(), sysinfo::Error> {
     use crate::monitor::spread::{Share, Spread};
     use crate::monitor::tree::Tree;
     use crate::serving::standing::monotonic_now;
@@ -77,7 +77,7 @@ fn instrument_monitor_beat() {
     let beat = std::time::Duration::from_secs(1);
     let mut summary = Counters::open(std::env::temp_dir());
     let mut page = Counters::open(std::env::temp_dir());
-    let mut tree = Tree::open(std::process::id()).unwrap();
+    let mut tree = Tree::open(std::process::id())?;
     let readings = [
         (
             "summary",
@@ -107,4 +107,5 @@ fn instrument_monitor_beat() {
             spread.p(Share::P99).as_micros()
         );
     }
+    Ok(())
 }

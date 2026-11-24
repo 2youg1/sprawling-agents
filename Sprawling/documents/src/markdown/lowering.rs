@@ -50,6 +50,10 @@ impl Lowering<'_> {
             .collect()
     }
 
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "comrak marks its AST non-exhaustive; disabled and future nodes retain their source"
+    )]
     fn block<'a>(&self, node: &'a AstNode<'a>, depth: usize) -> Block {
         let ast = node.data();
         let span = self.positions.span(ast.sourcepos);
@@ -163,6 +167,10 @@ impl Lowering<'_> {
         out
     }
 
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "comrak marks its AST non-exhaustive; disabled and future nodes retain their source"
+    )]
     fn inline<'a>(&self, node: &'a AstNode<'a>, depth: usize, out: &mut Vec<Inline>) {
         let ast = node.data();
         if depth >= NESTING_MAX {
