@@ -20,6 +20,11 @@ release notes and their commits.
 
 ---
 
+## v0.18.1-261125
+
+- **RefRain uses device fonts for CJK.** Paper Mono, Maple Mono and Libron still ship with the client. The full bundled CJK font made the compressed `sprawling` package too large for crates.io.
+- **Validation weighs the generated Cargo archives.** Publication waits for every publishable `.crate` to fit the registry's 10 MiB upload limit.
+
 ## v0.18.0-261125
 
 Wire moves from 80 to 82, including workspace operations and request-correlated conversation receipts. Reload browser tabs from the previous release after upgrading. `EVENT_LOG_V` stays at 2 and the configuration formats stay at 1. Stop the city and verify a restorable backup before updating.
