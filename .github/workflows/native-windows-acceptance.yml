@@ -9,6 +9,7 @@ on:
       - Sprawling/accounting/src/worker/driving/tests/sieving.rs
       - Cargo.toml
       - Cargo.lock
+      - rust-toolchain.toml
       - .github/workflows/native-windows-acceptance.yml
   workflow_dispatch:
 permissions:
@@ -132,7 +133,13 @@ jobs:
         if: always()
         shell: pwsh
         run: |
-          Get-ChildItem target/debug/deps/runtime-*.exe,target/debug/deps/exec_builds-*.exe | Get-FileHash -Algorithm SHA256 | Select-Object Hash,Path | ConvertTo-Json | Out-File -Encoding utf8 native-evidence/binaries.json
+          $suites = (Get-Content native-evidence/sprawling-runtime.json -Raw | ConvertFrom-Json).'rust-suites'.PSObject.Properties.Value
+          $hashes = foreach ($name in 'runtime', 'exec_builds') {
+            $probe = @($suites | Where-Object { $_.'binary-name' -eq $name })
+            if ($probe.Count -ne 1) { throw "Expected one $name test binary in the nextest inventory; found $($probe.Count)." }
+            Get-FileHash -Algorithm SHA256 -LiteralPath $probe[0].'binary-path' | Select-Object Hash,Path
+          }
+          $hashes | ConvertTo-Json | Out-File -Encoding utf8 native-evidence/binaries.json
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
