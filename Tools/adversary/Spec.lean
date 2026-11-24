@@ -257,7 +257,7 @@ inductive Answer | accepted (frames : List Frame) | denied (complaint : Complain
 inductive Ending | reply | record (kind : String) | silence  -- 一次 `call` 在什么到达时结束（D9）
 def Verb.ending  : Verb → Ending
 def discover     : IO (Option Door)
-def Door.raise   : Door → (city home : System.FilePath) → IO Unit
+def Door.raise   : Door → (workspace home : System.FilePath) → IO System.FilePath
 def Door.serve   : Door → System.FilePath → Port → System.FilePath → IO Serving  -- 城、端口、给城的 home；有 launcher 时经它起城
 def Door.ask     : Door → Port → Verb → IO Answer
 def Door.verify  : Door → System.FilePath → IO (Except String Nat)
@@ -359,6 +359,10 @@ def knownHosts : Door → Ground → IO Json
 def render     : Gathered → String
 def writeChecklist : Setting → Json → System.FilePath → IO Unit
 ```
+
+D10 `Door.raise` 从 `sprawling init` 的回执取得私有城目录，核对其中的账本目录已建立，再交给
+`servingAt` 与磁盘检查使用。临时 home 同时传给初始化与服务。这样同一次场景中的进程、文件检查
+与回放读到的是同一座城。解析回执沿用产品已经公开的路径，不在检验器重算 workspace 标识。
 
 **清单的每一节从决定它的那一处读出，本目录不列任何一项**：页面是客户端 `BARE` 表的键（与 `cargo xtask shots` 读的是同一张表、同一种读法），命令是 `SLASH` 表的拼法，工具是模型第一次请求里拿到的目录（替身的记录），skill 是归档的书架，provider 是城自己对 `known_hosts` 的回答。一份写在这里的名单会是每一项的第二个家，而它会在有人加一页的那天成为错的那一份。`SLASH` 里由别的表算出来的语法（强度的词、页面的名字）记作 `computed`，不在这里求值：求值就是那张表的第二份读法。清单只在走完之后写，第一节把走过的每一步列成已勾选。
 

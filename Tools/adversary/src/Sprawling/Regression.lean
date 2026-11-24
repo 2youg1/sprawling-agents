@@ -91,6 +91,8 @@ private def fieldsOf (index : Nat) : Action y → List String
     , "policy: kernel::RunPolicy::of(kernel::Mode::Work),"
     , idemField index
     , s!"session: Some(kernel::SessionName::parse({quoted session}).unwrap()),"
+    , "resume: None,"
+    , "images: Vec::new(),"
     , "effort: None,"
     , "model: None," ]
   | .stop scope => [s!"scope: {scopeOf scope},", idemField index]

@@ -35,10 +35,14 @@ structure Stage where
 /-- Raises a city in a fresh folder, with a home beside it. -/
 def Stage.raise (door : Door) : IO Stage := do
   let root ← IO.FS.createTempDir
-  let stage : Stage := { root, city := root / "city", home := root / "home" }
-  IO.FS.createDirAll stage.home
-  door.raise stage.city stage.home
-  return stage
+  try
+    let home := root / "home"
+    IO.FS.createDirAll home
+    let city ← door.raise (root / "city") home
+    return { root, city, home }
+  catch error =>
+    try IO.FS.removeDirAll root catch _ => pure ()
+    throw error
 
 /-- Throws the folder away. -/
 def Stage.discard (stage : Stage) : IO Unit :=
