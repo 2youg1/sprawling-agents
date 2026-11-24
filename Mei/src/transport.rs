@@ -20,11 +20,18 @@ const IO_TIMEOUT: Duration = Duration::from_secs(600);
 const PULSE_INTERVAL: Duration = Duration::from_secs(5);
 
 const PROBE_TIMEOUT: Duration = Duration::from_secs(2);
+const WSA_IO_PENDING: i32 = 997;
+const PENDING_READ_BACKOFF: Duration = Duration::from_millis(5);
 
 struct Timeouts {
     connect: Duration,
     io: Duration,
     pulse: Duration,
+}
+
+struct ResponseTrace<'a> {
+    pulse: &'a mut dyn Write,
+    path: &'a str,
 }
 
 pub struct Client {
@@ -148,7 +155,12 @@ impl Client {
                     .with_path(path.clone()),
             )
         })?;
-        let response = read_to_eof(&mut stream, &self.timeouts, pulse, &path)?;
+        let response = read_to_eof(
+            &mut stream,
+            &self.timeouts,
+            ResponseTrace { pulse, path: &path },
+            Read::read,
+        )?;
         let answer = parse(&response)?;
         if self.session.is_some() {
             let route = match self.route_observation() {
@@ -223,8 +235,15 @@ impl Client {
                 .with_path(path.clone()),
             )
         })?;
-        let mut sink = std::io::sink();
-        let response = read_to_eof(&mut stream, budget, &mut sink, &path)?;
+        let response = read_to_eof(
+            &mut stream,
+            budget,
+            ResponseTrace {
+                pulse: &mut std::io::sink(),
+                path: &path,
+            },
+            Read::read,
+        )?;
         parse(&response)
     }
 
@@ -256,10 +275,11 @@ impl Client {
 fn read_to_eof(
     stream: &mut TcpStream,
     timeouts: &Timeouts,
-    pulse: &mut dyn Write,
-    path: &str,
+    ResponseTrace { pulse, path }: ResponseTrace<'_>,
+    mut read: impl FnMut(&mut TcpStream, &mut [u8]) -> std::io::Result<usize>,
 ) -> Result<Vec<u8>> {
-    let deadline = Instant::now() + timeouts.io;
+    let mut last_pulse = Instant::now();
+    let deadline = last_pulse + timeouts.io;
     let mut response = Vec::new();
     let mut chunk = [0_u8; 8192];
     loop {
@@ -287,7 +307,7 @@ fn read_to_eof(
                 .with_path(path),
             )
         })?;
-        match stream.read(&mut chunk) {
+        match read(stream, &mut chunk) {
             Ok(0) => return Ok(response),
             Ok(count) => response.extend_from_slice(chunk.get(..count).ok_or_else(|| {
                 Error::Diagnostic(
@@ -300,10 +320,20 @@ fn read_to_eof(
                     .with_path(path),
                 )
             })?),
+            Err(err) if cfg!(windows) && err.raw_os_error() == Some(WSA_IO_PENDING) => {
+                if last_pulse.elapsed() >= timeouts.pulse {
+                    write_pulse(pulse, path)?;
+                    last_pulse = Instant::now();
+                }
+                std::thread::sleep(
+                    PENDING_READ_BACKOFF.min(deadline.saturating_duration_since(Instant::now())),
+                );
+            }
             Err(err)
                 if err.kind() == ErrorKind::WouldBlock || err.kind() == ErrorKind::TimedOut =>
             {
                 write_pulse(pulse, path)?;
+                last_pulse = Instant::now();
             }
             Err(err) => {
                 return Err(Error::Diagnostic(

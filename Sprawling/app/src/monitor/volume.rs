@@ -9,7 +9,11 @@ use kernel::degradation::VolumeSpace;
 use sysinfo::{Disk, Disks};
 
 pub(crate) fn read(city: &Path) -> Option<VolumeSpace> {
-    space(&Disks::new_with_refreshed_list(), &resolved(city)?)
+    let city = resolved(city)?;
+    let Ok(disks) = Disks::new_with_refreshed_list() else {
+        return None;
+    };
+    space(&disks, &city)
 }
 
 pub(crate) fn resolved(city: &Path) -> Option<PathBuf> {
@@ -50,7 +54,6 @@ pub(crate) fn space(disks: &Disks, city: &Path) -> Option<VolumeSpace> {
 
 pub(crate) fn holding<'d>(disks: &'d Disks, city: &Path) -> Option<&'d Disk> {
     disks
-        .list()
         .iter()
         .filter(|disk| city.starts_with(disk.mount_point()))
         .max_by_key(|disk| disk.mount_point().components().count())

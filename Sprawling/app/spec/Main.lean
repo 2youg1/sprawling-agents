@@ -304,7 +304,7 @@ pub(super) fn spread_line(spread: &Spread, failed: u32, host: Host, audience: Au
 // bin::monitor::tree —— shape: adapter；pub，因为读它的 gauge 在二进制那一半
 pub struct Tree;                            // 私有：sysinfo::System、根 pid、每个见过的 pid 的上一读数、各峰值、读取次数
 impl Tree {
-    pub fn open(root: u32) -> Tree;
+    pub fn open(root: u32) -> Result<Tree, sysinfo::Error>;
     pub fn read(&mut self, elapsed: Duration) -> Option<TreeReading>; // 根已不在：None
     pub fn seen(&self) -> Option<Seen>;     // 一拍都没读到：None
     pub(crate) fn reads(&self) -> Reads;
@@ -339,6 +339,9 @@ impl Arguments { pub(super) fn after_dashes(&self) -> Option<&[String]>; } // �
 // accounting::worker::Hands（`Sprawling/accounting/Spec.lean` §8-11）
 pub monotonic: fn() -> Instant,             // 生产交 monotonic_now；派活准备与 probe 的用时都读它
 ```
+
+`gauge --pid` 在进程表无法打开时报告读取来源的错误。测量一条命令时，进程表无法打开只使树的采样缺失，
+命令退出码与墙钟读数仍有意义。把打开失败解释成找不到 PID 会把系统计数器的问题报成用户输错了进程号。
 
 **选哪个对象。** 给了 `--pid` 是 `Process`，`--` 之后有词是 `Command`，都没有是 `City`。命令行错误退 2（§8-103 的 `Line`），一行说明哪里错、最近的合法写法是什么：`--pid` 与 `--` 同时出现；`--at`、`--token` 配 `Process` 或 `Command`；`--every`、`--samples` 配 `City`（城的拍距由城定，§8-96）；`--every` 在范围外或不是整数；`--samples` 为 0 或不是整数；`--` 之后没有词。
 

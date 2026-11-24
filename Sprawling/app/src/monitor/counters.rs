@@ -28,8 +28,8 @@ pub(crate) struct Reads {
 }
 
 struct Machine {
-    system: System,
-    disks: Disks,
+    system: Result<System, sysinfo::Error>,
+    disks: Result<Disks, sysinfo::Error>,
 }
 
 impl Counters {
@@ -87,21 +87,22 @@ impl Machine {
     fn open() -> Self {
         Self {
             system: System::new(),
-            disks: Disks::new_with_refreshed_list(),
+            disks: Disks::new(),
         }
     }
 
-    fn read(&mut self, volume: &std::path::Path, own: Sample) -> Sample {
-        self.system.refresh_cpu_usage();
-        let memory = super::memory::refreshed(&mut self.system);
-        self.disks.refresh(true);
-        Sample {
-            machine_cpu_permille: permille(self.system.global_cpu_usage()),
-            machine_available_bytes: memory.available,
-            volume_free_bytes: super::volume::space(&self.disks, volume)
-                .map_or(0, |space| space.free_bytes),
-            ..own
+    fn read(&mut self, volume: &std::path::Path, mut sample: Sample) -> Sample {
+        if let Ok(system) = &mut self.system {
+            system.refresh_cpu_usage();
+            sample.machine_cpu_permille = permille(system.global_cpu_usage());
+            sample.machine_available_bytes = super::memory::refreshed(system).available;
         }
+        if let Ok(disks) = &mut self.disks {
+            disks.refresh(true);
+            sample.volume_free_bytes =
+                super::volume::space(disks, volume).map_or(0, |space| space.free_bytes);
+        }
+        sample
     }
 }
 

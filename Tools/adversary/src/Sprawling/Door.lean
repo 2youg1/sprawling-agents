@@ -445,11 +445,38 @@ def Door.status (door : Door) : IO String := do
     throw <| IO.userError s!"status failed (exit {said.exitCode}): {said.err}"
   return said.out
 
-/-- Raises a city in a directory that does not have one. -/
-def Door.raise (door : Door) (city home : System.FilePath) : IO Unit := do
-  let said ← capture door.binary #["init", city.toString] #[("USERPROFILE", some home.toString)]
+private def testHome (home : System.FilePath) : Array (String × Option String) :=
+  #[("USERPROFILE", some home.toString), ("HOME", some home.toString)]
+
+private def raisedLedger (output : String) : Option System.FilePath := do
+  let heading := "city raised: ledger at "
+  let line ← (output.splitOn "\n").find? (·.startsWith heading)
+  let rest := (line.drop heading.length).toString
+  let separator := " (genesis seq "
+  let seq :: tail :: earlier := (rest.splitOn separator).reverse | none
+  let path := separator.intercalate (tail :: earlier).reverse
+  let seq := seq.trimAscii.toString
+  if !path.isEmpty && seq.endsWith ")" && (seq.dropEnd 1).toString.toNat?.isSome then
+    some ⟨path⟩
+  else
+    none
+
+#guard
+  (raisedLedger "city raised: ledger at /tmp/check (genesis seq 1)/.sprawling/ledger (genesis seq 0)").map
+    System.FilePath.toString == some "/tmp/check (genesis seq 1)/.sprawling/ledger"
+
+/-- Raises a city's private state and returns the directory named by init. -/
+def Door.raise (door : Door) (workspace home : System.FilePath) : IO System.FilePath := do
+  let said ← capture door.binary #["init", workspace.toString] (testHome home)
   if said.exitCode != 0 then
     throw <| IO.userError s!"a city could not be raised (exit {said.exitCode}): {said.err}"
+  let some ledger := raisedLedger said.out
+    | throw <| IO.userError "sprawling init did not report the new ledger path"
+  let some city := ledger.parent >>= (·.parent)
+    | throw <| IO.userError s!"the reported ledger path has no city directory: {ledger}"
+  if !(← ledger.isDir) then
+    throw <| IO.userError s!"sprawling init reported a ledger directory that does not exist: {ledger}"
+  return city
 
 /-- A stream being emptied for as long as the city lives, with its tail kept.
 
@@ -544,8 +571,7 @@ def Door.serve (door : Door) (city : System.FilePath) (port : Port)
     | none => (door.binary.toString, served, Closing.interrupt)
   let child ← IO.Process.spawn
     { cmd, args
-    , env := #[("USERPROFILE", some home.toString), ("HOME", some home.toString)]
-        ++ (← runtimePinned)
+    , env := testHome home ++ (← runtimePinned)
     , stdin := servedStdio.stdin
     , stdout := servedStdio.stdout
     , stderr := servedStdio.stderr }
