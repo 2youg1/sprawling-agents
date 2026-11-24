@@ -568,3 +568,48 @@ test "a click hit names the visible python card" {
     try std.testing.expectEqual(@as(u16, 3), hits.items[0].card);
     try std.testing.expect(hits.items[0].end > hits.items[0].row);
 }
+
+fn copiedAfterReflow(
+    before: write.Entry,
+    after: write.Entry,
+    widths: struct { u16, u16 },
+    first: Point,
+    last: Point,
+    expected: []const u8,
+) !void {
+    const gpa = std.testing.allocator;
+    const region: write.Live = .{ .composer = .{ .typed = "", .cursor = 0, .placeholder = "Mei", .room = "Mei", .offer = "" } };
+    var hits: std.ArrayList(Hit) = .empty;
+    defer hits.deinit(gpa);
+    var view: View = .{};
+    defer view.deinit(gpa);
+    const initial = try draw(gpa, &.{before}, &.{}, region, widths[0], 20, false, &view, &hits);
+    defer gpa.free(initial);
+    view.selection = .{ .start = view.location(first).?, .finish = view.location(last).? };
+    var copied: std.Io.Writer.Allocating = .init(gpa);
+    defer copied.deinit();
+    view.copy = &copied.writer;
+    const reflowed = try draw(gpa, &.{after}, &.{}, region, widths[1], 20, false, &view, &hits);
+    defer gpa.free(reflowed);
+    try std.testing.expectEqualStrings(expected, copied.written());
+}
+
+test "a growing reply keeps its selection when Markdown starts farther down" {
+    const early = write.Entry{ .reply = "intro line is here\nalpha beta gamma" };
+    const late = write.Entry{ .reply = "intro line is here\nalpha beta gamma\n# Topic" };
+    try copiedAfterReflow(early, late, .{ 40, 40 }, .{ .row = 1, .column = 8 }, .{ .row = 1, .column = 12 }, "beta");
+}
+
+test "a prompt keeps its selected words when the time gutter appears" {
+    for ([_]?u32{ 45, null }) |at| {
+        const entry = write.Entry{ .you = .{ .at = at, .said = "alpha beta gamma" } };
+        try copiedAfterReflow(entry, entry, .{ 59, 60 }, .{ .row = 0, .column = 8 }, .{ .row = 0, .column = 12 }, "beta");
+    }
+}
+
+test "a right table cell keeps its selected characters when cells wrap" {
+    const entry = write.Entry{ .reply = "| A | B |\n| --- | --- |\n| abcdef | uvwxyz |" };
+    try copiedAfterReflow(entry, entry, .{ 19, 12 }, .{ .row = 2, .column = 11 }, .{ .row = 2, .column = 14 }, "uvw");
+    try copiedAfterReflow(entry, entry, .{ 19, 12 }, .{ .row = 2, .column = 15 }, .{ .row = 2, .column = 11 }, "uvwx");
+    try copiedAfterReflow(entry, entry, .{ 19, 9 }, .{ .row = 2, .column = 11 }, .{ .row = 2, .column = 14 }, "uvw");
+}

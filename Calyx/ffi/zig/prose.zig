@@ -342,3 +342,32 @@ test "wide characters keep their columns inside a list" {
     try std.testing.expect(std.mem.indexOf(u8, out.buffered(), "中文") != null);
     try std.testing.expect(p.column <= p.limit);
 }
+
+test "a formula cannot turn into a Markdown block prefix" {
+    var buffer: [256]u8 = undefined;
+    var output: std.Io.Writer = .fixed(&buffer);
+    var painter = paint.Painter.meiFrame(&output, 40);
+    try blocks(&painter, "$- 1$\n$# 1$\n- $x^2$", .{ .left = 0, .measure = 39, .style = .plain, .marks = .prose });
+    try std.testing.expect(std.mem.indexOf(u8, output.buffered(), "- 1") != null);
+    try std.testing.expect(std.mem.indexOf(u8, output.buffered(), "# 1") != null);
+    try std.testing.expectEqual(@as(usize, 1), std.mem.count(u8, output.buffered(), "•"));
+}
+
+test "long Mermaid node identities remain distinct on narrow screens" {
+    var buffer: [512]u8 = undefined;
+    var output: std.Io.Writer = .fixed(&buffer);
+    var painter = paint.Painter.meiFrame(&output, 8);
+    try blocks(&painter, "```mermaid\nflowchart LR\nBuildAlpha --> BuildBeta\n```", .{
+        .left = 0,
+        .measure = 7,
+        .style = .plain,
+        .marks = .prose,
+    });
+    const drawn = output.buffered();
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "…") == null);
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "↓") != null);
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "BuildA") != null);
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "lpha") != null);
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "BuildB") != null);
+    try std.testing.expect(std.mem.indexOf(u8, drawn, "eta") != null);
+}
