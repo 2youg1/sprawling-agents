@@ -325,11 +325,13 @@ fn a_pending_windows_read_keeps_the_response_on_the_same_socket() {
             io: Duration::from_secs(2),
             pulse: Duration::from_millis(50),
         },
-        &mut pulses,
-        "loopback response",
+        ResponseTrace {
+            pulse: &mut pulses,
+            path: "loopback response",
+        },
         |socket, buffer| {
             if std::mem::replace(&mut pending, false) {
-                Err(std::io::Error::from_raw_os_error(997))
+                Err(std::io::Error::from_raw_os_error(WSA_IO_PENDING))
             } else {
                 socket.read(buffer)
             }

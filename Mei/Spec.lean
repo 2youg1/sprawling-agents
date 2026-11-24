@@ -141,6 +141,8 @@ ACP client（城 harness、编辑器或其他）spawn `mei --acp`；`acp` 不依
 目录条目同时给出 `context_window` 与 `reasoning_levels`。每次自动路由请求携带独立
 `X-Magpie-Session`，完整响应后 GET `/v1/magpie/route?session=…`，把实际 model/effort 写给 Face。
 路由观测失败不推翻已成功的模型回答，Face 保留 requested model/effort，不声称它们是实际值。
+每次 HTTP 响应的读取都受同一个单调截止时刻约束。等待读超时和 Windows 同步读取返回的
+`WSA_IO_PENDING` 进入下一次读取；其他错误结束响应并保留诊断。读取期间不重发请求。
 -/
 
 /-! ## 8 接口先行
@@ -443,6 +445,10 @@ doctor 测试用假探测/安装闭包和隔离缓存，不执行真实下载；
 /-! D18 `HARNESS_MODEL` 缺省时服从 Magpie `first_id` 的可见路由，空目录失败；理由：零参数启动应使用人已配置的路由，而不是另存一份模型配置。被否：编译期模型名、扫描并改写 Magpie 配置、静默取任意不可用模型。 -/
 /-! D19 图片仍经唯一 python 工具的 `show_image` 原语返回标准 image tool-result；理由：模型必须收到视觉块才能真正看图，base64 不进入 stdout 就不会挤占小结果预算。被否：第二图片工具、OCR/外部视觉 API 冒充 Mei 自身看图、把 base64 当普通文本。 -/
 /-! D20 默认 adaptive + high 只定义请求；实际 model/effort 仅以 Magpie route 为确认来源，未确认就标 requested。`requested` 是请求实际携带的值：`HARNESS_EXTRA` 覆盖 `model` 时，model 行与目录元数据都以请求为准，另一模型的 context/efforts 不沿用。`mei --describe` 只读查询目录及实际请求设置，将同一 `mei.obs model` 写到 stdout，供首次任务前的 effort 选择。它不运行 Python、不加载工作区指令、不发生成请求。被否：把路由组 ID 当最终模型、把支持级别列表当当前级别、为显示状态而伪报 default、把目录选择而非请求当 requested。 -/
+
+/-! D24 Windows 的 `WSA_IO_PENDING` 复用本次响应的读取截止时刻。若此错误早于本次读的等待窗口，
+等到该窗口结束再读，避免反复立即失败时占满线程并密集发存活观测。被否：把 997 当作连接失败，
+因为未读完的响应仍可能继续到达；重置预算会让慢速响应无限延长读取。 -/
 
 /-! D23 Python 的私有帧传回异常标志，Mei 把异常标到 `tool_result.is_error`，仍将完整捕获内容送回模型。每个已经验证的调用执行前发 `mei.obs tool_start`。工作区指令成功读取时发 `mei.obs workspace`，只携带加载标志。交互运行把 PNG/JPEG 解码为有界灰阶字符预览，经 `mei.obs image` 发给 Calyx。原图片完整保留在工具结果里。理由：前端以真实运行结果识别状态，避免从 traceback 文本或普通 stderr 猜测；灰阶预览可在备用屏重排，不依赖宿主图形扩展。 -/
 /-! D21 任务进行中的 Steer 接到本波最新一条 tool_result 文本末尾，不打断当前工具调用。
