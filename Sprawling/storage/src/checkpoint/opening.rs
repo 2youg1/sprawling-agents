@@ -3,8 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Condvar, Mutex, PoisonError};
+use std::time::Duration;
 
 use kernel::{RESERVED_PREFIX, RunId};
 
@@ -18,13 +20,33 @@ pub(crate) enum IndexOwner {
     Writer(PathBuf),
 }
 
-static HEAD_MOVES: Mutex<()> = Mutex::new(());
+static HEAD_MOVES: Mutex<BTreeSet<PathBuf>> = Mutex::new(BTreeSet::new());
+static RELEASED: Condvar = Condvar::new();
 
-pub(crate) fn moving_head() -> Result<MutexGuard<'static, ()>, StorageError> {
-    HEAD_MOVES.lock().map_err(|_| StorageError::Checkpoint {
-        op: "move HEAD",
-        detail: "a thread failed while it was moving HEAD".to_owned(),
-    })
+pub(crate) struct HeadGuard(PathBuf);
+
+pub(crate) fn moving_head(path: &Path) -> Result<HeadGuard, StorageError> {
+    let held = HEAD_MOVES.lock().unwrap_or_else(PoisonError::into_inner);
+    let (mut held, _) = RELEASED
+        .wait_timeout_while(held, Duration::from_secs(30), |held| held.contains(path))
+        .unwrap_or_else(PoisonError::into_inner);
+    if !held.insert(path.to_owned()) {
+        return Err(StorageError::Checkpoint {
+            op: "move HEAD",
+            detail: format!("{} is still committing after 30 seconds", path.display()),
+        });
+    }
+    Ok(HeadGuard(path.to_owned()))
+}
+
+impl Drop for HeadGuard {
+    fn drop(&mut self) {
+        HEAD_MOVES
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .remove(&self.0);
+        RELEASED.notify_all();
+    }
 }
 
 pub(crate) enum HeadMove {
@@ -54,7 +76,15 @@ fn writers_dir(root: &Path) -> PathBuf {
 }
 
 impl Checkpoint {
+    pub(super) fn head_lock(&self) -> &Path {
+        match (&self.index, &self.reference) {
+            (IndexOwner::Writer(path), Some(_)) => path,
+            _ => self.repo.path(),
+        }
+    }
+
     pub fn open(city_root: &Path) -> Result<Checkpoint, StorageError> {
+        let _initializing = moving_head(city_root)?;
         let repo = match git2::Repository::open(city_root) {
             Ok(repo) => repo,
             Err(err) if err.code() == git2::ErrorCode::NotFound => {
@@ -77,41 +107,54 @@ impl Checkpoint {
                 .set_bool("core.autocrlf", false)
                 .map_err(git_err("pin the repository's line endings"))?;
         }
+        if cfg!(windows) && local.get_bool("core.longpaths") != Ok(true) {
+            local
+                .set_bool("core.longpaths", true)
+                .map_err(git_err("enable long checkout paths"))?;
+        }
         Ok(Checkpoint {
             repo,
             last: None,
             index: IndexOwner::City,
+            reference: None,
             entropy_allow: kernel::EntropyAllowlist::default(),
         })
     }
 
     pub fn open_writer(root: &Path, writer: RunId) -> Result<Checkpoint, StorageError> {
-        let repo = git2::Repository::open(root)
-            .map_err(git_err("open the city repository for a writer"))?;
-        let dir = writers_dir(root);
+        let repo =
+            git2::Repository::open(root).map_err(git_err("open the private writer checkout"))?;
+        Self::writer(repo, writers_dir(root), writer, None)
+    }
+
+    pub(crate) fn writer(
+        repo: git2::Repository,
+        dir: PathBuf,
+        writer: RunId,
+        reference: Option<String>,
+    ) -> Result<Self, StorageError> {
         let own = dir.join(writer.to_string());
-        let seed = repo.path().join("index");
-        let refused = |detail: String| StorageError::Checkpoint {
-            op: "seed a writer's index",
-            detail,
+        let refused = |source| StorageError::Io {
+            op: "open the writer index",
+            path: own.clone(),
+            source,
         };
-        let present = |path: &Path| {
-            path.try_exists()
-                .map_err(|err| refused(format!("{}: {err}", path.display())))
-        };
-        std::fs::create_dir_all(&dir)
-            .map_err(|err| refused(format!("{}: {err}", dir.display())))?;
-        if !present(&own)? && present(&seed)? {
-            std::fs::copy(&seed, &own)
-                .map_err(|err| refused(format!("{}: {err}", own.display())))?;
+        std::fs::create_dir_all(&dir).map_err(refused)?;
+        let fresh = !own.try_exists().map_err(refused)?;
+        let mut index = git2::Index::open(&own).map_err(git_err("open the writer index"))?;
+        if fresh && let Some(commit) = Self::parent_at(&repo, reference.as_deref())? {
+            let tree = commit.tree().map_err(git_err("read the writer baseline"))?;
+            index
+                .read_tree(&tree)
+                .map_err(git_err("seed the writer index from its baseline"))?;
         }
-        let mut index = git2::Index::open(&own).map_err(git_err("open a writer's index"))?;
         repo.set_index(&mut index)
             .map_err(git_err("give a writer its index"))?;
         Ok(Checkpoint {
             repo,
             last: None,
             index: IndexOwner::Writer(own),
+            reference,
             entropy_allow: kernel::EntropyAllowlist::default(),
         })
     }

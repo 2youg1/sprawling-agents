@@ -120,6 +120,7 @@ impl RunWorker {
         let offered = match (&outcome, &lease) {
             (Ok(Completion::Done(_)), Some(tree)) => self.offer_for_harness(
                 &Offering {
+                    project: building.addr(),
                     tree: tree.path(),
                     scopes: &tree_scope(&building),
                     of: &harness_provenance(city, run, &at.addr, at.predecessor()),
@@ -132,7 +133,11 @@ impl RunWorker {
             ),
             (Ok(_) | Err(_), _) => Ok(()),
         };
-        let returned = self.give_tree_back(lease);
+        let returned = if offered.is_ok() && outcome.is_ok() {
+            self.retire_checkout(lease)
+        } else {
+            self.give_tree_back(lease)
+        };
         left?;
         offered?;
         returned?;

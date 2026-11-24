@@ -80,10 +80,7 @@ mod tests {
         assert!(listed.contains(&".sprawling"), "{listed:?}");
         assert!(listed.contains(&"hall"), "{listed:?}");
 
-        assert_eq!(
-            listed,
-            vec![".git", ".sprawling", "hall", ".gitignore", "City.md"]
-        );
+        assert_eq!(listed, vec![".sprawling", "hall", ".gitignore", "City.md"]);
     }
 
     #[test]

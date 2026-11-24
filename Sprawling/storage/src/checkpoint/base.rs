@@ -24,10 +24,11 @@ pub enum BaseProgress {
     Packed { bytes: usize },
 }
 
-pub(super) struct BaseOf<'a> {
-    pub(super) scopes: &'a [String],
-    pub(super) t: TimeMs,
-    pub(super) of: &'a Provenance,
+pub(crate) struct BaseOf<'a> {
+    pub(crate) scopes: &'a [String],
+    pub(crate) t: TimeMs,
+    pub(crate) of: &'a Provenance,
+    pub(crate) source: Option<&'a crate::SourceSnapshot>,
 }
 
 pub(super) enum BaseTarget {
@@ -44,20 +45,40 @@ impl Checkpoint {
         of: &Provenance,
         progress: &mut dyn FnMut(BaseProgress),
     ) -> Result<Commit, StorageError> {
+        self.import_base(
+            &BaseOf {
+                scopes,
+                t,
+                of,
+                source: None,
+            },
+            progress,
+        )
+    }
+
+    pub(crate) fn import_base(
+        self,
+        base: &BaseOf<'_>,
+        progress: &mut dyn FnMut(BaseProgress),
+    ) -> Result<Commit, StorageError> {
         if Self::head_commit(&self.repo)?.is_some() {
-            return self.write_held(&BaseOf { scopes, t, of }, BaseTarget::Filed, progress);
+            return self.write_held(base, BaseTarget::Filed, progress);
         }
-        let _head_moves = super::opening::moving_head()?;
+        let _head_moves = super::opening::moving_head(self.repo.path())?;
         let target = match Self::head_commit(&self.repo)? {
             None => BaseTarget::Head,
             Some(_) => BaseTarget::Filed,
         };
-        self.write_held(&BaseOf { scopes, t, of }, target, progress)
+        self.write_held(base, target, progress)
     }
 
     pub(super) fn reopened(&self) -> Result<Checkpoint, StorageError> {
         let repo = git2::Repository::open(self.repo.path())
             .map_err(git_err("open the city repository for a base"))?;
+        if let Some(workdir) = self.repo.workdir() {
+            repo.set_workdir(workdir, false)
+                .map_err(git_err("attach the project working directory"))?;
+        }
         let index = match &self.index {
             IndexOwner::City => IndexOwner::City,
             IndexOwner::Writer(own) => {
@@ -71,6 +92,7 @@ impl Checkpoint {
             repo,
             last: None,
             index,
+            reference: self.reference.clone(),
             entropy_allow: self.entropy_allow.clone(),
         })
     }
@@ -97,8 +119,18 @@ impl Checkpoint {
             .set_odb(&odb)
             .map_err(git_err("hold the base checkpoint in memory"))?;
 
-        let BaseOf { scopes, t, of } = *base;
-        let files = self.stage_scopes_held(scopes)?;
+        let BaseOf {
+            scopes,
+            t,
+            of,
+            source,
+        } = *base;
+        let mut files = self.stage_scopes_held(scopes)?;
+        if let Some(source) = source {
+            files.extend(source.stage(&self.repo, of.actor())?);
+            files.sort_unstable();
+            files.dedup();
+        }
         progress(BaseProgress::Staged { files: files.len() });
         let withheld = self.scan_staged(scopes)?;
         let oid = self.commit(&CommitPlan {

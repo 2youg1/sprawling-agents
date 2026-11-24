@@ -15,14 +15,10 @@
 use crate::worker::fixture::*;
 use crate::worker::*;
 
-/// An anthropic-shaped key, put together at run time so that the tree
-/// itself holds no key shape for `xtask secret` to find.
 fn written() -> String {
     ["sk-", "ant-", &"Wq3z".repeat(10)].concat()
 }
 
-/// A key the model writes into a new file through `edit` reaches the
-/// vault, and the file holds the reference that resolves to it.
 #[test]
 fn a_written_key_reaches_the_vault_and_not_the_file() {
     let key = written();
@@ -73,25 +69,19 @@ fn a_written_key_reaches_the_vault_and_not_the_file() {
     );
 }
 
-/// A key a tool reads out of the city reaches the vault, and the model is
-/// handed the reference that resolves to it.
 #[test]
 fn a_key_a_tool_reads_reaches_the_vault_and_not_the_model() {
     let key = written();
     let dir = tempfile::tempdir().unwrap();
     crate::worker::fixture::init_city(dir.path()).unwrap();
     std::fs::create_dir_all(dir.path().join("lab/room1")).unwrap();
-    // Ignored, as a person keeps a key file: a key the checkpoint would
-    // stage is refused there before any tool runs, which is a different
-    // door from the one this test is about.
     std::fs::write(dir.path().join("lab/room1/.gitignore"), "keys.md\n").unwrap();
-    std::fs::write(
-        dir.path().join("lab/room1/keys.md"),
-        format!("token = {key}\n"),
-    )
-    .unwrap();
-    let (base_url, provider) = fake_openai(
+    let project =
+        storage::ProjectRepository::at(dir.path(), &Address::parse("lab").unwrap()).unwrap();
+    let fixture = format!("token = {key}\n");
+    let (base_url, provider) = fake_openai_paced(
         &["m-local"],
+        Vec::new(),
         vec![
             tool_completion(
                 "reading",
@@ -101,6 +91,17 @@ fn a_key_a_tool_reads_reaches_the_vault_and_not_the_model() {
             ),
             completion("done", None),
         ],
+        std::sync::Arc::new(move |request| {
+            if request.starts_with("GET ") {
+                return;
+            }
+            let trees = project.trees().unwrap();
+            for name in trees.live().unwrap() {
+                let repo = git2::Repository::open(project.root()).unwrap();
+                let tree = repo.find_worktree(name.as_str()).unwrap();
+                std::fs::write(tree.path().join("lab/room1/keys.md"), &fixture).unwrap();
+            }
+        }),
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     worker
@@ -135,8 +136,6 @@ fn a_key_a_tool_reads_reaches_the_vault_and_not_the_model() {
     );
 }
 
-/// A tool that records the arguments it was handed, standing for exec,
-/// delegate, an MCP tool or any other tool on the bench that is not edit.
 struct Recording {
     meta: kernel::ToolMeta,
     seen: std::sync::Arc<std::sync::Mutex<Vec<kernel::Payload>>>,
@@ -156,9 +155,6 @@ impl kernel::Tool for Recording {
     }
 }
 
-/// A key nested anywhere in the arguments of a tool other than edit,
-/// such as the command line exec would run to write a file, reaches the
-/// tool as the reference that resolves to it.
 #[test]
 fn a_key_in_any_tool_argument_reaches_the_vault_and_not_the_tool() {
     use super::{Keeper, Kept};
@@ -217,8 +213,6 @@ fn a_key_in_any_tool_argument_reaches_the_vault_and_not_the_tool() {
     );
 }
 
-/// The same key handed to tools twice in one run is kept once: both calls
-/// hand the tool one reference, and a different key gets its own.
 #[test]
 fn one_key_seen_twice_is_kept_under_one_reference() {
     use super::{Keeper, Kept};
@@ -273,7 +267,6 @@ fn one_key_seen_twice_is_kept_under_one_reference() {
     );
 }
 
-/// A tool that has already acted and returns a key it read.
 struct Reading {
     meta: kernel::ToolMeta,
     found: String,
@@ -293,9 +286,6 @@ impl kernel::Tool for Reading {
     }
 }
 
-/// When the vault refuses a key in a result, the call still succeeds,
-/// because the tool's effect has happened: the model reads a marker that
-/// names the vault's code in the key's place, and never the key.
 #[test]
 fn a_result_key_the_vault_refuses_is_withheld_and_the_call_stands() {
     use super::{Keeper, Kept};

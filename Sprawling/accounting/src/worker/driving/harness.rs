@@ -244,6 +244,7 @@ fn drive_turn<L: Ledger>(
             let scope = tree_scope(&half.building);
             match commit(
                 &HarnessCheckpoint {
+                    city: &half.city_root,
                     root: &root,
                     scope: &scope,
                     of: &of,
@@ -279,6 +280,7 @@ fn drive_turn<L: Ledger>(
 }
 
 struct HarnessCheckpoint<'a> {
+    city: &'a Path,
     root: &'a Path,
     scope: &'a [String],
     of: &'a storage::Provenance,
@@ -289,9 +291,14 @@ fn commit(
     plan: &HarnessCheckpoint<'_>,
     context: &DriveContext,
 ) -> Result<Payload, runtime::CheckpointFailure> {
-    let mut own = storage::Checkpoint::open_writer(plan.root, plan.of.run())
-        .map_err(runtime::CheckpointFailure::from)?
-        .with_entropy_allowlist(plan.entropy_allow.clone());
+    let mut own = storage::ProjectRepository::run_checkpoint(
+        plan.city,
+        plan.root,
+        plan.of.run(),
+        plan.of.actor(),
+    )
+    .map_err(runtime::CheckpointFailure::from)?
+    .with_entropy_allowlist(plan.entropy_allow.clone());
     let committed = own
         .wave_pre(plan.scope, context.clock.now()?, plan.of)
         .map_err(runtime::CheckpointFailure::from);

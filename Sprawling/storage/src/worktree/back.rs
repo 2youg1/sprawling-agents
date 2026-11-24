@@ -30,8 +30,8 @@ impl Worktrees {
         if self.live()?.contains(name) {
             return Err(busy("a live tree holds this name"));
         }
-        let city = self.refuse_oversized(name.as_str())?;
         let commit = self.commit_at(point)?;
+        let city = self.check_size(name.as_str(), commit.tree_id())?;
 
         let branch = self
             .repo
@@ -118,7 +118,7 @@ impl Worktrees {
         Ok(restored)
     }
 
-    fn commit_at(&self, point: &GitOid) -> Result<git2::Commit<'_>, StorageError> {
+    pub(super) fn commit_at(&self, point: &GitOid) -> Result<git2::Commit<'_>, StorageError> {
         let missing = |err: git2::Error| StorageError::Worktree {
             op: "find the point to go back to",
             detail: format!("{point}: {err}"),

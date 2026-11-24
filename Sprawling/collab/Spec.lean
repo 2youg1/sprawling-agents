@@ -158,11 +158,11 @@ Signal、Inbox、Steer、Workshop、NodeContract、fan-in、Artifact、arbitrati
 - 登记在调用时由 `GoalBooking` 判定，桌子不留副本：并排派出的两轮活读同一份目标表，只凭副本两轮都会登记同一片地。权威按队列次序对全城的目标表 `arbitrate`，先写账（`goal_registered` 或 `goal_conflict`）再回答；它的 `Err` 原样交给模型，桌子不排任何效应。
 - 撞了就不登记，拒词只在本模块拼一次；一个只说「不行」的拒绝会让模型换个说法再试。同一 run 内的第二次登记看得见第一次。不写第三种 `arbitration_verdict`：`conflict_payload` 已携着那一级，该事件留给真正跑过一场仲裁的 run。
 
-**`collab::pr_tool`**（形状 4 适配器）。`OpenRequest { node, implementer, branch, commit }` 与它的 `payload`、`from_payload`、`merged_payload`、`rejected_payload`；`MergedRequest` 是 `pr_merged` 的键（`reviewed_commit` 被审的、`commit` 落地的、`verified_by`、flatten 的 `CommitAttribution`）；`RejectedRequest` 是 `pr_rejected` 的键（flatten 的 `request`、`by`、`why`）；`PrEffect::{Opened, Merged, Rejected}`；`PrDesk::new(who, room, branch, node, open)`；三个 action：`open`、`list`、`check`。
+**`collab::pr_tool`**（形状 4 适配器）。`OpenRequest { node, project, implementer, branch, commit }` 与它的 `payload`、`from_payload`、`merged_payload`、`rejected_payload`；`MergedRequest` 是 `pr_merged` 的键（`project` 定位实现方的私有仓库，`reviewed_commit` 被审的、`commit` 落地的、`verified_by`、flatten 的 `CommitAttribution`）；`RejectedRequest` 是 `pr_rejected` 的键（flatten 的 `request`、`by`、`why`）；`PrEffect::{Opened, Merged, Rejected}`；`PrDesk::new(who, room, branch, node, open)`；三个 action：`open`、`list`、`check`。
 
 - 验证与 merge 是一次调用的两个结果：一个 `Verified` 而无人 merge 的请求是第三种要人去追的状态，而 merge 就是「验证通过」的含义；拒绝是同一次调用的另一个结果（`passed: false` 携 `why`）。
 - typestate 是走过的：`check` 内部真的造 `Claim`、`verified(true, self.who)`、`Pr::open(..).verified(&artifact)`，实现者不自测被检查两次：工具先拒（`E_GATE_DENIED`），类型再拒。
-- 被判的是一个 commit 而不是一条分支：`OpenRequest.commit` 记下开请求那一刻分支站在哪里，Artifact 的 digest 由它派生，看过一个 commit 的人没有为后一个背书。`pr_merged` 同时携被审的与落地的两个 commit，一个键装两个事实，Ledger 的链就断在 merge 这一步；`merged_payload` 是这一行唯一的成形处。
+- 同一项目与分支的新 `pr_opened` 替换待审提交；并发评审只对仍在等待的那个提交生效。被判的是一个 commit 而不是一条分支：`OpenRequest.commit` 记下开请求那一刻分支站在哪里，Artifact 的 digest 由它派生，看过一个 commit 的人没有为后一个背书。`pr_merged` 同时携被审的与落地的两个 commit，一个键装两个事实，Ledger 的链就断在 merge 这一步；`merged_payload` 是这一行唯一的成形处。
 - 三条记录的形状留在 collab，因为它们的键里有 `NodeId`。没有树的 run 说得出自己没有：`open` 报 `E_TOOL_UNAVAILABLE` 并指向要审查的楼。谁得到树由楼说了算（`RULES.toml` 的 `review = true`，见 `Sprawling/city/Spec.lean` §8-2；D4）。
 
 **`collab::triage`**（形状 1 判定；性质见 `spec/Triage.lean`）。`Reflex::{Discard, Notify, Light, Full}`、`Arrival`、`Rule`、`Landing { addr, reflex, because }`；`Triage::new(rules, fallback)` 在构造点拒空匹配串。

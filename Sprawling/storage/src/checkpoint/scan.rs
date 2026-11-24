@@ -6,12 +6,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use kernel::TimeMs;
-use kernel::event::record::{CheckpointFinding, Commit, SecretEgressBlocked};
+use kernel::event::record::{CheckpointFinding, SecretEgressBlocked};
 use kernel::secret::{SecretSpan, scan};
 
 use crate::error::StorageError;
 
-use super::commit::{Checkpoint, CommitDetails, commit_record, git_err};
+use super::commit::{Checkpoint, git_err};
 use super::opening::{HeadMove, commit_refused};
 use super::provenance::Provenance;
 
@@ -208,7 +208,7 @@ impl Checkpoint {
                 .repo
                 .find_commit(oid)
                 .map_err(git_err("read the last checkpoint"))?,
-            None => match Self::head_commit(&self.repo)? {
+            None => match Self::parent_at(&self.repo, self.reference.as_deref())? {
                 Some(commit) => commit,
                 None => return Ok(None),
             },
@@ -217,6 +217,20 @@ impl Checkpoint {
             .tree()
             .map(Some)
             .map_err(git_err("read the last checkpoint's tree"))
+    }
+
+    pub(super) fn parent_at<'a>(
+        repo: &'a git2::Repository,
+        reference: Option<&str>,
+    ) -> Result<Option<git2::Commit<'a>>, StorageError> {
+        match reference {
+            Some(name) => repo
+                .find_reference(name)
+                .and_then(|found| found.peel_to_commit())
+                .map(Some)
+                .map_err(git_err("read the run baseline")),
+            None => Self::head_commit(repo),
+        }
     }
 
     pub(super) fn head_commit(
@@ -375,10 +389,17 @@ impl Checkpoint {
         let signature = git2::Signature::new(plan.of.actor().as_str(), &email, &when)
             .map_err(git_err("build signature"))?;
         let (update, parents): (_, Vec<git2::Commit>) = match plan.head {
-            HeadMove::Leave => (None, Self::head_commit(&self.repo)?.into_iter().collect()),
+            HeadMove::Leave => (
+                None,
+                Self::parent_at(&self.repo, self.reference.as_deref())?
+                    .into_iter()
+                    .collect(),
+            ),
             HeadMove::Advance => (
-                Some("HEAD"),
-                Self::head_commit(&self.repo)?.into_iter().collect(),
+                Some(self.reference.as_deref().unwrap_or("HEAD")),
+                Self::parent_at(&self.repo, self.reference.as_deref())?
+                    .into_iter()
+                    .collect(),
             ),
         };
         let parent_refs: Vec<&git2::Commit> = parents.iter().collect();
@@ -396,34 +417,6 @@ impl Checkpoint {
             .map_err(|err| commit_refused(update, err))?;
         self.last = Some(oid);
         Ok(oid)
-    }
-
-    pub fn land(
-        &mut self,
-        scopes: &[String],
-        t: TimeMs,
-        of: &Provenance,
-        subject: &str,
-    ) -> Result<Commit, StorageError> {
-        let _head_moves = super::opening::moving_head()?;
-        let files = self.stage_scopes(scopes)?;
-
-        let withheld = self.scan_staged(scopes)?;
-        let oid = self.commit(&CommitPlan {
-            t,
-            of,
-            subject,
-            head: HeadMove::Advance,
-        })?;
-        commit_record(
-            oid,
-            CommitDetails {
-                of,
-                scopes,
-                files,
-                withheld,
-            },
-        )
     }
 }
 

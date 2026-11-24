@@ -39,6 +39,7 @@ impl RunWorker {
         let task = self.take_custody(task)?;
         let goal = self.take_custody(goal)?;
 
+        self.recover_project(seat.building().addr())?;
         self.book_rules(seat.building())?;
         let session = super::session::session_for(&at.addr, at.session.take(), &task)?;
 
@@ -84,7 +85,7 @@ impl RunWorker {
             )
             .map_err(storage::StorageError::into_ax)?;
 
-        site.name_tree(&at)?;
+        site.name_tree()?;
         let desks = self.open_desks(&site, &at.addr, at.depth())?;
 
         let inherited = self.inherited(&at, site.run_id)?;
@@ -214,8 +215,22 @@ impl RunWorker {
                 held_out: None,
             }
         };
-        self.settle_requests(&site, &at, &desks.pr, &produced)?;
-        self.release_lease(&mut site)?;
+        let settled = self
+            .settle_requests(&site, &at, &desks.pr, &produced)
+            .and_then(|()| {
+                if driven.is_ok() {
+                    self.finish_work(&site, &at)
+                } else {
+                    Ok(())
+                }
+            });
+        let released = if settled.is_ok() && driven.is_ok() {
+            self.retire_checkout(site.lease.take())
+        } else {
+            self.release_lease(&mut site)
+        };
+        settled?;
+        released?;
         let landed = self.conclude(
             site,
             &at,
@@ -252,6 +267,19 @@ impl RunWorker {
         Ok(())
     }
 
+    pub(super) fn retire_checkout(
+        &self,
+        lease: Option<storage::WorktreeLease>,
+    ) -> Result<(), AxError> {
+        if let Some(held) = lease {
+            self.connectors.release_root(held.path());
+            storage::Worktrees::open(held.owner())
+                .and_then(|trees| trees.retire(held))
+                .map_err(storage::StorageError::into_ax)?;
+        }
+        Ok(())
+    }
+
     fn release_lease(&mut self, site: &mut Site) -> Result<(), AxError> {
         self.give_tree_back(site.lease.take())
     }
@@ -263,7 +291,8 @@ impl RunWorker {
         let Some(held) = lease else {
             return Ok(());
         };
-        storage::Worktrees::open(&self.city_root)
+        self.connectors.release_root(held.path());
+        storage::Worktrees::open(held.owner())
             .map_err(storage::StorageError::into_ax)?
             .release(held)
             .map_err(storage::StorageError::into_ax)

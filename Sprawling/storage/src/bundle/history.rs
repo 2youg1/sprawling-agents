@@ -11,7 +11,6 @@ use crate::error::{StorageError, io_err};
 use crate::vfs::Vfs;
 
 use super::landing::{Bits, land};
-use super::manifest::CITY;
 
 pub(crate) const HISTORY: &str = "history";
 const PACK: &str = "history.pack";
@@ -35,33 +34,62 @@ pub(crate) struct Carried {
 impl Carried {
     pub(crate) fn of(vfs: &dyn Vfs, bundle: &Path) -> Result<Carried, StorageError> {
         let dir = bundle.join(HISTORY);
-        let at = dir.join(REFS);
-        let refs = match vfs.exists(&at) {
-            true => vfs
+        let mut total = Self::default();
+        for path in project_dirs(vfs, &dir)? {
+            let at = path.join(REFS);
+            let refs = vfs
                 .read(&at)
-                .map_err(io_err("read the history refs", &at))?
+                .map_err(io_err("read the project refs", &at))?;
+            let lines = refs
                 .split(|byte| *byte == b'\n')
                 .filter(|line| !line.is_empty())
-                .count(),
-            false => 0,
-        };
-        Ok(Carried {
-            packs: u64::from(vfs.exists(&dir.join(PACK))),
-            refs: u64::try_from(refs).map_err(|_| malformed(&at))?,
-        })
+                .count();
+            total.refs = total
+                .refs
+                .saturating_add(u64::try_from(lines).map_err(|_| malformed(&at))?);
+            total.packs = total
+                .packs
+                .saturating_add(u64::from(vfs.exists(&path.join(PACK))));
+        }
+        Ok(total)
     }
 }
 
 pub(crate) fn export(vfs: &mut dyn Vfs, city_root: &Path, dest: &Path) -> Result<(), StorageError> {
-    let repo = match git2::Repository::open(city_root) {
-        Ok(repo) => repo,
-        Err(err) if err.code() == git2::ErrorCode::NotFound => return Ok(()),
-        Err(err) => return Err(git_err("export")(err)),
+    for project in crate::ProjectRepository::list(city_root)? {
+        let repo =
+            git2::Repository::open(project.root()).map_err(git_err("export project history"))?;
+        let dir = dest.join(HISTORY).join(project.building().as_str());
+        write_project(vfs, dest, &dir, &repo)?;
+    }
+    Ok(())
+}
+
+fn project_dirs(vfs: &dyn Vfs, history: &Path) -> Result<Vec<std::path::PathBuf>, StorageError> {
+    let files = match vfs.list(history) {
+        Ok(files) => files,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(err) => return Err(io_err("list project histories", history)(err)),
     };
-    let (pack, refs) = pack_of(&repo, "export")?;
-    let dir = dest.join(HISTORY);
-    vfs.create_dir_all(&dir)
-        .map_err(io_err("make a bundle directory", &dir))?;
+    if !files.is_empty() {
+        return Err(malformed(history));
+    }
+    let mut dirs = vfs
+        .list_dirs(history)
+        .map_err(io_err("list project histories", history))?;
+    dirs.sort();
+    Ok(dirs)
+}
+
+fn write_project(
+    vfs: &mut dyn Vfs,
+    dest: &Path,
+    dir: &Path,
+    repo: &git2::Repository,
+) -> Result<(), StorageError> {
+    let (pack, refs) = pack_of(repo, "export")?;
+    vfs.create_dir_all(dir)
+        .map_err(io_err("make a bundle directory", dir))?;
     if let Some(bytes) = pack {
         let target = WriteTarget::within("write a history pack", dest, &dir.join(PACK))?;
         land(vfs, target, &bytes, Bits::OfReplaced)?;
@@ -78,10 +106,18 @@ fn pack_of(
     let mut walk = repo.revwalk().map_err(git_err(op))?;
     let mut refs = String::new();
     let head = repo.find_reference("HEAD").map_err(git_err(op))?;
+    let trunk = head
+        .symbolic_target()
+        .map_err(git_err(op))?
+        .map(str::to_owned);
     let listed = repo.references().map_err(git_err(op))?;
     for reference in std::iter::once(Ok(head)).chain(listed) {
         let reference = reference.map_err(git_err(op))?;
         let name = reference.name().map_err(git_err(op))?;
+        if name != "HEAD" && Some(name) != trunk.as_deref() && !name.starts_with("refs/sprawling/")
+        {
+            continue;
+        }
         if let Some(target) = reference.symbolic_target().map_err(git_err(op))? {
             refs.push_str(&format!("{SYMBOLIC}{target} {name}\n"));
         } else if let Some(oid) = reference.target() {
@@ -116,83 +152,50 @@ impl History {
         vfs: &dyn Vfs,
         bundle: &Path,
         city_root: &Path,
-    ) -> Result<Option<History>, StorageError> {
-        let dir = bundle.join(HISTORY);
-        let at = dir.join(REFS);
-        let whole = bundle.join(CITY).join(kernel::GIT_METADATA);
-        let legacy = whole.symlink_metadata().is_ok_and(|meta| meta.is_dir());
-        let packed = vfs.exists(&at);
-        if !packed && !legacy {
-            return Ok(None);
-        }
-        let occupied = city_root.join(kernel::GIT_METADATA);
-
-        if occupied.symlink_metadata().is_ok() {
-            return Err(StorageError::Bundle {
-                op: "restore",
-                detail: format!("{} already holds a repository", occupied.display()),
-            });
-        }
-        let (pack, text, at) = if packed && legacy {
-            return Err(StorageError::Bundle {
-                op: "restore",
-                detail: format!(
-                    "{} and {} are two histories, and an export writes one",
-                    dir.display(),
-                    whole.display()
-                ),
-            });
-        } else if packed {
-            let bytes = vfs
-                .read(&at)
-                .map_err(io_err("read the history refs", &at))?;
-            let text = String::from_utf8(bytes).map_err(|_| malformed(&at))?;
-            let pack = dir.join(PACK);
-            let pack = match vfs.exists(&pack) {
-                true => Some(
-                    vfs.read(&pack)
-                        .map_err(io_err("read a history pack", &pack))?,
-                ),
-                false => None,
-            };
-            (pack, text, at)
-        } else {
-            for borrowed in [
-                whole.join("objects").join("info").join("alternates"),
-                whole.join("commondir"),
-            ] {
-                match borrowed.symlink_metadata() {
-                    Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
-                    Err(err) => {
-                        return Err(io_err("inspect borrowed history storage", &borrowed)(err));
-                    }
-                    Ok(_) => {
-                        return Err(StorageError::Bundle {
-                            op: "restore",
-                            detail: format!(
-                                "{} borrows history from outside the bundle",
-                                borrowed.display()
-                            ),
-                        });
-                    }
-                }
+    ) -> Result<Vec<(crate::ProjectRepository, History)>, StorageError> {
+        let mut histories = Vec::new();
+        for dir in project_dirs(vfs, &bundle.join(HISTORY))? {
+            crate::alias::WriteTarget::within("read bundled project history", bundle, &dir)?;
+            let name = dir
+                .file_name()
+                .and_then(|name| name.to_str())
+                .ok_or_else(|| malformed(&dir))?;
+            let addr =
+                kernel::Address::parse(name).map_err(|source| StorageError::Draft { source })?;
+            let project = crate::ProjectRepository::at(city_root, &addr)?;
+            if project
+                .root()
+                .try_exists()
+                .map_err(io_err("inspect the private restore target", project.root()))?
+            {
+                return Err(StorageError::Bundle {
+                    op: "restore project history",
+                    detail: format!("{} already exists", project.root().display()),
+                });
             }
-            let repo = git2::Repository::open_bare(&whole).map_err(|err| StorageError::Bundle {
-                op: "restore",
-                detail: format!(
-                    "{} carries protected metadata that is no repository: {}",
-                    whole.display(),
-                    err.message()
-                ),
-            })?;
-            let (pack, text) = pack_of(&repo, "restore")?;
-            (pack, text, whole)
+            histories.push((project, Self::project(vfs, &dir)?));
+        }
+        Ok(histories)
+    }
+
+    fn project(vfs: &dyn Vfs, dir: &Path) -> Result<Self, StorageError> {
+        let at = dir.join(REFS);
+        let bytes = vfs.read(&at).map_err(io_err("read project refs", &at))?;
+        let text = String::from_utf8(bytes).map_err(|_| malformed(&at))?;
+        let path = dir.join(PACK);
+        let pack = if vfs.exists(&path) {
+            Some(
+                vfs.read(&path)
+                    .map_err(io_err("read project history", &path))?,
+            )
+        } else {
+            None
         };
         let refs = text
             .lines()
             .map(|line| parse(line).ok_or_else(|| malformed(&at)))
             .collect::<Result<Vec<_>, _>>()?;
-        Ok(Some(History { pack, refs }))
+        Ok(History { pack, refs })
     }
 
     pub(crate) fn land(self, city_root: &Path) -> Result<(), StorageError> {

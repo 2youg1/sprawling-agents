@@ -292,7 +292,8 @@ fn the_checkpoint_after_an_edit_stages_the_edited_path_and_not_the_domain() {
         subjects,
         vec![
             "checkpoint: hall".to_owned(),
-            "checkpoint: hall/note.md".to_owned()
+            "checkpoint: hall/note.md".to_owned(),
+            "run completed".to_owned()
         ]
     );
 }
@@ -319,7 +320,8 @@ fn a_note_beside_the_hall(city: &std::path::Path) -> git2::Repository {
             model: None,
         })
         .unwrap();
-    git2::Repository::open(city).unwrap()
+    let project = storage::ProjectRepository::at(city, &Address::parse("hall").unwrap()).unwrap();
+    git2::Repository::open(project.root()).unwrap()
 }
 
 #[test]

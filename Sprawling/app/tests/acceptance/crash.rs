@@ -226,8 +226,8 @@ fn a_city_killed_between_a_job_put_and_its_checkpoint_line_reopens_with_nothing_
         ReopenedWhole {
             opening: "Intact".to_owned(),
             closed_calls: 0,
-            listed: Vec::new(),
-            death_recorded: false,
+            listed: vec![(true, Some("cancelled".to_owned()), EventKind::RunFrozen)],
+            death_recorded: true,
             verifies: true,
             room_works_again: true,
         },
@@ -302,7 +302,11 @@ fn written_by_the_call(city_root: &Path) -> Vec<std::path::PathBuf> {
     while let Some(dir) = open.pop() {
         for entry in std::fs::read_dir(&dir).unwrap() {
             let path = entry.unwrap().path();
-            if path.is_dir() && path.file_name() != Some(std::ffi::OsStr::new(".git")) {
+            if path.is_dir()
+                && !kernel::PROTECTED_METADATA
+                    .iter()
+                    .any(|name| path.file_name() == Some(std::ffi::OsStr::new(name)))
+            {
                 open.push(path);
             } else if path.file_name() == Some(std::ffi::OsStr::new("notes.md")) {
                 found.push(path);
@@ -344,8 +348,11 @@ fn a_city_killed_after_a_checkpoint_swap_and_before_its_line_loses_and_doubles_n
     let oid = lines_of(&ledger)
         .iter()
         .map(|raw| serde_json::from_slice::<serde_json::Value>(raw).unwrap())
+        .skip_while(|line| line["kind"] != "run_started")
         .find(|line| {
-            line["kind"] == "checkpoint_committed" && line["run"] == run.to_string().as_str()
+            line["kind"] == "checkpoint_committed"
+                && line["run"] == run.to_string().as_str()
+                && line["data"]["oid"].is_string()
         })
         .and_then(|line| line["data"]["oid"].as_str().map(str::to_owned))
         .unwrap();
@@ -356,8 +363,11 @@ fn a_city_killed_after_a_checkpoint_swap_and_before_its_line_loses_and_doubles_n
         std::fs::remove_file(path).unwrap();
     }
     let before = lines_of(&ledger);
-    let pinned = dir
-        .path()
+    let project =
+        storage::ProjectRepository::at(dir.path(), &kernel::Address::parse("lab").unwrap())
+            .unwrap();
+    let pinned = project
+        .root()
         .join(".git/refs/sprawling/runs")
         .join(run.to_string())
         .join(&oid)

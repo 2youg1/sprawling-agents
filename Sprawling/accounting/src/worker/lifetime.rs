@@ -123,9 +123,6 @@ impl RunWorker {
         } = hands;
         let now = crate::Clock::now(&*clock)?;
 
-        storage::Worktrees::lift_abandoned_leases(city_root, &ledger)
-            .map_err(storage::StorageError::into_ax)?;
-
         city::keep_records_out_of_git(city_root)?;
 
         for edited in city::follow_defaults(city_root)? {
@@ -176,6 +173,7 @@ impl RunWorker {
         let mut worker = RunWorker {
             city_root: city_root.to_path_buf(),
             city: std::sync::OnceLock::new(),
+            recovered_projects: std::collections::BTreeSet::new(),
             ledger,
             opening: LedgerOpening::from(report),
             cas,
@@ -230,9 +228,7 @@ impl RunWorker {
         for building in city::buildings(city_root)? {
             city::migrate_mcp(city_root, &building)?;
         }
-        worker.sweep_abandoned_trees();
         worker.bring_configuration_forward();
-        worker.open_checkpoints();
         Ok(worker)
     }
 
@@ -313,27 +309,24 @@ impl RunWorker {
         Ok(())
     }
 
-    fn sweep_abandoned_trees(&mut self) {
-        let told = match storage::Worktrees::sweep_abandoned(&self.city_root, &[]) {
-            Ok(swept) if swept.is_empty() => return,
-            Ok(swept) => format!(
-                "took back {} worktree(s) a crash left behind: {}",
-                swept.len(),
-                swept
-                    .iter()
-                    .map(storage::WorktreeName::as_str)
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ),
-            Err(err) => format!(
-                "could not take back the worktrees a crash left behind; the next open tries again: {err}"
-            ),
-        };
-        self.note(
-            runtime::diagnostics::Level::Effect,
-            "accounting::worker",
-            &told,
-        );
+    pub(super) fn recover_project(&mut self, building: &kernel::Address) -> Result<(), AxError> {
+        if self.recovered_projects.contains(building) {
+            return Ok(());
+        }
+        let project = storage::ProjectRepository::at(&self.city_root, building)
+            .map_err(storage::StorageError::into_ax)?;
+        if project.root().join(".git").exists() {
+            self.reconcile_project(
+                &project,
+                &project.trees().map_err(storage::StorageError::into_ax)?,
+            )?;
+        }
+        storage::Worktrees::lift_abandoned_leases(project.root(), &self.ledger)
+            .map_err(storage::StorageError::into_ax)?;
+        storage::Worktrees::sweep_abandoned(project.root(), &[])
+            .map_err(storage::StorageError::into_ax)?;
+        self.recovered_projects.insert(building.clone());
+        Ok(())
     }
 
     fn bring_configuration_forward(&mut self) {
@@ -371,20 +364,6 @@ impl RunWorker {
                 &line,
             );
         }
-    }
-
-    fn open_checkpoints(&mut self) {
-        let opened = storage::Checkpoint::open(&self.city_root)
-            .and_then(|_| storage::Checkpoint::sweep_writers(&self.city_root));
-        let told = match opened {
-            Ok(0) => return,
-            Ok(swept) => format!("took back {swept} checkpoint index(es) a crash left behind"),
-            Err(err) => format!(
-                "could not open the checkpoint repository or take back the indexes a crash left; the next open tries again: {err}"
-            ),
-        };
-        let level = runtime::diagnostics::Level::Effect;
-        self.note(level, "accounting::worker", &told);
     }
 
     pub fn take_back_the_lost(&mut self) {

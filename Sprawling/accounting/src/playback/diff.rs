@@ -56,14 +56,17 @@ fn change(
     path: &str,
     budget: &mut usize,
 ) -> Change {
-    let patch = match storage::of_file(city_root, base, Head::Commit(head), path) {
+    let Ok(project) = storage::ProjectRepository::containing(city_root, head) else {
+        return Change::Missing;
+    };
+    let patch = match storage::of_file(project.root(), base, Head::Commit(head), path) {
         Ok(patch) => patch,
         Err(_unavailable) => return Change::Missing,
     };
     if !patch.lines.is_empty() || !patch.withheld.is_empty() {
         return shown(patch, budget);
     }
-    match binary(city_root, [head, base], path) {
+    match binary(project.root(), [head, base], path) {
         Ok(true) => Change::Binary,
         Ok(false) => Change::Empty,
         Err(_unreadable) => Change::Missing,

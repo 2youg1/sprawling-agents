@@ -28,8 +28,6 @@ pub(crate) fn addr(raw: &str) -> Address {
 
 pub(crate) type Line = (RunId, Option<&'static str>, EventKind, Value);
 
-/// The ledger lines `script` spells, chained from genesis, each line's
-/// `t` its seq.
 pub(crate) fn lines(script: Vec<Line>) -> Vec<Vec<u8>> {
     lines_at(
         script
@@ -40,8 +38,6 @@ pub(crate) fn lines(script: Vec<Line>) -> Vec<Vec<u8>> {
     )
 }
 
-/// The ledger lines `script` spells, chained from genesis, each line at
-/// the `t` it is paired with.
 pub(crate) fn lines_at(script: Vec<(u64, Line)>) -> Vec<Vec<u8>> {
     let mut prev = kernel::GENESIS_PREV;
     let mut out = Vec::new();
@@ -65,7 +61,6 @@ pub(crate) fn lines_at(script: Vec<(u64, Line)>) -> Vec<Vec<u8>> {
     out
 }
 
-/// Writes `lines` as the city's one segment, followed by `tail` bytes.
 pub(crate) fn write(root: &Path, lines: &[Vec<u8>], tail: &[u8]) {
     let dir = kernel::layout::CityLayout::new(root).ledger();
     std::fs::create_dir_all(&dir).unwrap();
@@ -83,9 +78,6 @@ pub(crate) fn confidential(root: &Path, building: &str) {
     std::fs::write(path, "confidential = true\nwrite = \"everything\"\n").unwrap();
 }
 
-/// A city with an open building `lab` and a confidential one `vault`:
-/// run 1 works in `lab` and once names a file in `vault`; run 2 works in
-/// `vault`.
 pub(crate) fn city() -> (tempfile::TempDir, Vec<Vec<u8>>) {
     let dir = tempfile::tempdir().unwrap();
     let written = lines(vec![
@@ -251,8 +243,6 @@ fn a_confidential_line_reaches_no_table() {
     );
 }
 
-/// The question run 1 raises in `lab` and the answer the city writes on
-/// its own run, with no address.
 fn asked_and_answered() -> (Value, Value) {
     let cluster = kernel::ClusterKey {
         class: kernel::ApprovalClass::Question,
@@ -330,7 +320,7 @@ fn a_merge_names_its_landed_commit_beside_the_checkpoints() {
             run(1),
             Some("lab/a"),
             EventKind::PrOpened,
-            json!({"node": "1", "implementer": "lab/a", "branch": "lab-a", "commit": checkpoint}),
+            json!({"node": "1", "project": "lab", "implementer": "lab/a", "branch": "lab-a", "commit": checkpoint}),
         ),
         (
             run(1),
@@ -338,7 +328,7 @@ fn a_merge_names_its_landed_commit_beside_the_checkpoints() {
             EventKind::PrMerged,
             json!({
                 "node": "1", "implementer": "lab/a", "branch": "lab-a",
-                "reviewed_commit": checkpoint, "commit": landed, "verified_by": "lab/b",
+                "project": "lab", "reviewed_commit": checkpoint, "commit": landed, "verified_by": "lab/b",
             }),
         ),
     ]);

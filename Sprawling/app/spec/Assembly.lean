@@ -39,7 +39,7 @@ mod browser_bidi; mod browser_tool; mod keying; mod outside; mod revealing;
 pub struct SystemClock;                                   // 墙钟只在这里取样（确定性规则 2）
 pub fn hands(vault: gateway::Custodian) -> accounting::worker::Hands;  // 生产的手只在这里造
 pub fn init_city(city_root: &Path) -> Result<InitReport, AxError>;     // = form_city(.., Adopt::Nothing)
-pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError>;
+pub fn form_city(city_root: &Path, adopt: Adopt<'_>) -> Result<InitReport, AxError>;
 pub async fn listen(serving: serving::Serving) -> Result<Listening, AxError>;   // §8-88
 impl Listening {
     pub fn local_addr(&self) -> SocketAddr;                // wire D16

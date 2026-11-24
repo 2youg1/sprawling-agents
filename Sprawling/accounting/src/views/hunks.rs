@@ -11,7 +11,9 @@ pub(super) fn hunks_answer(
     oid_b: kernel::GitOid,
     path: &str,
 ) -> wire::Answer {
-    let Ok(patch) = storage::of_file(city_root, oid_a, storage::Head::Commit(oid_b), path) else {
+    let Ok(patch) = storage::ProjectRepository::containing(city_root, oid_a).and_then(|project| {
+        storage::of_file(project.root(), oid_a, storage::Head::Commit(oid_b), path)
+    }) else {
         return super::prepared::unavailable(format!("Hunks({oid_a}..{oid_b} {path})"));
     };
     wire::Answer::Hunks(Box::new(wire::HunksAnswer {

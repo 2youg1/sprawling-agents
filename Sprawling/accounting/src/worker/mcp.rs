@@ -38,6 +38,14 @@ impl crate::Connectors for Residents {
         self.tools(server, write_root, confidential, resolve)
     }
 
+    fn release_root(&self, write_root: &std::path::Path) {
+        let mut keys = self
+            .keys
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        keys.retain(|keyed| keyed.root != write_root);
+    }
+
     fn invalidate(&self, reference: &kernel::SecretRef) {
         let keys = self
             .keys

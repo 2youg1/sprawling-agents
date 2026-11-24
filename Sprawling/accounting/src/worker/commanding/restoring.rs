@@ -38,7 +38,8 @@ impl RunWorker {
             }
         };
 
-        storage::Checkpoint::open(&self.city_root)
+        storage::ProjectRepository::at(&self.city_root, address)
+            .and_then(|project| project.checkpoint())
             .and_then(|checkpoint| checkpoint.restore(address, oid))
             .map_err(storage::StorageError::into_ax)?;
 
@@ -83,7 +84,8 @@ impl RunWorker {
             ));
         }
 
-        let restored = storage::Checkpoint::open(&self.city_root)
+        let restored = storage::ProjectRepository::at(&self.city_root, at)
+            .and_then(|project| project.checkpoint())
             .and_then(|checkpoint| checkpoint.take_back(at, &point))
             .map_err(storage::StorageError::into_ax)?;
         self.record(EventKind::FileRestored, Payload::of(&restored)?)

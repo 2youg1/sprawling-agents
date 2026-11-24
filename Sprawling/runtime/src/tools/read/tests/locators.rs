@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! A Locator is read where the bytes belong: a `cas:` block at the
-//! building it was put for, a `file:` at its address, and a block put
-//! for no building not at all.
-
 use super::*;
 
 fn only_lab() -> ReadBound {
@@ -73,9 +69,6 @@ fn a_cas_block_is_read_at_the_building_it_was_put_for() {
     }
 }
 
-/// A block put for several buildings is read where any of them opens to
-/// the reader, and refused, when none does, with the reason of the first
-/// building it was put for.
 #[test]
 fn a_cas_block_put_for_two_buildings_is_judged_at_the_first_that_opens() {
     let dir = tempfile::tempdir().unwrap();
@@ -123,20 +116,28 @@ fn a_cas_block_put_for_two_buildings_is_judged_at_the_first_that_opens() {
 fn a_file_locator_reads_the_bytes_of_its_commit_under_its_address_bound() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path();
-    git(root, &["init", "-q"]);
+    let project =
+        storage::ProjectRepository::at(root, &kernel::Address::parse("lab").unwrap()).unwrap();
+    std::fs::create_dir_all(project.root()).unwrap();
+    git(project.root(), &["init", "-q"]);
     for building in ["lab", "vault"] {
-        std::fs::create_dir_all(root.join(building)).unwrap();
-        std::fs::write(root.join(building).join("Memo.md"), "at the commit\n").unwrap();
+        std::fs::create_dir_all(project.root().join(building)).unwrap();
+        std::fs::write(
+            project.root().join(building).join("Memo.md"),
+            "at the commit\n",
+        )
+        .unwrap();
     }
-    git(root, &["add", "."]);
-    git(root, &["commit", "-q", "-m", "one"]);
-    let oid = git(root, &["rev-parse", "HEAD"]);
+    git(project.root(), &["add", "."]);
+    git(project.root(), &["commit", "-q", "-m", "one"]);
+    let oid = git(project.root(), &["rev-parse", "HEAD"]);
+    std::fs::create_dir(root.join("lab")).unwrap();
     std::fs::write(root.join("lab").join("Memo.md"), "changed since\n").unwrap();
     let tool = ReadTool::new(
         root,
         Arc::new(Mutex::new(Catalog::new())),
         only_lab(),
-        Path::new("no-store"),
+        &kernel::layout::CityLayout::new(root).cas(),
     )
     .unwrap();
 
@@ -150,8 +151,6 @@ fn a_file_locator_reads_the_bytes_of_its_commit_under_its_address_bound() {
     assert_eq!(err.code(), &AxCode::GateDenied);
 }
 
-/// A malformed Locator is refused in one sentence: the recovery joins
-/// its two source lines with one space, not their indentation.
 #[test]
 fn a_malformed_locator_is_refused_in_one_sentence() {
     let dir = tempfile::tempdir().unwrap();

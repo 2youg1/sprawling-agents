@@ -69,28 +69,32 @@ fn a_torn_tail_is_told_in_the_startup_scan() {
 }
 
 #[test]
-fn a_crash_left_worktree_is_gone_once_the_city_opens() {
+fn opening_a_city_defers_worktree_recovery_until_that_project_runs() {
     let dir = tempfile::tempdir().unwrap();
     crate::worker::fixture::init_city(dir.path()).unwrap();
-    let repo = git2::Repository::init(dir.path()).unwrap();
+    let project =
+        storage::ProjectRepository::at(dir.path(), &kernel::Address::parse("lab").unwrap())
+            .unwrap();
+    let repo = git2::Repository::init(project.root()).unwrap();
     let signature = git2::Signature::now("city", "city@example.invalid").unwrap();
     let tree = repo
         .find_tree(repo.index().unwrap().write_tree().unwrap())
         .unwrap();
     repo.commit(Some("HEAD"), &signature, &signature, "base", &tree, &[])
         .unwrap();
-    let trees = storage::Worktrees::open(dir.path()).unwrap();
+    let trees = storage::Worktrees::open(project.root()).unwrap();
     let name = storage::WorktreeName::parse("run-1").unwrap();
     drop(trees.claim(&name, &[]).unwrap());
 
-    drop(
-        RunWorker::new(
-            dir.path(),
-            runtime::diagnostics::Diagnostics::off(),
-            crate::worker::fixture::hands(),
-        )
-        .unwrap(),
-    );
-
+    let mut worker = RunWorker::new(
+        dir.path(),
+        runtime::diagnostics::Diagnostics::off(),
+        crate::worker::fixture::hands(),
+    )
+    .unwrap();
+    assert_eq!(trees.live().unwrap(), vec![name]);
+    worker
+        .recover_project(&kernel::Address::parse("lab").unwrap())
+        .unwrap();
     assert_eq!(trees.live().unwrap(), Vec::new());
 }

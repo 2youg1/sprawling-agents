@@ -20,6 +20,7 @@ thiserror.workspace = true
 # Checkpoints: git is the restoration authority for tracked files, so
 # the pre-wave commit oid is what a file_discarded points back at.
 git2.workspace = true
+tempfile.workspace = true
 
 # The link count of a file on Windows: std reads it only on the unstable
 # `windows_by_handle` feature, and this crate writes no unsafe
@@ -37,7 +38,6 @@ conformance = ["kernel/conformance"]
 # judged by it wherever its tests run.
 kernel = { workspace = true, features = ["conformance"] }
 proptest.workspace = true
-tempfile.workspace = true
 trybuild.workspace = true
 
 [lints]

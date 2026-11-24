@@ -7,9 +7,6 @@ use super::super::*;
 use crate::worker::fixture::*;
 use crate::worker::*;
 
-/// A building under review lends every run its own tree so that
-/// nothing it produces is the building's until somebody else checks
-/// it. This asks whether the shelf is inside that checkpoint.
 #[test]
 fn a_run_under_review_puts_nothing_on_the_shelf_before_it_is_checked() {
     let dir = tempfile::tempdir().unwrap();
@@ -62,9 +59,6 @@ fn a_run_under_review_puts_nothing_on_the_shelf_before_it_is_checked() {
         "a run under review reached the building's shelf without being checked: {before:?}"
     );
 
-    // The other half of the same rule: checkpointing it must not lose it.
-    // A shelf entry nobody can ever reach is a worse answer than one
-    // that arrived too early.
     let branch = branch_opened(&report.ledger_dir);
     let (base_url, _second) = fake_openai(
         &["m-local"],
@@ -78,7 +72,6 @@ fn a_run_under_review_puts_nothing_on_the_shelf_before_it_is_checked() {
             completion("checked", None),
         ],
     );
-    // The implementer's writer lets go first: a city has one writer.
     drop(worker);
     let mut checker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     checker
@@ -102,7 +95,6 @@ fn a_run_under_review_puts_nothing_on_the_shelf_before_it_is_checked() {
     );
 }
 
-/// The branch a request was opened on, read back from the history.
 fn branch_opened(ledger_dir: &Path) -> String {
     let verified = runtime::replay::verify_ledger_dir(ledger_dir).unwrap();
     let mut found = None;
@@ -124,8 +116,6 @@ fn branch_opened(ledger_dir: &Path) -> String {
 fn work_in_a_review_building_reaches_it_only_after_someone_else_checks_it() {
     let dir = tempfile::tempdir().unwrap();
     let report = crate::worker::fixture::init_city(dir.path()).unwrap();
-    // The building asks for review, so every run works in its own
-    // tree and nothing lands until a second resident says so.
     let building = dir.path().join("lab");
     std::fs::create_dir_all(building.join("room1")).unwrap();
     std::fs::create_dir_all(building.join("room2")).unwrap();
@@ -182,51 +172,68 @@ fn work_in_a_review_building_reaches_it_only_after_someone_else_checks_it() {
         "the implementer's work is invisible to the building until it is merged"
     );
 
-    // A second resident checks it. The same tool, a different run.
-    let branch = {
-        let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
-        let mut found = None;
-        for line in verified.raw_lines() {
-            let record = EventRecord::parse_line(line).unwrap();
-            if record.kind() == EventKind::PrOpened {
-                found = record
-                    .data()
-                    .as_map()
-                    .get("branch")
-                    .and_then(|v| v.as_str())
-                    .map(str::to_owned);
-            }
-        }
-        found.expect("opening a request leaves a record naming the branch")
-    };
-    let (base_url, _second) = fake_openai(
-        &["m-local"],
-        vec![
-            tool_completion(
-                "checking",
-                "tu_3",
-                "pr",
-                serde_json::json!({ "action": "check", "branch": branch, "passed": true }),
-            ),
-            completion("checked", None),
-        ],
-    );
-    // The implementer's writer lets go first: a city has one writer.
-    drop(worker);
-    let mut checker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
-    checker
-        .handle(wire::Command::Dispatch {
-            addr: Address::parse("lab/room2").unwrap(),
-            task: "check the notes".to_owned(),
-            goal: "one check, then stop".to_owned(),
-            policy: kernel::RunPolicy::of(kernel::Mode::Work),
-            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"two"),
-            session: None,
+    let branch = branch_opened(&report.ledger_dir);
+    let project =
+        storage::ProjectRepository::at(dir.path(), &Address::parse("lab").unwrap()).unwrap();
+    let private = git2::Repository::open(project.root()).unwrap();
+    let baseline = private.head().unwrap().peel_to_commit().unwrap();
+    std::fs::write(building.join("independent"), "other run").unwrap();
+    let identity = storage::Provenance::new(
+        RunId::CITY,
+        Address::parse("lab").unwrap(),
+        kernel::B3Hash::digest(b"city"),
+        storage::ModelChoice {
+            id: String::new(),
             effort: None,
-            model: None,
-        })
+        },
+    );
+    project
+        .checkpoint()
+        .unwrap()
+        .land(
+            &["lab".to_owned()],
+            TimeMs::new(3000),
+            &identity,
+            "independent change",
+        )
         .unwrap();
-
+    drop(worker);
+    for pass in [b"first review".as_slice(), b"renewed review".as_slice()] {
+        let (base_url, _provider) = fake_openai(
+            &["m-local"],
+            vec![
+                tool_completion(
+                    "checking",
+                    "tu_3",
+                    "pr",
+                    serde_json::json!({ "action": "check", "branch": branch, "passed": true }),
+                ),
+                completion("checked", None),
+            ],
+        );
+        let mut checker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+        checker
+            .handle(wire::Command::Dispatch {
+                addr: Address::parse("lab/room2").unwrap(),
+                task: "check the notes".to_owned(),
+                goal: "one check, then stop".to_owned(),
+                policy: kernel::RunPolicy::of(kernel::Mode::Work),
+                idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, pass),
+                session: None,
+                effort: None,
+                model: None,
+            })
+            .unwrap();
+        if pass == b"first review" {
+            assert_eq!(std::fs::read_to_string(&note).unwrap(), "before\n");
+            assert_ne!(baseline.id(), private.head().unwrap().target().unwrap());
+            assert_eq!(checker.collaborating.requests.len(), 1);
+        }
+    }
+    assert_eq!(
+        std::fs::read_to_string(building.join("independent")).unwrap(),
+        "other run"
+    );
     assert_eq!(
         std::fs::read_to_string(&note).unwrap(),
         "after\n",
@@ -243,11 +250,6 @@ fn work_in_a_review_building_reaches_it_only_after_someone_else_checks_it() {
     assert!(history.contains("pr_merged"));
 }
 
-/// A commit trailer that claims a person reviewed the work is a false
-/// statement in permanent history. The verifier here is a second
-/// resident, which is what a review building means and is not a person,
-/// so the merge this city makes carries no `Reviewed-by:` line even on a
-/// machine whose git config names somebody.
 #[test]
 fn a_merge_no_person_looked_at_names_no_person_as_its_reviewer() {
     let dir = tempfile::tempdir().unwrap();
@@ -283,11 +285,13 @@ fn a_merge_no_person_looked_at_names_no_person_as_its_reviewer() {
         })
         .unwrap();
 
-    // The city's repository exists once a run has committed in it, and a
-    // person's name in its config is what a reviewer trailer would be
-    // built out of if anything asked for one.
     {
-        let repo = git2::Repository::open(dir.path()).unwrap();
+        let repo = git2::Repository::open(
+            storage::ProjectRepository::at(dir.path(), &Address::parse("lab").unwrap())
+                .unwrap()
+                .root(),
+        )
+        .unwrap();
         let mut config = repo.config().unwrap();
         config.set_str("user.name", "Ada Lovelace").unwrap();
         config.set_str("user.email", "ada@example.org").unwrap();
@@ -306,7 +310,6 @@ fn a_merge_no_person_looked_at_names_no_person_as_its_reviewer() {
             completion("checked", None),
         ],
     );
-    // The implementer's writer lets go first: a city has one writer.
     drop(worker);
     let mut checker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
     checker
@@ -322,7 +325,12 @@ fn a_merge_no_person_looked_at_names_no_person_as_its_reviewer() {
         })
         .unwrap();
 
-    let repo = git2::Repository::open(dir.path()).unwrap();
+    let repo = git2::Repository::open(
+        storage::ProjectRepository::at(dir.path(), &Address::parse("lab").unwrap())
+            .unwrap()
+            .root(),
+    )
+    .unwrap();
     let message = repo
         .head()
         .unwrap()

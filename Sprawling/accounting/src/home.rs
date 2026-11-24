@@ -73,9 +73,78 @@ impl Home {
         self.root.join(CITIES_DIR).join(CITY_DIR)
     }
 
+    pub fn workspace(&self, selected: &Path) -> Result<PathBuf, AxError> {
+        let path = physical(selected)?;
+        let stores = physical(&self.product_dir().join("w"))?;
+        if path.parent() == Some(stores.as_path())
+            && path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| {
+                    name.len() == 32
+                        && name
+                            .bytes()
+                            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+                })
+        {
+            return Ok(path);
+        }
+        if stores.starts_with(&path) || path.starts_with(&stores) {
+            return Err(AxError::failure(
+                AxCode::InvalidArgs,
+                "select a workspace",
+                path.display().to_string(),
+            )
+            .with_recovery("select a project folder outside the private workspace store"));
+        }
+        let id = kernel::B3Hash::digest(path.as_os_str().as_encoded_bytes());
+        let private = stores.join(id.to_string().chars().take(32).collect::<String>());
+        if physical(&private)? != private {
+            return Err(AxError::failure(
+                AxCode::InvalidArgs,
+                "resolve private workspace storage",
+                private.display().to_string(),
+            )
+            .with_recovery(
+                "remove the redirected private workspace entry and open the workspace again",
+            ));
+        }
+        Ok(private)
+    }
+
     fn product_dir(&self) -> PathBuf {
         self.root.join(kernel::RESERVED_PREFIX)
     }
+}
+
+fn physical(path: &Path) -> Result<PathBuf, AxError> {
+    let refused = |err: std::io::Error| {
+        AxError::failure(
+            AxCode::PathNotFound,
+            "resolve the workspace location",
+            format!("{}: {err}", path.display()),
+        )
+        .with_recovery("choose a directory whose parent exists and is readable")
+    };
+    let absolute = std::path::absolute(path).map_err(refused)?;
+    let mut missing = Vec::new();
+    for ancestor in absolute.ancestors() {
+        match std::fs::canonicalize(ancestor) {
+            Ok(mut found) => {
+                found.extend(missing.into_iter().rev());
+                return Ok(found);
+            }
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                if let Some(name) = ancestor.file_name() {
+                    missing.push(name);
+                } else {
+                    return Err(refused(err));
+                }
+            }
+            Err(err) => return Err(refused(err)),
+        }
+    }
+    Err(refused(std::io::ErrorKind::NotFound.into()))
 }
 
 #[cfg(test)]

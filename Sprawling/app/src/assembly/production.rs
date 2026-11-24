@@ -72,7 +72,7 @@ pub fn init_city(city_root: &Path) -> Result<InitReport, AxError> {
     form_city(city_root, Adopt::Nothing)
 }
 
-pub fn form_city(city_root: &Path, adopt: Adopt) -> Result<InitReport, AxError> {
+pub fn form_city(city_root: &Path, adopt: Adopt<'_>) -> Result<InitReport, AxError> {
     let (vault, _notice) = crate::serving::open_vault();
     form(city_root, adopt, hands(vault))
 }

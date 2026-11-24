@@ -268,7 +268,9 @@ fn fly_here(worker: &mut RunWorker, room: &str) -> (Flown, bool) {
 }
 
 fn stock_is_ready(city_root: &Path) -> bool {
-    let Ok(repo) = git2::Repository::open(city_root) else {
+    let project =
+        storage::ProjectRepository::at(city_root, &kernel::Address::parse("lab").unwrap()).unwrap();
+    let Ok(repo) = git2::Repository::open(project.root()) else {
         return false;
     };
     let Ok(tree) = repo.find_worktree("+spare") else {

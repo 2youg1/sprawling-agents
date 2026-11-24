@@ -194,7 +194,7 @@ fn a_building_created_from_the_control_surface_is_read_back_by_the_city() {
     );
 }
 
-fn created_line(ledger_dir: &std::path::Path, addr: &str) -> serde_json::Value {
+pub(super) fn created_line(ledger_dir: &std::path::Path, addr: &str) -> serde_json::Value {
     runtime::replay::verify_ledger_dir(ledger_dir)
         .unwrap()
         .raw_lines()
@@ -246,43 +246,6 @@ fn a_folder_raised_from_the_control_surface_is_adopted_and_its_files_kept() {
             .policy()
             .confidential
     );
-}
-
-#[test]
-fn an_absolute_host_folder_is_copied_into_a_building_without_moving_the_source() {
-    let city_dir = tempfile::tempdir().unwrap();
-    let source = tempfile::tempdir().unwrap();
-    let report = init_city(city_dir.path()).unwrap();
-    std::fs::create_dir_all(source.path().join("src")).unwrap();
-    std::fs::write(source.path().join("src/main.rs"), "fn main() {}\n").unwrap();
-    let mut worker = RunWorker::new(
-        city_dir.path(),
-        runtime::diagnostics::Diagnostics::off(),
-        hands(),
-    )
-    .unwrap();
-
-    worker
-        .handle(wire::Command::CreateBuilding {
-            addr: Address::parse("imported").unwrap(),
-            template: wire::TemplateName::parse("minimal").unwrap(),
-            rules: None,
-            source: Some(source.path().to_string_lossy().into_owned()),
-            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"import"),
-        })
-        .unwrap();
-
-    assert_eq!(
-        std::fs::read_to_string(city_dir.path().join("imported/src/main.rs")).unwrap(),
-        "fn main() {}\n"
-    );
-    assert_eq!(
-        std::fs::read_to_string(source.path().join("src/main.rs")).unwrap(),
-        "fn main() {}\n"
-    );
-    let line = created_line(&report.ledger_dir, "imported");
-    assert_eq!(line["data"]["adopted"], serde_json::json!(true));
-    assert!(line["data"].get("source").is_none());
 }
 
 #[test]
@@ -439,7 +402,15 @@ fn a_folder_somebody_already_works_in_becomes_a_city_around_that_work() {
     std::fs::create_dir_all(dir.path().join("notes")).unwrap();
     std::fs::write(dir.path().join("README.md"), "# my work\n").unwrap();
 
-    let report = crate::worker::genesis::form(dir.path(), Adopt::EveryFolder, hands()).unwrap();
+    let report = crate::worker::genesis::form(
+        dir.path(),
+        Adopt::Named(&[
+            Address::parse("parser").unwrap(),
+            Address::parse("notes").unwrap(),
+        ]),
+        hands(),
+    )
+    .unwrap();
     let city::Standing::Work { adoptable, loose } = &report.standing else {
         panic!("a folder with work in it is not an empty one");
     };
@@ -465,7 +436,15 @@ fn a_folder_somebody_already_works_in_becomes_a_city_around_that_work() {
         assert!(city::load(dir.path(), &addr).is_ok());
     }
 
-    let err = crate::worker::genesis::form(dir.path(), Adopt::EveryFolder, hands()).unwrap_err();
+    let err = crate::worker::genesis::form(
+        dir.path(),
+        Adopt::Named(&[
+            Address::parse("parser").unwrap(),
+            Address::parse("notes").unwrap(),
+        ]),
+        hands(),
+    )
+    .unwrap_err();
     assert_eq!(err.code(), &AxCode::ConfigInvalid);
 }
 

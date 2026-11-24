@@ -14,6 +14,7 @@ use super::name::WorktreeName;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorktreeLease {
+    pub(crate) owner: PathBuf,
     pub(crate) name: WorktreeName,
     pub(crate) path: PathBuf,
     pub(crate) disk: ByteLen,
@@ -32,6 +33,11 @@ pub struct FileWork {
 }
 
 impl WorktreeLease {
+    #[must_use]
+    pub fn owner(&self) -> &Path {
+        &self.owner
+    }
+
     #[must_use]
     pub fn name(&self) -> &WorktreeName {
         &self.name

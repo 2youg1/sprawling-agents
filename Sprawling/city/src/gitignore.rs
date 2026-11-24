@@ -22,11 +22,11 @@ fn block() -> Vec<String> {
         "# was thinking is not.".to_owned(),
         ROADMAP_FILE.to_owned(),
         MEMO_FILE.to_owned(),
-        HANDOFF_FILE.to_owned(),
+        format!("!{HANDOFF_FILE}"),
         JOB_FILE.to_owned(),
         URBANITE_FILE.to_owned(),
         format!("{RUN_ID_PATTERN}.{TRANSCRIPT_EXT}"),
-        format!("/{ARCHIVE_DIR}/"),
+        format!("!/{ARCHIVE_DIR}/"),
         format!("!{SPEC_FILE}"),
         format!("{RESERVED_PREFIX}/"),
         format!("!/{RESERVED_PREFIX}/"),
@@ -90,7 +90,10 @@ fn append_missing(path: &Path, rules: &[String]) -> Result<(), AxError> {
 }
 
 pub(crate) fn seal_room(room: &Path) -> Result<(), AxError> {
-    crate::document::replace(&room.join(GITIGNORE_FILE), b"*\n")
+    crate::document::replace(
+        &room.join(GITIGNORE_FILE),
+        format!("*\n!{HANDOFF_FILE}\n").as_bytes(),
+    )
 }
 
 fn storage(path: &Path, err: &std::io::Error) -> AxError {

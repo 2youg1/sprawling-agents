@@ -12,6 +12,95 @@ use crate::error::StorageError;
 
 use super::trees::Worktrees;
 
+pub(super) const PENDING: &str = "refs/sprawling/pending";
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum LandingRecord {
+    Absent,
+    Completed,
+    Reviewed,
+}
+
+impl Worktrees {
+    pub fn reconcile_landing(
+        &self,
+        recorded: impl FnOnce(kernel::GitOid) -> Result<LandingRecord, kernel::AxError>,
+    ) -> Result<(), StorageError> {
+        let _moving = crate::checkpoint::opening::moving_head(self.repo.path())?;
+        let pending = match self.repo.find_reference(PENDING) {
+            Ok(reference) => reference,
+            Err(err) if err.code() == git2::ErrorCode::NotFound => return Ok(()),
+            Err(err) => return Err(landing_error(err)),
+        };
+        let oid = pending.peel_to_commit().map_err(landing_error)?.id();
+        let point = kernel::GitOid::parse(&oid.to_string()).ok_or_else(|| {
+            landing_error(git2::Error::from_str("invalid pending merge identifier"))
+        })?;
+        match recorded(point).map_err(|source| StorageError::Draft { source })? {
+            LandingRecord::Absent => self
+                .repo
+                .find_reference(PENDING)
+                .and_then(|mut reference| reference.delete())
+                .map_err(landing_error),
+            state => self.complete_landing(oid, state == LandingRecord::Reviewed),
+        }
+    }
+
+    pub(super) fn complete_landing(
+        &self,
+        oid: git2::Oid,
+        reviewed: bool,
+    ) -> Result<(), StorageError> {
+        let repo = &self.repo;
+        let merge = repo.find_commit(oid).map_err(landing_error)?;
+        let base = merge.parent_id(0).map_err(landing_error)?;
+        let head = repo.head().map_err(landing_error)?;
+        let current = head.peel_to_commit().map_err(landing_error)?.id();
+        if current == base {
+            let tree = merge.tree().map_err(landing_error)?;
+            check_out(repo, &tree, CheckoutRun::Write)?;
+            repo.reference_matching(
+                head.name().map_err(landing_error)?,
+                oid,
+                true,
+                base,
+                "complete project landing",
+            )
+            .map_err(landing_error)?;
+        } else if current != oid
+            && !repo
+                .graph_descendant_of(current, oid)
+                .map_err(landing_error)?
+        {
+            return Err(StorageError::MergeStale {
+                name: head.name().map_err(landing_error)?.to_owned(),
+                detail: format!(
+                    "the recorded merge {oid} expects {base}, but the project is at {current}"
+                ),
+            });
+        }
+        if reviewed {
+            repo.reference(
+                &format!("refs/sprawling/reviewed/{oid}"),
+                oid,
+                true,
+                "pin the reviewed merge",
+            )
+            .map_err(landing_error)?;
+        }
+        repo.find_reference(PENDING)
+            .and_then(|mut pending| pending.delete())
+            .map_err(landing_error)
+    }
+}
+
+fn landing_error(err: git2::Error) -> StorageError {
+    StorageError::Worktree {
+        op: "finish the recorded project landing",
+        detail: err.to_string(),
+    }
+}
+
 pub struct Landing<'a> {
     pub t: TimeMs,
     pub of: &'a Provenance,
@@ -41,9 +130,74 @@ impl Landing<'_> {
     }
 }
 
+pub enum ReviewPlan<'a> {
+    Ready(PlannedMerge<'a>),
+    Renewed(kernel::GitOid),
+    Conflicted,
+}
+
+impl Worktrees {
+    pub fn prepare_review(
+        &self,
+        name: &super::name::WorktreeName,
+        point: &kernel::GitOid,
+    ) -> Result<ReviewPlan<'_>, StorageError> {
+        match self.plan_reviewed(name, point) {
+            Ok(plan) => return Ok(ReviewPlan::Ready(plan)),
+            Err(StorageError::MergeStale { .. }) => {}
+            Err(error) => return Err(error),
+        };
+        let offered = self.commit_at(point)?;
+        let trunk = self
+            .repo
+            .head()
+            .and_then(|head| head.peel_to_commit())
+            .map_err(landing_error)?;
+        let mut index = self
+            .repo
+            .merge_commits(&trunk, &offered, None)
+            .map_err(landing_error)?;
+        if index.has_conflicts() {
+            return Ok(ReviewPlan::Conflicted);
+        }
+        let tree = self
+            .repo
+            .find_tree(index.write_tree_to(&self.repo).map_err(landing_error)?)
+            .map_err(landing_error)?;
+        let renewed = self
+            .repo
+            .commit(
+                None,
+                &offered.author(),
+                &offered.committer(),
+                offered.message().map_err(landing_error)?,
+                &tree,
+                &[&trunk, &offered],
+            )
+            .map_err(landing_error)?;
+        self.repo
+            .reference(
+                &format!("refs/sprawling/reviews/{renewed}"),
+                renewed,
+                true,
+                "pin the renewed review candidate",
+            )
+            .map_err(landing_error)?;
+        kernel::GitOid::parse(&renewed.to_string())
+            .map(ReviewPlan::Renewed)
+            .ok_or_else(|| {
+                landing_error(git2::Error::from_str("invalid renewed review identifier"))
+            })
+    }
+}
+
 pub struct PlannedMerge<'a> {
     pub(super) trees: &'a Worktrees,
+    pub(super) trunk: String,
+    pub(super) base: git2::Oid,
     pub(super) target: git2::Oid,
+    pub(super) tree: git2::Oid,
+    pub(super) reviewed: bool,
 }
 
 impl std::fmt::Debug for PlannedMerge<'_> {
@@ -59,8 +213,16 @@ impl PlannedMerge<'_> {
         self.target.to_string()
     }
 
-    pub fn apply(self, landing: &Landing<'_>) -> Result<(), StorageError> {
-        self.trees.land_merge(self.target, landing)
+    pub fn apply(self, landing: &Landing<'_>) -> Result<String, StorageError> {
+        self.before_landing(landing, |_| Ok(()))
+    }
+
+    pub fn before_landing(
+        self,
+        landing: &Landing<'_>,
+        record: impl FnOnce(String) -> Result<(), kernel::AxError>,
+    ) -> Result<String, StorageError> {
+        self.trees.land_merge(&self, landing, record)
     }
 }
 

@@ -54,7 +54,18 @@ fn read_admitted(
             range: None,
         } => {
             admit(address.as_str(), action, bound)?;
-            storage::blob_at(&reader.city_root, *oid, address)
+            let city =
+                kernel::layout::CityLayout::of_cas(&reader.block_store).ok_or_else(|| {
+                    AxError::failure(
+                        AxCode::ConfigInvalid,
+                        action,
+                        reader.block_store.display().to_string(),
+                    )
+                    .with_recovery("supply the active private city’s CAS directory")
+                })?;
+            let project = storage::ProjectRepository::at(city.root(), address)
+                .map_err(StorageError::into_ax)?;
+            storage::blob_at(project.root(), *oid, address)
                 .map_err(StorageError::into_ax)?
                 .ok_or_else(|| {
                     AxError::failure(

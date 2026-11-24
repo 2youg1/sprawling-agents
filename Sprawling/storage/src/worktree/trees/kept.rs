@@ -32,13 +32,19 @@ impl Worktrees {
             Err(err) if err.code() == git2::ErrorCode::NotFound => return Ok(()),
             Err(err) => return Err(refuse("open the city repository", err)),
         };
-        let names = repo
+        let trees = Worktrees::over(repo, city_root);
+        let names = trees
+            .repo
             .worktrees()
             .map_err(|err| refuse("list worktrees", err))?;
         for name in names.iter().flatten().flatten() {
-            let tree = repo
+            let tree = trees
+                .repo
                 .find_worktree(name)
                 .map_err(|err| refuse("find a worktree", err))?;
+            if !trees.owns_registration(&tree, name) {
+                continue;
+            }
             let lock = tree
                 .is_locked()
                 .map_err(|err| refuse("read a worktree lock", err))?;
@@ -92,6 +98,7 @@ impl Worktrees {
             })?;
         let weight = measure(tree.path())?;
         Ok(WorktreeLease {
+            owner: self.city_root.clone(),
             name: name.clone(),
             path: tree.path().to_path_buf(),
             disk: weight.bytes,
@@ -236,7 +243,6 @@ mod tests {
             let dir = tempfile::tempdir().unwrap();
             let trees = bulk_city(dir.path(), files);
             let scope = ["bulk".to_owned()];
-            let city = entries(dir.path());
 
             let placed = trees.claim(&name("node-1"), &scope).unwrap();
             let tree = placed.path().to_path_buf();
@@ -246,7 +252,7 @@ mod tests {
                     created: files,
                     rewritten: 0,
                     removed: 0,
-                    walked: city,
+                    walked: 0,
                 },
                 "a placement at {files} files"
             );

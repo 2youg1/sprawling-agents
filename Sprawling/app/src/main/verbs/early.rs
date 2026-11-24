@@ -4,8 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use super::Need::{Optional, Required};
-use super::Takes::Nothing;
-use super::{AfterDashes, Effect, JSON, MEI_REPLAY, Row, SERVED, Verb, flag};
+use super::{AfterDashes, Effect, JSON, MEI_REPLAY, Row, SERVED, Verb};
 
 pub(super) const MEI: Row = Row {
     verb: Verb::Mei,
@@ -111,11 +110,7 @@ pub(super) const INIT: Row = Row {
     name: "init",
     aliases: &[],
     positionals: &[("city", Required)],
-    flags: &[flag(
-        "--adopt",
-        Nothing,
-        "every folder already there becomes a building",
-    )],
+    flags: &[],
     says: "raise a city: writes the genesis record",
     effect: Effect::Changes,
     after_dashes: AfterDashes::Refused,

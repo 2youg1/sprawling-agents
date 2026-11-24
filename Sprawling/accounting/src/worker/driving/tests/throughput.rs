@@ -83,7 +83,7 @@ struct Taken {
 #[test]
 fn throughput_counts() {
     let runs = 4;
-    let taken = scenario(runs, Latency::Zero);
+    let taken = scenario(runs, Latency::Zero, &["lab"]);
     let count = |kind: &str| {
         taken
             .lines
@@ -103,6 +103,38 @@ fn throughput_counts() {
 }
 
 #[test]
+fn concurrent_runs_from_two_projects_finish_in_their_own_trees() {
+    let projects = ["mobile", "services"];
+    let taken = scenario(4, Latency::Zero, &projects);
+    for project in projects {
+        let runs: std::collections::BTreeSet<_> = taken
+            .lines
+            .iter()
+            .filter(|event| {
+                event["kind"] == "worktree_opened"
+                    && event["addr"]
+                        .as_str()
+                        .is_some_and(|at| at.split('/').next() == Some(project))
+            })
+            .map(|event| event["run"].as_str().unwrap())
+            .collect();
+        assert_eq!(runs.len(), 2);
+        let kind_count = |kind: &str| {
+            taken
+                .lines
+                .iter()
+                .filter(|event| {
+                    event["kind"] == kind
+                        && event["run"].as_str().is_some_and(|run| runs.contains(run))
+                })
+                .count()
+        };
+        assert_eq!(kind_count("run_frozen"), 2);
+        assert_eq!(kind_count("tool_result"), 2 * TOOL_CALLS);
+    }
+}
+
+#[test]
 #[ignore = "a wall-clock instrument; just bench runs it"]
 fn instrument_throughput() {
     let idle = relay_idle();
@@ -110,7 +142,7 @@ fn instrument_throughput() {
         arm.name().to_owned()
     }) {
         for runs in chosen("SPRAWLING_TP1_RUNS", &RUN_COUNTS, usize::to_string) {
-            let taken = scenario(runs, latency);
+            let taken = scenario(runs, latency, &["lab"]);
             let head = format!("n_runs={runs} latency={}", latency.name());
             println!("{}", throughput_line(&head, &taken));
             for (wait, samples) in waits(&taken, &idle) {
@@ -120,9 +152,9 @@ fn instrument_throughput() {
     }
 }
 
-fn scenario(runs: usize, latency: Latency) -> Taken {
+fn scenario(runs: usize, latency: Latency, projects: &[&str]) -> Taken {
     let dir = tempfile::tempdir().unwrap();
-    raise_rooms(dir.path(), runs);
+    raise_rooms(dir.path(), runs, projects);
     let calls = Arc::new(AtomicUsize::new(0));
     let pace: Pace = Arc::new(move |request: &str| {
         if request.starts_with("POST ") {
@@ -151,19 +183,27 @@ fn scenario(runs: usize, latency: Latency) -> Taken {
     let idle_before = health.idle_us();
     let posted_ms = crate::Clock::now(&WallClock).unwrap().value();
     let started = Instant::now();
+    let (refused, refusals) = std::sync::mpsc::channel();
     for room in 0..runs {
+        let refused = refused.clone();
         desk.post(
             dispatch(
-                &format!("lab/r{room:02}"),
+                &format!("{}/r{room:02}", projects[room % projects.len()]),
                 &task(room),
                 task(room).as_bytes(),
             ),
-            wire::Reply::nowhere(),
+            wire::Reply::to(move |error| {
+                if refused.send(error).is_ok() {
+                    wire::Delivered::ToThePeer
+                } else {
+                    wire::Delivered::PeerGone
+                }
+            }),
         );
     }
     let done = Arc::new(AtomicBool::new(false));
     let sampler = sample_relay(relay, Arc::clone(&done));
-    let lines = until_frozen(dir.path(), runs);
+    let lines = until_frozen(dir.path(), runs, &refusals);
     let wall = started.elapsed();
     let idle_us = health.idle_us().saturating_sub(idle_before);
     let relay_queue = health
@@ -213,12 +253,18 @@ fn script(room: usize) -> Vec<String> {
         .collect()
 }
 
-fn raise_rooms(root: &std::path::Path, runs: usize) {
+fn raise_rooms(root: &std::path::Path, runs: usize, projects: &[&str]) {
     init_city(root).unwrap();
     for room in 0..runs {
-        std::fs::create_dir_all(root.join("lab").join(format!("r{room:02}"))).unwrap();
+        std::fs::create_dir_all(
+            root.join(projects[room % projects.len()])
+                .join(format!("r{room:02}")),
+        )
+        .unwrap();
     }
-    lay_rules(root, "lab", &ordinary_rules(""));
+    for project in projects {
+        lay_rules(root, project, &ordinary_rules(""));
+    }
 }
 
 fn sample_relay(mut relay: Relay, done: Arc<AtomicBool>) -> std::thread::JoinHandle<Vec<Duration>> {
@@ -237,7 +283,7 @@ fn sample_relay(mut relay: Relay, done: Arc<AtomicBool>) -> std::thread::JoinHan
 
 fn relay_idle() -> Vec<Duration> {
     let dir = tempfile::tempdir().unwrap();
-    raise_rooms(dir.path(), 1);
+    raise_rooms(dir.path(), 1, &["lab"]);
     let (base_url, provider) = fake_openai_paced(
         &["m-local"],
         Vec::new(),
@@ -270,9 +316,16 @@ fn history(root: &std::path::Path) -> Vec<serde_json::Value> {
         .collect()
 }
 
-fn until_frozen(root: &std::path::Path, runs: usize) -> Vec<serde_json::Value> {
+fn until_frozen(
+    root: &std::path::Path,
+    runs: usize,
+    refusals: &std::sync::mpsc::Receiver<kernel::AxError>,
+) -> Vec<serde_json::Value> {
     let started = Instant::now();
     loop {
+        if let Ok(error) = refusals.try_recv() {
+            panic!("dispatch refused: {error}");
+        }
         let lines = history(root);
         if lines
             .iter()

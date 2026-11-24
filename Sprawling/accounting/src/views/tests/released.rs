@@ -6,13 +6,15 @@
 use crate::views::Views;
 use kernel::Address;
 
-/// The fold takes the same lock a reader does, so a reader that ran
-/// `git status` under it held every event behind that walk of the disk:
-/// a file written between `prepare` and `finish` is one the answer shows.
 #[test]
 fn a_git_status_reader_does_not_hold_the_views_while_git_reads_the_disk() {
     let dir = tempfile::tempdir().unwrap();
-    git2::Repository::init(dir.path()).unwrap();
+    git2::Repository::init(
+        storage::ProjectRepository::at(dir.path(), &Address::parse("lab").unwrap())
+            .unwrap()
+            .root(),
+    )
+    .unwrap();
     let lab = dir.path().join("lab");
     std::fs::create_dir(&lab).unwrap();
     std::fs::write(lab.join("before.txt"), "x").unwrap();
@@ -28,9 +30,6 @@ fn a_git_status_reader_does_not_hold_the_views_while_git_reads_the_disk() {
     assert_eq!(read, views.answer(&query));
 }
 
-/// The configuration ladder is read after the views are released, and
-/// the release page is not asked for under them: `prepare` leaves both
-/// reads to `finish`.
 #[test]
 fn the_config_ladder_and_the_release_page_are_read_after_the_views_are_released() {
     let dir = tempfile::tempdir().unwrap();
@@ -60,8 +59,6 @@ effort = \"low\"
     ));
 }
 
-/// A page that opens a file or lists a directory reads the tree after
-/// the views are released, so it shows the tree as it is at `finish`.
 #[test]
 fn the_tree_a_page_reads_is_read_after_the_views_are_released() {
     let dir = tempfile::tempdir().unwrap();
@@ -71,9 +68,6 @@ fn the_tree_a_page_reads_is_read_after_the_views_are_released() {
     let listing = views.prepare(&wire::Query::Listing { at: None });
     std::fs::write(dir.path().join("notes"), "written after the lock").unwrap();
 
-    // The listing finishes first: reading the document keeps its version
-    // in the city's content store under `.sprawling`, which a listing of
-    // the root then shows.
     let listed = listing.finish();
     assert_eq!(
         (document.finish(), listed),
@@ -105,8 +99,6 @@ fn the_tree_a_page_reads_is_read_after_the_views_are_released() {
     );
 }
 
-/// The building page walks the building's directory after the views are
-/// released; only its plan, folded and cached, is read under them.
 #[test]
 fn the_building_page_reads_its_directory_after_the_views_are_released() {
     let dir = tempfile::tempdir().unwrap();
@@ -122,9 +114,6 @@ fn the_building_page_reads_its_directory_after_the_views_are_released() {
     assert_eq!(answer, views.answer(&query));
 }
 
-/// The city page lists the buildings and reads their plans after the
-/// views are released: a building raised between `prepare` and `finish`
-/// is one the answer shows, and its plan is the one on disk then.
 #[test]
 fn the_city_page_lists_its_buildings_and_reads_their_plans_after_the_views_are_released() {
     let dir = tempfile::tempdir().unwrap();
@@ -153,8 +142,6 @@ fn the_city_page_lists_its_buildings_and_reads_their_plans_after_the_views_are_r
     assert_eq!(read, views.prepare(&wire::Query::CityView).finish());
 }
 
-/// A top-level folder nobody has drawn rules over is listed with the
-/// buildings and said to be adoptable; a building with rules is not.
 #[test]
 fn the_city_page_says_which_folders_are_waiting_to_be_adopted() {
     let dir = tempfile::tempdir().unwrap();
@@ -180,8 +167,6 @@ fn the_city_page_says_which_folders_are_waiting_to_be_adopted() {
     );
 }
 
-/// The rules a template would lay a building out with, read before the
-/// building exists; a room has none.
 #[test]
 fn a_template_is_read_for_an_address_before_anything_is_raised() {
     let dir = tempfile::tempdir().unwrap();
@@ -214,16 +199,19 @@ fn a_template_is_read_for_an_address_before_anything_is_raised() {
     ));
 }
 
-/// A change list, a patch, a stored object and an archive search read the
-/// disk after the views are released: a city that appears between
-/// `prepare` and `finish` is the one each of them reports.
 #[test]
 fn git_store_and_archive_readers_read_after_the_views_are_released() {
     let tmp = tempfile::tempdir().unwrap();
     let (staged, root) = (tmp.path().join("staged"), tmp.path().join("city"));
     let lab = Address::parse("lab").unwrap();
     std::fs::create_dir_all(staged.join("lab")).unwrap();
-    let repo = git2::Repository::init(&staged).unwrap();
+    let repo = git2::Repository::init(
+        storage::ProjectRepository::at(&staged, &lab)
+            .unwrap()
+            .root(),
+    )
+    .unwrap();
+    repo.set_workdir(&staged, false).unwrap();
     let signature = git2::Signature::now("city", "city@localhost").unwrap();
     let commit = |text: &str| {
         std::fs::write(staged.join("lab/lex.rs"), text).unwrap();
@@ -278,8 +266,6 @@ fn git_store_and_archive_readers_read_after_the_views_are_released() {
     ];
     let mut views = Views::new(&root);
     let prepared: Vec<_> = queries.iter().map(|query| views.prepare(query)).collect();
-    // Opening the store makes its directory, so a read done under the
-    // lock leaves a directory behind for the city to replace.
     if root.exists() {
         std::fs::remove_dir_all(&root).unwrap();
     }
@@ -299,9 +285,6 @@ fn git_store_and_archive_readers_read_after_the_views_are_released() {
     );
 }
 
-/// The skills page scans the shelves, and the vital signs count the
-/// buildings, after the views are released: a building raised between
-/// `prepare` and `finish` is one each of them sees.
 #[test]
 fn the_shelves_and_the_building_count_are_read_after_the_views_are_released() {
     let dir = tempfile::tempdir().unwrap();

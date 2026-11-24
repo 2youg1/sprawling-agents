@@ -245,11 +245,23 @@ impl CommitsAsk {
 }
 
 fn give_git_facts(city_root: &std::path::Path, commits: &mut [wire::CommitAnswer]) {
-    give_parents(city_root, commits);
-    give_messages(city_root, commits);
+    let mut groups =
+        std::collections::BTreeMap::<std::path::PathBuf, Vec<&mut wire::CommitAnswer>>::new();
+    for commit in commits {
+        if let Ok(project) = storage::ProjectRepository::at(city_root, &commit.actor) {
+            groups
+                .entry(project.root().to_path_buf())
+                .or_default()
+                .push(commit);
+        }
+    }
+    for (root, mut group) in groups {
+        give_parents(&root, &mut group);
+        give_messages(&root, &mut group);
+    }
 }
 
-fn give_messages(city_root: &std::path::Path, commits: &mut [wire::CommitAnswer]) {
+fn give_messages(city_root: &std::path::Path, commits: &mut [&mut wire::CommitAnswer]) {
     let Ok(repository) = git2::Repository::open(city_root) else {
         return;
     };
@@ -266,7 +278,7 @@ fn give_messages(city_root: &std::path::Path, commits: &mut [wire::CommitAnswer]
     }
 }
 
-fn give_parents(city_root: &std::path::Path, commits: &mut [wire::CommitAnswer]) {
+fn give_parents(city_root: &std::path::Path, commits: &mut [&mut wire::CommitAnswer]) {
     let oids: Vec<GitOid> = commits.iter().map(|commit| commit.oid).collect();
     let Ok(parents) = storage::parents_of(city_root, &oids) else {
         return;

@@ -30,6 +30,7 @@ pub trait Connectors {
     /// Drops every resident connection whose declaration carries
     /// `reference`, so the next `connect` redeems the reference again.
     fn invalidate(&self, reference: &kernel::SecretRef);
+    fn release_root(&self, write_root: &std::path::Path);
 }
 
 pub enum Reached {

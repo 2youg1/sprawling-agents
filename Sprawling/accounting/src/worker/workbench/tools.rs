@@ -127,7 +127,7 @@ impl Laying {
             .with_checkpoint(runtime::bench::CheckpointNet {
                 checkpoint: self.open_checkpoint(
                     &site.write_root,
-                    of.run(),
+                    &of,
                     site.rules.checkpoint_entropy_allow().clone(),
                 )?,
                 scope,

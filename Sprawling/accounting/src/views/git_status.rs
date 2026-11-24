@@ -32,11 +32,9 @@ impl Views {
 
 impl GitStatusAsk {
     pub(super) fn read(self) -> wire::Answer {
-        let Ok(status) = storage::working_status(
-            &self.city_root,
-            Some(self.building.as_str()),
-            self.checkpoint.as_ref().map(|commit| commit.oid),
-        ) else {
+        let Ok(status) = storage::ProjectRepository::at(&self.city_root, &self.building)
+            .and_then(|project| project.status(self.checkpoint.as_ref().map(|commit| commit.oid)))
+        else {
             return super::prepared::unavailable(format!("GitStatus({})", self.building.as_str()));
         };
         wire::Answer::GitStatus(Box::new(wire::GitStatusAnswer {

@@ -8,6 +8,7 @@ use super::*;
 fn request(branch: &str, implementer: &str) -> OpenRequest {
     OpenRequest {
         node: NodeId::parse(branch).unwrap(),
+        project: kernel::Address::parse("lab").unwrap(),
         implementer: implementer.to_owned(),
         branch: branch.to_owned(),
         commit: "0123456789abcdef0123456789abcdef01234567".to_owned(),
@@ -151,8 +152,6 @@ fn listing_says_which_ones_are_yours() {
     assert_eq!(mine, vec![true, false]);
 }
 
-/// Two commits, two keys: what a verifier read and what the trunk now
-/// carries are different facts, and a merged line says both.
 #[test]
 fn a_merged_line_keeps_the_commit_that_was_reviewed_beside_the_one_that_landed() {
     let opened = request("tree-a", "lab/room1");
@@ -168,8 +167,6 @@ fn a_merged_line_keeps_the_commit_that_was_reviewed_beside_the_one_that_landed()
     assert_eq!(read.commit, "fedcba9876543210fedcba9876543210fedcba98");
     assert_eq!(read.verified_by, "lab/room2");
 
-    // A line written before `reviewed_commit` existed reads as absent
-    // rather than as a broken record.
     let mut older = payload.as_map().clone();
     older.remove("reviewed_commit");
     let old = Payload::new(older)

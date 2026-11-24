@@ -25,6 +25,26 @@ pub(super) struct Arguments {
 }
 
 impl Arguments {
+    pub(super) fn resolve_city(&mut self, verb: Verb) -> Result<(), kernel::AxError> {
+        let Some(row) = super::verbs::row(verb) else {
+            return Ok(());
+        };
+        for ((name, _), given) in row.positionals.iter().zip(&mut self.positionals) {
+            if *name == "city" {
+                let private = super::router::private_city(std::path::Path::new(given))?;
+                *given = private.into_os_string().into_string().map_err(|path| {
+                    kernel::AxError::failure(
+                        kernel::AxCode::InvalidArgs,
+                        "encode the private city path",
+                        path.to_string_lossy(),
+                    )
+                    .with_recovery("select a home directory whose name is valid Unicode")
+                })?;
+            }
+        }
+        Ok(())
+    }
+
     pub(super) fn positional(&self, nth: usize) -> Option<&String> {
         self.positionals.get(nth.checked_sub(1)?)
     }

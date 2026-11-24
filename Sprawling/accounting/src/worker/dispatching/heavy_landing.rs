@@ -39,9 +39,14 @@ impl HeavyLanding {
         }
         driven.checkpointed.first().map(|base| Swept {
             base: base.clone(),
-            discarded: storage::Checkpoint::open(&site.write_root)
-                .and_then(|mut checkpoint| checkpoint.wave_post(base))
-                .map_err(storage::StorageError::into_ax),
+            discarded: storage::ProjectRepository::run_checkpoint(
+                &self.city_root,
+                &site.write_root,
+                site.run_id,
+                &at.addr,
+            )
+            .and_then(|mut checkpoint| checkpoint.wave_post(base))
+            .map_err(storage::StorageError::into_ax),
         })
     }
 

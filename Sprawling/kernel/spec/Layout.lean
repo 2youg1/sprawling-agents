@@ -63,6 +63,7 @@ impl CityLayout {
     pub fn playback_exports(&self) -> PathBuf;                  // root/.sprawling/playback
     pub fn monitor(&self) -> PathBuf;                           // root/.sprawling/MONITOR.toml
     pub fn city_address(&self) -> Option<Address>;             // 城自己的名字：根目录名，能拼成地址时
+    pub fn of_cas(dir: &Path) -> Option<CityLayout>;
     pub fn of_ledger(dir: &Path) -> Option<CityLayout>;         // ledger() 的逆：从账本目录取回城根
 }
 ```

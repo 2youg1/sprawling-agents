@@ -42,7 +42,6 @@ pub(super) fn name(raw: &str) -> WorktreeName {
     WorktreeName::parse(raw).unwrap()
 }
 
-/// A city of `files` small files under `bulk/`, committed.
 pub(crate) fn bulk_city(dir: &Path, files: u64) -> Worktrees {
     let bulk = dir.join("bulk");
     std::fs::create_dir_all(&bulk).unwrap();
@@ -56,7 +55,6 @@ pub(crate) fn bulk_city(dir: &Path, files: u64) -> Worktrees {
     Worktrees::open(dir).unwrap()
 }
 
-/// How many entries a directory and its `bulk/` hold between them.
 pub(crate) fn entries(root: &Path) -> u64 {
     let count = |dir: &Path| u64::try_from(std::fs::read_dir(dir).unwrap().count()).unwrap();
     count(root) + count(&root.join("bulk"))
@@ -94,9 +92,6 @@ fn one_node_holds_one_tree_and_the_second_claim_is_refused_by_name() {
     trees.claim(&name("node-1"), &[]).unwrap();
 }
 
-/// The ceiling asks how big the work is, and a city's own bookkeeping
-/// is not the work. A ledger far past the ceiling must not stop a node
-/// from getting a tree to put a one kilobyte edit in.
 #[test]
 fn the_city_s_own_bookkeeping_does_not_count_against_the_ceiling() {
     let dir = tempfile::tempdir().unwrap();
@@ -107,7 +102,7 @@ fn the_city_s_own_bookkeeping_does_not_count_against_the_ceiling() {
     std::fs::write(ledger.join("ledger-0.jsonl"), &bulk).unwrap();
 
     let source = trees.repo.workdir().unwrap().to_path_buf();
-    let measured = super::measure(&source).unwrap().bytes;
+    let measured = crate::worktree::weight::measure(&source).unwrap().bytes;
     assert!(
         measured.get() < 4096,
         "the ledger is not somebody's working tree: {} bytes",
@@ -116,10 +111,6 @@ fn the_city_s_own_bookkeeping_does_not_count_against_the_ceiling() {
     trees.claim(&name("node-1"), &[]).unwrap();
 }
 
-/// A release interrupted between unregistering and deleting, or a
-/// person who deleted the directory by hand, used to lock the name for
-/// good: git still listed it, and `claim` had only one thing to say
-/// about a listed name.
 #[test]
 fn a_registered_tree_with_no_directory_is_taken_back_rather_than_locked_away() {
     let dir = tempfile::tempdir().unwrap();
@@ -220,7 +211,6 @@ fn a_verified_node_lands_in_the_city_and_a_stale_one_is_sent_back() {
         "the city works on what the node produced"
     );
 
-    // A second node that branched before the merge is now behind.
     let stale = trees.claim(&name("node-2"), &[]).unwrap();
     std::fs::write(dir.path().join("lab").join("other.md"), b"trunk moved\n").unwrap();
     Checkpoint::open(dir.path())
@@ -233,13 +223,45 @@ fn a_verified_node_lands_in_the_city_and_a_stale_one_is_sent_back() {
         .land(&[], TimeMs::new(4_000), &owner(), "checkpoint: lab")
         .unwrap();
 
-    let err = trees.plan_merge(stale.name()).unwrap_err().into_ax();
+    let candidate = trees
+        .repo
+        .find_branch(stale.name().as_str(), git2::BranchType::Local)
+        .unwrap()
+        .get()
+        .target()
+        .unwrap();
+    let point = kernel::GitOid::parse(&candidate.to_string()).unwrap();
+    let err = trees
+        .plan_reviewed(stale.name(), &point)
+        .unwrap_err()
+        .into_ax();
     assert_eq!(err.code(), &kernel::AxCode::VersionConflict);
-    assert!(err.recovery().contains("verified again"));
+    let crate::ReviewPlan::Renewed(renewed) = trees.prepare_review(stale.name(), &point).unwrap()
+    else {
+        panic!("an advanced trunk needs a fresh reviewed snapshot");
+    };
+    assert_ne!(point, renewed);
+    let crate::ReviewPlan::Ready(plan) = trees.prepare_review(stale.name(), &renewed).unwrap()
+    else {
+        panic!("the refreshed candidate includes this trunk");
+    };
+    assert_eq!(plan.commit(), renewed.to_string());
+    let snapshot = trees.commit_at(&renewed).unwrap().tree().unwrap();
+    for path in ["lab/notes.md", "lab/other.md"] {
+        assert!(snapshot.get_path(Path::new(path)).is_ok());
+    }
+    trees
+        .plan_completed(stale.name(), &point)
+        .unwrap()
+        .apply(&landing(6_000, &owner(), false))
+        .unwrap();
     assert_eq!(
-        std::fs::read_to_string(dir.path().join("lab").join("notes.md")).unwrap(),
-        "from the node\n",
-        "a refused merge changes nothing in the city"
+        std::fs::read_to_string(dir.path().join("lab/notes.md")).unwrap(),
+        "stale work\n"
+    );
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join("lab/other.md")).unwrap(),
+        "trunk moved\n"
     );
 }
 
@@ -250,8 +272,6 @@ fn a_city_with_no_repository_is_refused_rather_than_given_one() {
     assert_eq!(err.code(), &kernel::AxCode::StorageFatal);
 }
 
-/// A merge is a thing that happened, so it has a commit of its own: two
-/// parents, and the trailers of the run that did the merging.
 #[test]
 fn a_merge_lands_as_a_two_parent_commit_carrying_the_merging_runs_trailers() {
     let dir = tempfile::tempdir().unwrap();
@@ -292,8 +312,6 @@ fn a_merge_lands_as_a_two_parent_commit_carrying_the_merging_runs_trailers() {
     );
 }
 
-/// A person's name is the person's. The city writes it only when the
-/// caller says a person looked and this machine's git config says who.
 #[test]
 fn a_person_who_looked_is_named_from_the_repositorys_own_config() {
     let dir = tempfile::tempdir().unwrap();
@@ -331,9 +349,6 @@ fn a_person_who_looked_is_named_from_the_repositorys_own_config() {
     );
 }
 
-/// A tree is never placed through a link: the checkout would write
-/// through whatever the name leads to, and `worktrees/node-1` reaching
-/// into the reserved subtree is exactly that.
 #[test]
 fn a_tree_is_never_placed_through_a_link() {
     let dir = tempfile::tempdir().unwrap();
@@ -387,10 +402,6 @@ fn a_merge_keeps_the_persons_uncommitted_edit_and_names_it_in_the_refusal() {
     assert!(err.to_string().contains("lab/notes.md"), "{err}");
 }
 
-/// A User's global, XDG and system git files can vanish between libgit2's
-/// look and its read on a fresh machine or a runner; the city's handle
-/// reads its own repository's file and nothing else, so neither the
-/// city's trees nor the stock can fail on a file the city never owned.
 #[test]
 fn the_citys_git_reads_its_repository_config_and_no_file_of_the_users() {
     let dir = tempfile::tempdir().unwrap();
@@ -416,4 +427,52 @@ fn the_citys_git_reads_its_repository_config_and_no_file_of_the_users() {
         levels,
         std::collections::BTreeSet::from(["Local".to_owned()])
     );
+}
+
+#[test]
+fn an_interrupted_landing_uses_the_durable_decision_on_reopen() {
+    for recorded in [crate::LandingRecord::Absent, crate::LandingRecord::Reviewed] {
+        let dir = tempfile::tempdir().unwrap();
+        let trees = city(dir.path());
+        let before = trees.repo.head().unwrap().target().unwrap();
+        let lease = trees.claim(&name("node"), &[]).unwrap();
+        std::fs::write(lease.path().join("lab/notes.md"), b"candidate").unwrap();
+        let candidate = Checkpoint::open(lease.path())
+            .unwrap()
+            .land(&[], TimeMs::new(2_000), &owner(), "offer")
+            .unwrap();
+        let plan = trees.plan_reviewed(lease.name(), &candidate.oid).unwrap();
+        let mut intent = String::new();
+        let interrupted = plan.before_landing(&landing(3_000, &owner(), false), |merge| {
+            intent = merge;
+            Err(kernel::AxError::failure(
+                kernel::AxCode::StorageFatal,
+                "interrupt landing",
+                "fixture",
+            )
+            .with_recovery("reopen the project"))
+        });
+        assert!(interrupted.is_err());
+        assert_eq!(trees.repo.head().unwrap().target(), Some(before));
+        drop(trees);
+        let reopened = Worktrees::open(dir.path()).unwrap();
+        reopened
+            .reconcile_landing(|point| {
+                assert_eq!(point.to_string(), intent);
+                Ok(recorded)
+            })
+            .unwrap();
+        reopened
+            .reconcile_landing(|_| panic!("the pending intent was already consumed"))
+            .unwrap();
+        let tip = reopened.repo.head().unwrap().target().unwrap();
+        assert_eq!(tip == before, recorded == crate::LandingRecord::Absent);
+        assert_eq!(
+            reopened
+                .repo
+                .refname_to_id(&format!("refs/sprawling/reviewed/{intent}"))
+                .is_ok(),
+            recorded == crate::LandingRecord::Reviewed
+        );
+    }
 }

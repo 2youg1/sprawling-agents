@@ -20,6 +20,37 @@ use kernel::{AxCode, EventKind, EventRecord, IdemKey, RunId, Seq};
 use remote_access::handshake::{CityFingerprint, Invitation};
 use remote_access::route::command::LOCAL_ENV;
 
+#[expect(
+    clippy::disallowed_methods,
+    reason = "each remote door and its client inherit the same isolated home"
+)]
+fn serve_workspace() -> Option<(accounting::worker::InitReport, Served)> {
+    const CASE: &str = "SPRAWLING_REMOTE_DOOR_TEST_CASE";
+    let thread = std::thread::current();
+    let case = thread.name().unwrap();
+    if std::env::var(CASE).as_deref() != Ok(case) {
+        let home = tempfile::tempdir().unwrap();
+        let status = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", case, "--nocapture"])
+            .env(CASE, case)
+            .env("USERPROFILE", home.path())
+            .env("HOME", home.path())
+            .status()
+            .unwrap();
+        assert!(
+            status.success(),
+            "{case} failed in its isolated home: {status}"
+        );
+        return None;
+    }
+    let home = accounting::home::Home::detect().unwrap();
+    let workspace = home.path().join("workspace");
+    let private = home.workspace(&workspace).unwrap();
+    let raised = sprawling::assembly::init_city(&private).unwrap();
+    choose_this_binary_as_the_route(&private);
+    Some((raised, Served::start(&workspace)))
+}
+
 #[test]
 #[ignore = "the route command the end-to-end test starts; it does nothing on its own"]
 fn route_stand_in() {
@@ -34,10 +65,9 @@ fn route_stand_in() {
 
 #[test]
 fn a_device_reaches_the_city_through_the_door_over_real_sockets() {
-    let dir = tempfile::tempdir().unwrap();
-    let raised = sprawling::assembly::init_city(dir.path()).unwrap();
-    choose_this_binary_as_the_route(dir.path());
-    let mut city = Served::start(dir.path());
+    let Some((raised, mut city)) = serve_workspace() else {
+        return;
+    };
 
     let opened = city.type_line("/remote open --for 1h", "the remote door is open");
     let at = between(&opened, "at https://", char::is_whitespace);
@@ -98,10 +128,9 @@ const SPACED: Duration = Duration::from_millis(remote_access::confirm::CONFIRM_S
 
 #[test]
 fn a_page_opens_the_door_only_with_the_code_the_console_printed() {
-    let dir = tempfile::tempdir().unwrap();
-    let raised = sprawling::assembly::init_city(dir.path()).unwrap();
-    choose_this_binary_as_the_route(dir.path());
-    let mut city = Served::start(dir.path());
+    let Some((raised, mut city)) = serve_workspace() else {
+        return;
+    };
     let banner = city.type_line("/remote devices", "no device is paired");
     let home = between(&banner, "WebUI    http://", char::is_whitespace);
     let home = home.trim_end_matches('/').to_owned();
@@ -168,10 +197,9 @@ fn a_page_opens_the_door_only_with_the_code_the_console_printed() {
 
 #[test]
 fn ten_wrong_codes_lock_the_pages_door_verbs_and_close_the_door() {
-    let dir = tempfile::tempdir().unwrap();
-    let raised = sprawling::assembly::init_city(dir.path()).unwrap();
-    choose_this_binary_as_the_route(dir.path());
-    let mut city = Served::start(dir.path());
+    let Some((raised, mut city)) = serve_workspace() else {
+        return;
+    };
     let banner = city.type_line("/remote devices", "no device is paired");
     let home = between(&banner, "WebUI    http://", char::is_whitespace);
     let home = home.trim_end_matches('/').to_owned();

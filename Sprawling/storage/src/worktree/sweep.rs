@@ -33,6 +33,13 @@ impl Worktrees {
         Ok(swept)
     }
 
+    pub fn retire(&self, lease: super::lease::WorktreeLease) -> Result<(), StorageError> {
+        let name = lease.name().clone();
+        self.release(lease)?;
+        self.forget(name.as_str())?;
+        self.drop_lease_branch(&name)
+    }
+
     fn sweep_registered(&self, held: &[WorktreeName]) -> Result<Vec<WorktreeName>, StorageError> {
         let mut swept = Vec::new();
         for name in self.live()? {
@@ -54,7 +61,11 @@ impl Worktrees {
                     op: "find a worktree",
                     detail: format!("{}: {err}", name.as_str()),
                 })?;
-        Ok(resolved(tree.path()) == resolved(&self.home.join(name.as_str())))
+        Ok(self.owns_registration(&tree, name.as_str()))
+    }
+
+    pub(super) fn owns_registration(&self, tree: &git2::Worktree, name: &str) -> bool {
+        resolved(tree.path()) == resolved(&self.home.join(name))
     }
 
     fn drop_lease_branch(&self, name: &WorktreeName) -> Result<(), StorageError> {
@@ -64,6 +75,32 @@ impl Worktrees {
                 detail: format!("{}: {err}", name.as_str()),
             }
         };
+        if let Some(run) = name
+            .as_str()
+            .strip_prefix("run-")
+            .and_then(|value| kernel::RunId::parse(value).ok())
+        {
+            match self
+                .repo
+                .find_reference(&format!("refs/sprawling/working/{run}"))
+            {
+                Ok(mut pin) => pin.delete().map_err(git_err("release the run baseline"))?,
+                Err(err) if err.code() == git2::ErrorCode::NotFound => {}
+                Err(err) => return Err(git_err("find the run baseline")(err)),
+            }
+            let path = self.repo.commondir().join("indexes").join(run.to_string());
+            match std::fs::remove_file(&path) {
+                Ok(()) => {}
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+                Err(source) => {
+                    return Err(StorageError::Io {
+                        op: "release the run index",
+                        path,
+                        source,
+                    });
+                }
+            }
+        }
         let mut branch = match self
             .repo
             .find_branch(name.as_str(), git2::BranchType::Local)
@@ -95,6 +132,7 @@ impl Worktrees {
     }
 
     pub(super) fn forget(&self, id: &str) -> Result<(), StorageError> {
+        let _registry = self.registry()?;
         let admin = self.repo.commondir().join(WORKTREE_DIR).join(id);
         let tree = match self.repo.find_worktree(id) {
             Ok(tree) => tree,
@@ -113,6 +151,12 @@ impl Worktrees {
                 });
             }
         };
+        if !self.owns_registration(&tree, id) {
+            return Err(StorageError::Worktree {
+                op: "prune a worktree",
+                detail: format!("{id}: registration points outside the project worktree directory"),
+            });
+        }
         let mut opts = git2::WorktreePruneOptions::new();
 
         opts.valid(true).locked(true).working_tree(true);
@@ -162,9 +206,8 @@ impl Worktrees {
             if held.contains(&name) || registered.contains(&name) {
                 continue;
             }
-            let path = entry.path();
-            std::fs::remove_dir_all(&path)
-                .map_err(io_err("remove an abandoned worktree", &path))?;
+            self.clear_unregistered(name.as_str())?;
+            self.drop_lease_branch(&name)?;
             swept.push(name);
         }
         Ok(swept)

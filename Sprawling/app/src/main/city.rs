@@ -41,23 +41,8 @@ pub(super) fn use_folder(folder: &std::path::Path) -> ExitCode {
         );
         return ExitCode::FAILURE;
     }
-    let history = match city::has_history(folder) {
-        Ok(history) => history,
-        Err(err) => return report(err),
-    };
-    if history == city::History::Present {
-        println!("{} is already a city; opening it", folder.display());
-        name_city(folder);
-        return serve_city(folder, DEFAULT_AT, &[], Entrance::Bare);
-    }
-    match assembly::form_city(folder, accounting::worker::Adopt::EveryFolder) {
-        Ok(report) => {
-            report_standing(&report);
-            name_city(folder);
-            serve_city(folder, DEFAULT_AT, &[], Entrance::Bare)
-        }
-        Err(err) => report(err),
-    }
+    name_city(folder);
+    up_at(folder, DEFAULT_AT, &[], Entrance::Bare)
 }
 
 pub(super) fn report_standing(report: &accounting::worker::InitReport) {
@@ -90,6 +75,11 @@ pub(super) fn up_at(
     args: &[String],
     entrance: Entrance,
 ) -> ExitCode {
+    let root = match super::router::private_city(city) {
+        Ok(root) => root,
+        Err(err) => return report(err),
+    };
+    let city = root.as_path();
     let history = match city::has_history(city) {
         Ok(history) => history,
         Err(err) => return report(err),
@@ -111,12 +101,7 @@ pub(super) fn init(read: &Arguments) -> ExitCode {
     let Some(dir) = read.positional(1) else {
         return ExitCode::from(2);
     };
-    let adopt = if read.has("--adopt") {
-        accounting::worker::Adopt::EveryFolder
-    } else {
-        accounting::worker::Adopt::Nothing
-    };
-    match assembly::form_city(std::path::Path::new(dir), adopt) {
+    match assembly::init_city(std::path::Path::new(dir)) {
         Ok(report) => {
             report_standing(&report);
             ExitCode::SUCCESS
