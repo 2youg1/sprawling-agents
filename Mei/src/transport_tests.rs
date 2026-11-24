@@ -315,7 +315,9 @@ fn a_pending_windows_read_keeps_the_response_on_the_same_socket() {
     let response = b"HTTP/1.0 200 OK\r\n\r\n{}";
     let (send, receive) = std::sync::mpsc::channel();
     let writer = thread::spawn(move || {
-        receive.recv().unwrap();
+        if receive.recv().is_err() {
+            return;
+        }
         thread::sleep(Duration::from_millis(40));
         peer.write_all(response).unwrap();
         peer.shutdown(std::net::Shutdown::Write).unwrap();
@@ -334,7 +336,7 @@ fn a_pending_windows_read_keeps_the_response_on_the_same_socket() {
             pulse: &mut pulses,
             path: "loopback response",
         },
-        |socket, buffer| {
+        move |socket, buffer| {
             if let Some(send) = pending.take() {
                 send.send(()).unwrap();
                 Err(std::io::Error::from_raw_os_error(WSA_IO_PENDING))
