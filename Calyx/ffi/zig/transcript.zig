@@ -39,13 +39,18 @@ pub fn entry(p: *paint.Painter, r: *scene.Reader, tag: part.Part, grid: Grid) Er
     try p.end();
 }
 
-pub fn lead(p: *paint.Painter, grid: Grid, seconds: u32, mark: []const u8, style: paint.Style) paint.Error!void {
+const MarkStyle = union(enum) { styled: paint.Style, gray: u8 };
+
+fn lead(p: *paint.Painter, grid: Grid, seconds: u32, mark: []const u8, style: MarkStyle) paint.Error!void {
     if (grid.timed and seconds != scene.no_time) {
         var b: format.Buffer = undefined;
         try p.fit(.faint, format.clock(&b, seconds), 8);
     }
     try p.to(grid.mark);
-    try p.fit(style, mark, 1);
+    switch (style) {
+        .styled => |styled| try p.fit(styled, mark, 1),
+        .gray => |tone| try p.grayMark(mark, tone),
+    }
     try p.to(grid.words);
 }
 
@@ -57,6 +62,18 @@ pub fn bannerChoice(p: *paint.Painter, r: *scene.Reader, web: bool) Error!void {
     const city = try r.text();
     const address = try r.text();
     const url = try r.text();
+    if (p.mei and url.len == 0) {
+        const metadata = text.width(address);
+        const available = p.room();
+        const path_room = @max(available / 3, available -| (metadata + 3));
+        const workspace = if (text.width(city) <= path_room) city else std.fs.path.basename(city);
+        try p.fit(.plain, workspace, path_room);
+        if (metadata != 0 and p.room() > 3) {
+            try p.cut(.faint, " · ", 3);
+            try p.fit(.faint, address, p.room());
+        }
+        return;
+    }
     const instruction = "  Type ";
     const command = "/web";
     const action = " to open the WebUI";
@@ -82,7 +99,7 @@ fn you(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
     const at = try r.word();
     const said = try r.text();
     try p.raw("\x1b]133;A\x1b\\");
-    try lead(p, grid, at, "›", .faint);
+    try lead(p, grid, at, "›", .{ .styled = .faint });
     try flow.flow(p, said, .{ .left = grid.words, .measure = grid.limit -| grid.words, .style = .plain, .marks = .plain });
 }
 
@@ -90,7 +107,7 @@ fn head(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
     const at = try r.word();
     const resident = try r.text();
     const facts = try r.word();
-    try lead(p, grid, at, "●", .faint);
+    try lead(p, grid, at, "●", .{ .styled = .faint });
     try p.fit(.bold, resident, p.room());
     var gap: []const u8 = "  ";
     for (0..facts) |_| {
@@ -118,7 +135,9 @@ fn tool(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
     const outcome = try r.outcome();
     var b: format.Buffer = undefined;
     const took = if (micros == scene.no_count) "" else format.took(&b, micros);
-    try lead(p, grid, at, "◇", .faint);
+    const mark = if (!p.mei) "◇" else if (outcome == .Failed) "×" else "✓";
+    const style: MarkStyle = if (p.mei) .{ .gray = p.completion_tone orelse paint.settled_tool_tone } else .{ .styled = .faint };
+    try lead(p, grid, at, mark, style);
     try p.fit(.plain, name, 8);
     try p.to(grid.words + 9);
     const figures = grid.figures();
@@ -128,7 +147,7 @@ fn tool(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
     try p.fit(.faint, took, took_width);
     switch (outcome) {
         .Answered => {},
-        .Failed => {
+        .Failed => if (!p.mei) {
             try p.to(p.column + 2);
             try p.fit(.alert, "failed", 6);
         },
@@ -153,8 +172,9 @@ fn ended(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
         .Done => .{ "done", .faint },
         .Limit => .{ "stopped at a limit", .alert },
         .Cancelled => .{ "cancelled", .faint },
+        .Failed => .{ "failed", .alert },
     };
-    try lead(p, grid, at, "■", style);
+    try lead(p, grid, at, "■", .{ .styled = style });
     try p.fit(style, word, p.room());
     if (seconds != scene.no_count) {
         var b: format.Buffer = undefined;
@@ -171,7 +191,7 @@ fn resolved(p: *paint.Painter, r: *scene.Reader, grid: Grid) Error!void {
         .Approved => .{ "✓", "approved  " },
         .Denied => .{ "✗", "denied  " },
     };
-    try lead(p, grid, at, mark, .faint);
+    try lead(p, grid, at, mark, .{ .styled = .faint });
     try p.fit(.faint, word, word.len);
     try p.fit(.faint, what, p.room());
 }

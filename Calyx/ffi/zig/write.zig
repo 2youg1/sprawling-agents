@@ -12,6 +12,7 @@ pub const Error = std.mem.Allocator.Error || std.Io.Writer.Error;
 pub const Banner = struct { city: []const u8, address: []const u8, url: []const u8 };
 pub const You = struct { at: ?u32, said: []const u8 };
 pub const Head = struct { at: ?u32, resident: []const u8, facts: []const []const u8 };
+pub const Reasoning = struct { characters: u64, body: []const u8 = "" };
 pub const Tool = struct {
     at: ?u32,
     name: []const u8,
@@ -26,7 +27,7 @@ pub const Entry = union(enum) {
     banner: Banner,
     you: You,
     head: Head,
-    reasoning: u64,
+    reasoning: Reasoning,
     tool: Tool,
     reply: []const u8,
     note: []const u8,
@@ -162,7 +163,7 @@ fn writeEntry(out: *std.Io.Writer, entry: Entry) Error!void {
             try count(out, h.facts.len);
             for (h.facts) |fact| try text(out, fact);
         },
-        .reasoning => |characters| try long(out, characters),
+        .reasoning => |thought| try long(out, thought.characters),
         .tool => |t| {
             try time(out, t.at);
             try text(out, t.name);
@@ -279,7 +280,7 @@ test "inline scene round-trips tags and fields" {
         .{ .banner = .{ .city = "city", .address = "addr", .url = "https://x" } },
         .{ .you = .{ .at = 3600, .said = "hi" } },
         .{ .head = .{ .at = null, .resident = "mei", .facts = &.{"a"} } },
-        .{ .reasoning = 12 },
+        .{ .reasoning = .{ .characters = 12 } },
         .{ .tool = .{
             .at = 2,
             .name = "run",

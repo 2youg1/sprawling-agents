@@ -15,9 +15,6 @@ const SIBLING_PIN: &str = "../../Sprawling/desktop/ffi/zig-version";
 const LIBRARY: &str = "sprawling_console_leaf";
 
 fn main() -> Result<(), String> {
-    // docs.rs sets DOCS_RS and has no Zig; rustdoc does not link the leaf
-    // (`Calyx/ffi/Spec.lean` D10). Named so a later build without
-    // the variable reruns this script instead of reusing the skip.
     println!("cargo::rerun-if-env-changed=DOCS_RS");
     if documenting() {
         return Ok(());
@@ -53,9 +50,6 @@ fn pin(here: &Path) -> Result<String, String> {
     };
     let pinned = read(&here.join(PIN))?;
     let sibling = here.join(SIBLING_PIN);
-    // Named only when it is there: cargo reads a path that does not
-    // exist as changed, and a package built from crates.io, which has no
-    // sibling, would compile the leaf again on every build.
     if sibling.exists() {
         println!("cargo::rerun-if-changed={SIBLING_PIN}");
         let theirs = read(&sibling)?;
@@ -208,6 +202,9 @@ fn compiled(here: &Path, out: &Path, target: &Target) -> Result<(), String> {
         "--name",
         LIBRARY,
     ]);
+    if !target.triple.contains("-windows-") {
+        zig.arg("-fcompiler-rt");
+    }
     if target.position_independent {
         zig.arg("-fPIC");
     }

@@ -75,6 +75,12 @@ fn onLine(ui: anytype, line: []u8) void {
         var parsed = std.json.parseFromSlice(std.json.Value, ui.gpa, line, .{}) catch break :blk false;
         defer parsed.deinit();
         if (parsed.value != .object) break :blk false;
+        if (parsed.value.object.get("type")) |kind| {
+            if (kind == .string and std.mem.eql(u8, kind.string, "mei.obs")) {
+                const name = parsed.value.object.get("kind") orelse break :blk false;
+                break :blk name == .string and std.mem.eql(u8, name.string, "image");
+            }
+        }
         const role = parsed.value.object.get("role") orelse break :blk false;
         if (role != .string) break :blk false;
         if (!std.mem.eql(u8, role.string, "user") and !std.mem.eql(u8, role.string, "assistant")) break :blk false;
@@ -99,27 +105,7 @@ fn onFinished(ui: anytype, finished: mei_process.Finished) void {
         ui.process = null;
     }
     const successful = !ui.lost and !finished.cancelled and finished.result == .ok;
-    var capture = CaptureFate.discard;
-    if (successful) {
-        if (ui.session) |*session| {
-            switch (session.append(ui.pending.items)) {
-                .ok => capture = .keep,
-                .err => |diag| {
-                    defer diag.deinit(ui.gpa);
-                    session.deinit();
-                    ui.session = null;
-                    ui.printNote(diag.text);
-                },
-                .uncertain => |diag| {
-                    defer diag.deinit(ui.gpa);
-                    session.deinit();
-                    ui.session = null;
-                    capture = .keep;
-                    ui.printNote(diag.text);
-                },
-            }
-        }
-    }
+    const capture = storeUsage(ui, successful);
     for (ui.pending.items) |line| ui.gpa.free(line);
     ui.pending.clearRetainingCapacity();
     finishCapture(ui, capture);
@@ -130,9 +116,37 @@ fn onFinished(ui: anytype, finished: mei_process.Finished) void {
     else
         ui.seen.finished(arena, finished.result, at) catch return;
     finished.result.deinit(ui.gpa);
+    ui.refreshGit();
     ui.print(entries);
     ui.touch(true);
     ui.ended();
+}
+
+fn storeUsage(ui: anytype, successful: bool) CaptureFate {
+    const session = if (ui.session) |*session| session else return .discard;
+    if (!successful and (ui.lost or session.resumePath() == null)) return .discard;
+    var usage_buf: [256]u8 = undefined;
+    const usage = ui.seen.sessionUsage(&usage_buf) catch unreachable;
+    const messages: []const []const u8 = if (successful) ui.pending.items else &.{};
+    if (messages.len == 0 and successful) return .discard;
+    const lines = ui.gpa.alloc([]const u8, messages.len + 1) catch {
+        ui.printNote("could not save the Mei session statistics");
+        return .discard;
+    };
+    defer ui.gpa.free(lines);
+    @memcpy(lines[0..messages.len], messages);
+    lines[messages.len] = usage;
+    const outcome = session.append(lines);
+    switch (outcome) {
+        .ok => return if (successful) .keep else .discard,
+        .err, .uncertain => |diag| {
+            defer diag.deinit(ui.gpa);
+            session.deinit();
+            ui.session = null;
+            ui.printNote(diag.text);
+            return if (successful and outcome == .uncertain) .keep else .discard;
+        },
+    }
 }
 
 pub fn stop(ui: anytype) void {

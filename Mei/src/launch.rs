@@ -11,7 +11,7 @@ use crate::error::{Code, Diagnostic, Error, Result};
 use crate::python;
 use crate::workspace;
 
-pub const MAX_TOKENS: u64 = 65536;
+pub const MAX_TOKENS: u64 = 256_000;
 pub const DEFAULT_EFFORT: &str = "high";
 pub const SYSTEM: &str = include_str!("MEI.md");
 pub const DEFAULT_BASE: &str = "http://127.0.0.1:3425";

@@ -3,16 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The one writer of a frame's bytes: styled text by the column, and the
-// handful of control sequences a frame uses. It counts the column and
-// the row it is on, so no line it draws runs past `limit`, the last
-// column a line may use; the terminal's own last column is never
-// written, because some terminals wrap the moment it is filled.
-//
-// Colour comes only from the terminal's own palette - the default
-// foreground, faint, bold, blue for ACCENT and yellow for ALERT - so a
-// frame takes the person's theme, light or dark, as it is.
-
 const std = @import("std");
 const text = @import("text.zig");
 
@@ -37,20 +27,61 @@ pub const Style = enum {
 };
 
 pub const Error = std.Io.Writer.Error;
+pub const working_glyph = "●";
+pub const settled_tool_tone = 172;
+
+pub fn writeGray(out: *std.Io.Writer, tone: u8) Error!void {
+    try out.print("\x1b[38;2;{d};{d};{d}m", .{ tone, tone, tone });
+}
+
+pub const Point = struct {
+    row: usize,
+    column: usize,
+
+    pub fn before(a: Point, b: Point) bool {
+        return a.row < b.row or (a.row == b.row and a.column < b.column);
+    }
+};
+
+pub const Selection = struct {
+    first: Point,
+    last: Point,
+
+    pub fn between(a: Point, b: Point) Selection {
+        return if (b.before(a)) .{ .first = b, .last = a } else .{ .first = a, .last = b };
+    }
+
+    fn contains(self: Selection, row: usize, column: usize, width: usize) bool {
+        const start: Point = .{ .row = row, .column = column };
+        const end: Point = .{ .row = row, .column = column + @max(width, 1) };
+        return self.first.before(end) and start.before(self.last);
+    }
+};
 
 pub const Painter = struct {
     out: *std.Io.Writer,
-    /// The last column a line may reach, counted from one.
     limit: usize,
     column: usize = 0,
     row: usize = 0,
     style: Style = .plain,
+    mei: bool = false,
+    working_tone: u8 = 117,
+    working_mark: ?Point = null,
+    completion_tone: ?u8 = null,
+    selection: ?Selection = null,
+    copy: ?*std.Io.Writer = null,
+    reversed: bool = false,
 
     pub fn init(out: *std.Io.Writer, terminal_width: usize) Painter {
         return .{ .out = out, .limit = @max(terminal_width, 2) - 1 };
     }
 
-    /// Room left on this line.
+    pub fn meiFrame(out: *std.Io.Writer, terminal_width: usize) Painter {
+        var painter = init(out, terminal_width);
+        painter.mei = true;
+        return painter;
+    }
+
     pub fn room(self: *const Painter) usize {
         return self.limit -| self.column;
     }
@@ -60,22 +91,34 @@ pub const Painter = struct {
     }
 
     fn styled(self: *Painter, style: Style) Error!void {
-        if (style == self.style) return;
-        try self.out.writeAll(style.sgr());
-        self.style = style;
+        const applied: Style = if (self.mei) switch (style) {
+            .accent => .plain,
+            .alert, .alert_bold => .bold,
+            else => style,
+        } else style;
+        if (applied == self.style) return;
+        try self.out.writeAll(applied.sgr());
+        self.style = applied;
+        self.reversed = false;
     }
 
-    /// One character, when it fits on this line.
+    fn reverse(self: *Painter, on: bool) Error!void {
+        if (on == self.reversed) return;
+        try self.out.writeAll(if (on) "\x1b[7m" else "\x1b[27m");
+        self.reversed = on;
+    }
+
     pub fn char(self: *Painter, style: Style, c: text.Char) Error!bool {
         if (c.columns > self.room()) return false;
         try self.styled(style);
+        const selected = if (self.selection) |range| range.contains(self.row, self.column, c.columns) else false;
+        try self.reverse(selected);
+        if (selected) if (self.copy) |copy| try copy.writeAll(c.shown);
         try self.out.writeAll(c.shown);
         self.column += c.columns;
         return true;
     }
 
-    /// A text on this line, cut with an ellipsis where it would run past
-    /// `max` columns or the end of the line.
     pub fn fit(self: *Painter, style: Style, s: []const u8, max: usize) Error!void {
         const allowed = @min(max, self.room());
         if (text.width(s) <= allowed) return self.cut(style, s, allowed);
@@ -86,8 +129,14 @@ pub const Painter = struct {
         self.column += 1;
     }
 
-    /// As much of `s` as fits in `max` columns, no ellipsis: for a
-    /// drawing, which loses nothing by stopping short.
+    pub fn grayMark(self: *Painter, mark: []const u8, tone: u8) Error!void {
+        if (self.room() == 0) return;
+        try self.styled(.plain);
+        try writeGray(self.out, tone);
+        try self.cut(.plain, mark, 1);
+        try self.out.writeAll("\x1b[39m");
+    }
+
     pub fn cut(self: *Painter, style: Style, s: []const u8, max: usize) Error!void {
         const stop = self.column + max;
         var at: usize = 0;
@@ -99,30 +148,50 @@ pub const Painter = struct {
         }
     }
 
-    /// Spaces up to `target`, counted from zero; nothing when already past.
     pub fn to(self: *Painter, target: usize) Error!void {
         const stop = @min(target, self.limit);
         if (self.column >= stop) return;
         try self.styled(.plain);
+        try self.reverse(false);
+        if (self.column != 0) {
+            if (self.selection) |range| {
+                if (self.copy) |copy| {
+                    const first = if (range.first.row == self.row) @max(self.column, range.first.column) else self.column;
+                    const last = if (range.last.row == self.row) @min(stop, range.last.column) else stop;
+                    if (range.first.row <= self.row and self.row <= range.last.row) try copy.splatByteAll(' ', last -| first);
+                }
+            }
+        }
         try self.out.splatByteAll(' ', stop - self.column);
         self.column = stop;
     }
 
-    /// The end of a line: style reset, then carriage return and line feed.
     pub fn end(self: *Painter) Error!void {
+        try self.newline("\n");
+    }
+
+    pub fn wrap(self: *Painter, gap: bool) Error!void {
+        try self.newline(if (gap) " " else "");
+    }
+
+    fn newline(self: *Painter, separation: []const u8) Error!void {
+        if (self.selection) |range| {
+            if (range.first.row <= self.row and self.row < range.last.row) {
+                if (self.copy) |copy| try copy.writeAll(separation);
+            }
+        }
         try self.styled(.plain);
+        try self.reverse(false);
         try self.out.writeAll("\r\n");
         self.column = 0;
         self.row += 1;
     }
 
-    /// The end of the last line of a frame, which leaves the cursor on it.
     pub fn close(self: *Painter) Error!void {
         try self.styled(.plain);
+        try self.reverse(false);
     }
 
-    /// A link a terminal may open (OSC 8) around `label`. Control
-    /// characters and invalid UTF-8 in the URI never reach the terminal.
     pub fn link(self: *Painter, style: Style, uri: []const u8, label: []const u8) Error!void {
         try self.out.writeAll("\x1b]8;;");
         var at: usize = 0;

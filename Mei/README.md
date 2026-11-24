@@ -124,7 +124,7 @@ The single Python call returns both the image and any printed text. PNG, JPEG, G
 | `/new`, `/n` | Start a new JSONL session; the old file stays |
 | `/resume`, `/r` | Resume the non-empty session you just left |
 | `/resume path.jsonl`, `/r path.jsonl` | Resume a named complete log |
-| `/e`, `/effect` | Cycle to the next Magpie reasoning level for the next run |
+| `/e`, `/effect` | Choose a Magpie reasoning level for the next run |
 | Esc | Clear a draft, or stop the current run and its process tree; never quits Calyx |
 | `/quit`, `/q` | Close this Calyx and its process tree; other sessions are independent |
 
@@ -135,10 +135,10 @@ Model routing stays in Magpie; there is no separate `/model` command.
 The composer shows:
 
 ```text
-actual-model · effort high · Agent Step 2 · 0.05% · 487/1048576
+actual-model · effort high · Agent Step 2 · Input 487
 ```
 
-Before Magpie confirms a route, the model and effort are marked `requested`. `Agent Step` counts model responses in the current run. Context use is `input_tokens + cache_creation_input_tokens + cache_read_input_tokens`, displayed against the model's maximum with exactly two decimal places; it is not a cumulative bill.
+Before Magpie confirms a route, the model and effort are marked `requested`. `Agent Step` counts model responses over the session. `Input` totals the session's input, cache creation and cache read tokens. With incomplete historic usage, `—` means unknown and `≥` shows the lower bound.
 
 ### 4. Steer mid-task and close safely
 

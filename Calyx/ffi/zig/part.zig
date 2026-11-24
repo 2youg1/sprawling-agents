@@ -33,6 +33,7 @@ pub const Ending = enum(u8) {
     Done = 0,
     Limit = 1,
     Cancelled = 2,
+    Failed = 3,
 };
 
 pub const Verdict = enum(u8) {

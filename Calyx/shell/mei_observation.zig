@@ -29,8 +29,10 @@ pub const Seen = struct {
     effort: []u8,
     effort_actual: bool = false,
     efforts: std.ArrayList([]u8) = .empty,
-    context_tokens: ?u64 = null,
-    used_tokens: ?u64 = null,
+    response_input: ?u64 = null,
+    session_input: u64 = 0,
+    missing_usage: u64 = 0,
+    agents_loaded: bool = false,
     step: u64 = 0,
     since: ?u64 = null,
     calling: bool = false,
@@ -99,7 +101,10 @@ pub const Seen = struct {
         self.calling = false;
         self.rest = .idle;
         self.headed = false;
-        self.used_tokens = null;
+        self.response_input = null;
+        self.session_input = 0;
+        self.missing_usage = 0;
+        self.agents_loaded = false;
         self.step = 0;
         self.run = false;
         self.effort_actual = false;
@@ -117,8 +122,7 @@ pub const Seen = struct {
         self.calling = false;
         self.rest = .idle;
         self.headed = false;
-        self.used_tokens = null;
-        self.step = 0;
+        self.response_input = null;
         self.effort_actual = false;
         self.setLast("");
         self.clearDraft();
@@ -145,31 +149,26 @@ pub const Seen = struct {
 
     pub fn offer(self: *Seen, buf: []u8) []const u8 {
         const source = if (self.effort_actual) "effort" else "requested";
-        var base_buf: [384]u8 = undefined;
-        const base = std.fmt.bufPrint(&base_buf, "{s} · {s} {s} · Agent Step {d}", .{
+        var input_buf: [30]u8 = undefined;
+        const input = if (self.missing_usage > 0 and self.missing_usage == self.step)
+            "—"
+        else
+            std.fmt.bufPrint(&input_buf, "{s}{d}", .{ if (self.missing_usage == 0) "" else "≥", self.session_input }) catch unreachable;
+        return std.fmt.bufPrint(buf, "{s} · {s} {s} · Agent Step {d} · Input {s}", .{
             self.model,
             source,
             self.effort,
             self.step,
-        }) catch return self.model;
-        if (self.used_tokens) |used| {
-            if (self.context_tokens) |window| {
-                const scaled = @as(u128, used) * 10000 + window / 2;
-                const hundredths = scaled / window;
-                return std.fmt.bufPrint(buf, "{s} · {d}.{d}{d}% · {d}/{d}", .{
-                    base,
-                    hundredths / 100,
-                    (hundredths % 100) / 10,
-                    hundredths % 10,
-                    used,
-                    window,
-                }) catch base;
-            }
-        }
-        if (self.context_tokens) |window| {
-            return std.fmt.bufPrint(buf, "{s} · max {d}", .{ base, window }) catch base;
-        }
-        return std.fmt.bufPrint(buf, "{s} · context unknown", .{base}) catch base;
+            input,
+        }) catch self.model;
+    }
+
+    pub fn sessionUsage(self: *const Seen, buf: []u8) ![]const u8 {
+        return std.fmt.bufPrint(buf, "{{\"type\":\"mei.obs\",\"kind\":\"session_usage\",\"steps\":{d},\"input\":{d},\"missing\":{d}}}", .{
+            self.step,
+            self.session_input,
+            self.missing_usage,
+        });
     }
 
     pub fn line(self: *Seen, arena: std.mem.Allocator, raw: []const u8, at: u64) ![]write.Entry {
@@ -191,6 +190,9 @@ pub const Seen = struct {
         const content = value.object.get("content") orelse return try noteEntries(arena, raw);
         if (role != .string) return try noteEntries(arena, raw);
         if (std.mem.eql(u8, role.string, "assistant")) {
+            self.step +|= 1;
+            if (self.response_input) |tokens| self.session_input +|= tokens else self.missing_usage +|= 1;
+            self.response_input = null;
             self.clearDraft();
             return try self.assistant(arena, content, at);
         }
@@ -255,16 +257,11 @@ pub const Seen = struct {
     }
 
     fn observation(self: *Seen, arena: std.mem.Allocator, value: std.json.Value) ![]write.Entry {
-        _ = arena;
         const kind = if (value.object.get("kind")) |k| (if (k == .string) k.string else "") else "";
         if (std.mem.eql(u8, kind, "model")) {
             if (value.object.get("model")) |model| {
                 if (model == .string) self.replace(&self.model, model.string);
             }
-            self.context_tokens = if (value.object.get("context_tokens")) |tokens|
-                (if (tokens == .integer and tokens.integer > 0) @intCast(tokens.integer) else null)
-            else
-                null;
             if (value.object.get("effort")) |effort| {
                 if (effort == .string) self.requestEffort(effort.string);
             }
@@ -299,16 +296,32 @@ pub const Seen = struct {
         } else if (std.mem.eql(u8, kind, "usage")) {
             if (value.object.get("usage")) |usage| {
                 if (usage == .object) {
-                    var used: u64 = 0;
+                    var used: ?u64 = null;
                     for ([_][]const u8{ "input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens" }) |name| {
                         if (usage.object.get(name)) |tokens| {
-                            if (tokens == .integer and tokens.integer >= 0) used +|= @intCast(tokens.integer);
+                            if (number(tokens)) |n| used = (used orelse 0) +| n;
                         }
                     }
-                    self.used_tokens = used;
-                    self.step +|= 1;
+                    self.response_input = used;
                 }
             }
+        } else if (std.mem.eql(u8, kind, "session_usage")) {
+            const steps = number(value.object.get("steps") orelse return &.{}) orelse return &.{};
+            const input = number(value.object.get("input") orelse return &.{}) orelse return &.{};
+            const missing = number(value.object.get("missing") orelse return &.{}) orelse return &.{};
+            if (missing > steps) return &.{};
+            self.step = steps;
+            self.session_input = input;
+            self.missing_usage = missing;
+        } else if (std.mem.eql(u8, kind, "workspace")) {
+            if (value.object.get("agents")) |agents| {
+                if (agents == .bool) self.agents_loaded = agents.bool;
+            }
+        } else if (std.mem.eql(u8, kind, "tool_start")) {
+            self.calling = true;
+        } else if (std.mem.eql(u8, kind, "image")) {
+            const preview = value.object.get("preview") orelse return &.{};
+            if (preview == .string) return noteEntries(arena, try arena.dupe(u8, preview.string));
         }
         return &.{};
     }
@@ -323,7 +336,6 @@ pub const Seen = struct {
             return try entries.toOwnedSlice(arena);
         }
         if (content != .array) return try entries.toOwnedSlice(arena);
-        var reasoning: u64 = 0;
         var text: std.ArrayList(u8) = .empty;
         defer text.deinit(arena);
         for (content.array.items) |block| {
@@ -331,21 +343,28 @@ pub const Seen = struct {
             const ty = if (block.object.get("type")) |t| (if (t == .string) t.string else "") else "";
             if (std.mem.eql(u8, ty, "thinking")) {
                 if (block.object.get("thinking")) |th| {
-                    if (th == .string) reasoning +|= th.string.len;
+                    if (th == .string and th.string.len != 0) {
+                        const body = try arena.dupe(u8, th.string);
+                        try entries.append(arena, .{ .reasoning = .{
+                            .characters = std.unicode.utf8CountCodepoints(body) catch body.len,
+                            .body = body,
+                        } });
+                    }
                 }
             } else if (std.mem.eql(u8, ty, "text")) {
                 if (block.object.get("text")) |tx| {
-                    if (tx == .string) try text.appendSlice(arena, tx.string);
+                    if (tx == .string and tx.string.len != 0) {
+                        try text.appendSlice(arena, tx.string);
+                        try entries.append(arena, .{ .reply = try arena.dupe(u8, tx.string) });
+                    }
                 }
             } else if (std.mem.eql(u8, ty, "tool_use")) {
                 self.noteCall(block, at);
                 self.calling = true;
             }
         }
-        if (reasoning > 0) try entries.append(arena, .{ .reasoning = reasoning });
         const said = try text.toOwnedSlice(arena);
         self.setLast(said);
-        if (said.len > 0) try entries.append(arena, .{ .reply = said });
         return try entries.toOwnedSlice(arena);
     }
 
@@ -357,7 +376,7 @@ pub const Seen = struct {
         if (content != .array) return try entries.toOwnedSlice(arena);
         var said: std.ArrayList(u8) = .empty;
         defer said.deinit(arena);
-        for (content.array.items) |block| {
+        for (content.array.items, 0..) |block, index| {
             if (block != .object) continue;
             const ty = if (block.object.get("type")) |t| (if (t == .string) t.string else "") else "";
             if (std.mem.eql(u8, ty, "tool_result")) {
@@ -365,6 +384,10 @@ pub const Seen = struct {
             } else if (std.mem.eql(u8, ty, "text")) {
                 if (block.object.get("text")) |text| {
                     if (text == .string and text.string.len > 0) {
+                        if (!self.headed and index == 0 and isWorkspaceGuide(text.string)) {
+                            self.agents_loaded = true;
+                            continue;
+                        }
                         if (said.items.len > 0) try said.append(arena, '\n');
                         try said.appendSlice(arena, text.string);
                     }
@@ -524,7 +547,7 @@ pub const Seen = struct {
             },
             .err => blk: {
                 self.rest = .failed;
-                break :blk .Limit;
+                break :blk .Failed;
             },
         };
         const answer: ?[]const u8 = switch (result) {
@@ -542,7 +565,7 @@ pub const Seen = struct {
             if (a.len > 0) {
                 if (ending == .Done and !std.mem.eql(u8, a, self.last_text)) {
                     try entries.append(arena, .{ .reply = try arena.dupe(u8, a) });
-                } else if (ending == .Limit) {
+                } else if (ending == .Failed) {
                     try entries.append(arena, .{ .note = try arena.dupe(u8, a) });
                 }
             }
@@ -568,6 +591,19 @@ pub const Seen = struct {
         self.replace(&self.last_text, text);
     }
 };
+
+fn number(value: std.json.Value) ?u64 {
+    return switch (value) {
+        .integer => |integer| std.math.cast(u64, integer),
+        .number_string => |decimal| std.fmt.parseInt(u64, decimal, 10) catch null,
+        else => null,
+    };
+}
+
+fn isWorkspaceGuide(text: []const u8) bool {
+    return std.mem.startsWith(u8, text, "<workspace-instructions source=\"AGENTS.md\">\n") and
+        std.mem.endsWith(u8, text, "\n</workspace-instructions>");
+}
 
 pub fn noteEntries(arena: std.mem.Allocator, said: []const u8) ![]write.Entry {
     const entries = try arena.alloc(write.Entry, 1);
@@ -598,7 +634,7 @@ test "mei.obs pulse model route usage never become notes" {
     }
 }
 
-test "observations drive actual effort step and two-decimal context" {
+test "session totals span runs, restore a checkpoint and mark missing usage" {
     const gpa = std.testing.allocator;
     var seen = try Seen.init(gpa, "auto");
     defer seen.deinit();
@@ -609,12 +645,18 @@ test "observations drive actual effort step and two-decimal context" {
     _ = try seen.line(arena, "{\"type\":\"mei.obs\",\"kind\":\"model\",\"model\":\"group/plan-first\",\"context_tokens\":1048576,\"efforts\":[\"none\",\"low\",\"high\",\"max\"],\"effort\":\"high\"}", 1);
     _ = try seen.line(arena, "{\"type\":\"mei.obs\",\"kind\":\"route\",\"available\":true,\"model\":\"provider/actual\",\"effort\":\"high\"}", 2);
     _ = try seen.line(arena, "{\"type\":\"mei.obs\",\"kind\":\"usage\",\"usage\":{\"input_tokens\":231,\"cache_creation_input_tokens\":0,\"cache_read_input_tokens\":256}}", 3);
+    _ = try seen.line(arena, "{\"role\":\"assistant\",\"content\":\"first\"}", 4);
+    seen.begin(5);
+    _ = try seen.line(arena, "{\"type\":\"mei.obs\",\"kind\":\"usage\",\"usage\":{\"input_tokens\":13}}", 6);
+    _ = try seen.line(arena, "{\"role\":\"assistant\",\"content\":\"second\"}", 7);
+    _ = try seen.line(arena, "{\"role\":\"assistant\",\"content\":\"step without usage\"}", 8);
+    var saved_buf: [256]u8 = undefined;
+    const saved = try seen.sessionUsage(&saved_buf);
+    seen.reset();
+    _ = try seen.line(arena, saved, 9);
     const offer = seen.offer(&offer_buf);
     try std.testing.expect(std.mem.indexOf(u8, offer, "provider/actual") != null);
-    try std.testing.expect(std.mem.indexOf(u8, offer, "effort high") != null);
-    try std.testing.expect(std.mem.indexOf(u8, offer, "Agent Step 1") != null);
-    try std.testing.expect(std.mem.indexOf(u8, offer, "0.05%") != null);
-    try std.testing.expect(std.mem.indexOf(u8, offer, "487/1048576") != null);
+    try std.testing.expect(std.mem.indexOf(u8, offer, "Agent Step 3 · Input ≥500") != null);
 }
 
 test "image results never print base64" {

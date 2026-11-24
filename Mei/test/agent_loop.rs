@@ -204,7 +204,23 @@ fn e2e_beginner_workflow_from_first_prompt_to_project_change() {
     assert_eq!(output.stdout, b"42");
     let mut lines = trace.lines();
     assert_model_observation(lines.next().unwrap());
-    assert_eq!(lines.count(), 6);
+    let records: Vec<Value> = lines
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    assert_eq!(
+        records
+            .iter()
+            .filter(|record| record.get("role").is_some())
+            .count(),
+        6
+    );
+    assert_eq!(
+        records
+            .iter()
+            .filter(|record| record["kind"] == "tool_start")
+            .count(),
+        2
+    );
     let requests = first_gateway.join().unwrap();
     assert_eq!(requests.len(), 3);
     assert_eq!(requests[0]["model"], "test/model");

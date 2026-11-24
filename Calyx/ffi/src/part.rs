@@ -93,16 +93,23 @@ pub enum Ending {
     Done,
     Limit,
     Cancelled,
+    Failed,
 }
 
 impl Ending {
-    pub const ALL: [Ending; 3] = [Ending::Done, Ending::Limit, Ending::Cancelled];
+    pub const ALL: [Ending; 4] = [
+        Ending::Done,
+        Ending::Limit,
+        Ending::Cancelled,
+        Ending::Failed,
+    ];
 
     pub const fn number(self) -> u8 {
         match self {
             Ending::Done => 0,
             Ending::Limit => 1,
             Ending::Cancelled => 2,
+            Ending::Failed => 3,
         }
     }
 }

@@ -11,7 +11,7 @@ const effort = @import("mei_effort.zig");
 const observation = @import("mei_observation.zig");
 const mei_session = @import("mei_session.zig");
 
-pub const Action = enum { task, steer, handled, quit };
+pub const Action = enum { task, steer, effort_menu, handled, quit };
 
 const ResumeArg = enum { typed, resolved };
 
@@ -39,7 +39,7 @@ pub fn dispatch(ui: anytype, typed: []const u8) Action {
                 ui.printNote("no previous Mei session; use /resume <jsonl>");
             }
         },
-        .change_effort => switchEffort(ui),
+        .change_effort => return .effort_menu,
         .unknown => ui.printNote("unknown Mei command; available: /new, /resume [jsonl], /effect, /quit"),
         .quit => unreachable,
     }
@@ -70,9 +70,6 @@ pub fn createSession(ui: anytype) bool {
             ui.session = session;
             ui.seen.reset();
             ui.clearConversation();
-            var buf: [512]u8 = undefined;
-            const msg = std.fmt.bufPrint(&buf, "new Mei session: {s}", .{session.pathSlice()}) catch "new Mei session";
-            ui.printNote(msg);
             return true;
         },
         .err => |diag| {
@@ -116,9 +113,6 @@ fn resumeSession(ui: anytype, path_in: []const u8, arg: ResumeArg) void {
                 const more = ui.seen.line(arena, line, at) catch continue;
                 entries.appendSlice(arena, more) catch {};
             }
-            var buf: [512]u8 = undefined;
-            const msg = std.fmt.bufPrint(&buf, "resumed Mei session: {s}", .{session.pathSlice()}) catch "resumed Mei session";
-            entries.append(arena, .{ .note = arena.dupe(u8, msg) catch msg }) catch {};
             rememberCurrent(ui);
             ui.session = session;
             ui.print(entries.items);
@@ -131,11 +125,7 @@ fn resumeSession(ui: anytype, path_in: []const u8, arg: ResumeArg) void {
     }
 }
 
-fn switchEffort(ui: anytype) void {
-    const selected = effort.next(ui.seen.currentEffort(), ui.seen.effortLevels()) orelse {
-        ui.printNote("Magpie effort levels arrive with the first model selection");
-        return;
-    };
+pub fn chooseEffort(ui: anytype, selected: []const u8) void {
     const encoded = effort.updatedExtra(ui.gpa, ui.environ.get("HARNESS_EXTRA"), selected) catch {
         ui.printNote("could not update HARNESS_EXTRA; keep it as one JSON object");
         return;
@@ -146,9 +136,6 @@ fn switchEffort(ui: anytype) void {
         return;
     };
     ui.seen.requestEffort(selected);
-    var buf: [128]u8 = undefined;
-    const msg = std.fmt.bufPrint(&buf, "requested effort for the next run: {s}", .{selected}) catch "requested effort updated";
-    ui.printNote(msg);
 }
 
 const Fake = struct {
