@@ -360,7 +360,8 @@ def render     : Gathered → String
 def writeChecklist : Setting → Json → System.FilePath → IO Unit
 ```
 
-D10 `Door.raise` 从 `sprawling init` 的回执取得私有城目录，核对其中的账本目录已建立，再交给
+D10 `Door.raise` 从 `sprawling init` 回执末尾的序号分隔处取出完整的账本路径。路径本身可以
+含有相同的分隔文字。由账本路径取得私有城目录，核对其中的账本目录已建立，再交给
 `servingAt` 与磁盘检查使用。临时 home 同时传给初始化与服务。这样同一次场景中的进程、文件检查
 与回放读到的是同一座城。解析回执沿用产品已经公开的路径，不在检验器重算 workspace 标识。
 

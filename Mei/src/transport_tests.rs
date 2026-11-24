@@ -313,31 +313,37 @@ fn a_pending_windows_read_keeps_the_response_on_the_same_socket() {
     let mut stream = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
     let (mut peer, _) = listener.accept().unwrap();
     let response = b"HTTP/1.0 200 OK\r\n\r\n{}";
-    peer.write_all(response).unwrap();
-    peer.shutdown(std::net::Shutdown::Write).unwrap();
+    let (send, receive) = std::sync::mpsc::channel();
+    let writer = thread::spawn(move || {
+        receive.recv().unwrap();
+        thread::sleep(Duration::from_millis(40));
+        peer.write_all(response).unwrap();
+        peer.shutdown(std::net::Shutdown::Write).unwrap();
+    });
 
-    let mut pending = true;
+    let mut pending = Some(send);
     let mut pulses = Vec::new();
     let found = read_to_eof(
         &mut stream,
         &Timeouts {
             connect: Duration::from_secs(2),
             io: Duration::from_secs(2),
-            pulse: Duration::from_millis(50),
+            pulse: Duration::from_secs(2),
         },
         ResponseTrace {
             pulse: &mut pulses,
             path: "loopback response",
         },
         |socket, buffer| {
-            if std::mem::replace(&mut pending, false) {
+            if let Some(send) = pending.take() {
+                send.send(()).unwrap();
                 Err(std::io::Error::from_raw_os_error(WSA_IO_PENDING))
             } else {
                 socket.read(buffer)
             }
         },
-    )
-    .unwrap();
-    assert_eq!(found, response);
-    assert!(!pulses.is_empty());
+    );
+    writer.join().unwrap();
+    assert_eq!(found.unwrap(), response);
+    assert!(pulses.is_empty());
 }

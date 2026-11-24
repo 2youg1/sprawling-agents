@@ -131,7 +131,8 @@ pub(crate) fn concurrent_calls(prepared: &Prepared) -> Result<Concurrent, String
 }
 
 pub(crate) fn measure_memory(prepared: &Prepared) -> Result<Memory, String> {
-    let mut tree = Tree::open(std::process::id());
+    let mut tree = Tree::open(std::process::id())
+        .map_err(|error| fixture(format!("open the benchmark process counters: {error}")))?;
     let before = tree
         .read(Duration::ZERO)
         .ok_or_else(|| fixture("the memory reader could not find this bench process"))?;

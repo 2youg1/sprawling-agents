@@ -452,10 +452,18 @@ private def raisedLedger (output : String) : Option System.FilePath := do
   let heading := "city raised: ledger at "
   let line ← (output.splitOn "\n").find? (·.startsWith heading)
   let rest := (line.drop heading.length).toString
-  match rest.splitOn " (genesis seq " with
-  | [path, seq] =>
-    if !path.isEmpty && seq.trimAscii.toString.endsWith ")" then some ⟨path⟩ else none
-  | _ => none
+  let separator := " (genesis seq "
+  let seq :: tail :: earlier := (rest.splitOn separator).reverse | none
+  let path := separator.intercalate (tail :: earlier).reverse
+  let seq := seq.trimAscii.toString
+  if !path.isEmpty && seq.endsWith ")" && (seq.dropEnd 1).toString.toNat?.isSome then
+    some ⟨path⟩
+  else
+    none
+
+#guard
+  (raisedLedger "city raised: ledger at /tmp/check (genesis seq 1)/.sprawling/ledger (genesis seq 0)").map
+    System.FilePath.toString == some "/tmp/check (genesis seq 1)/.sprawling/ledger"
 
 /-- Raises a city's private state and returns the directory named by init. -/
 def Door.raise (door : Door) (workspace home : System.FilePath) : IO System.FilePath := do

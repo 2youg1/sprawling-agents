@@ -124,7 +124,7 @@ impl Report { pub fn write_csv(&self) -> Result<PathBuf, String>; }
 | `python_warm_call` | 同一解释器已校验后重复运行负载，返回时先停表再做输出校验；另写一次全局并检查下一次调用看不到它 | 热调用分布、重复输出逐字节相等与新解释器状态隔离 |
 | `python_concurrent_call` | 固定并发度的 scoped threads 从同一屏障出发，每个线程对同一解释器路径各起一次 `-c`；以最后一次返回为每轮 wall 终点，之后核对输出 | 并发调用延迟、整批吞吐与尾延迟；每轮原始 wall 也进 CSV，可重算终端的 calls_per_s |
 | `python_start_delay` | 同上，每线程记录从本轮开始到屏障后实际起跑的时间，CSV 保留其 burst 轮次 | 起跑调度分布；当前没有 admission queue，故不把它改名成 queue delay |
-| `python_memory` | 并发 burst 前、期间与排空后经 `sprawling::monitor::tree::Tree` 读当前进程；相邻整表读取遵守 `MINIMUM_BEAT`，必要时延后最终读取 | Unix 的 virtual 与 resident；Windows 明确写 private commit 与 resident，不伪称取得虚拟地址预留。before／peak／after 与 beats 都进 CSV；peak 只是采样看到的下界 |
+| `python_memory` | 并发 burst 前、期间与排空后经 `sprawling::monitor::tree::Tree` 读当前进程；相邻整表读取遵守 `MINIMUM_BEAT`，必要时延后最终读取。无法打开进程计数器时保留失败原因并结束该项测量 | Unix 的 virtual 与 resident；Windows 明确写 private commit 与 resident，不伪称取得虚拟地址预留。before／peak／after 与 beats 都进 CSV；peak 只是采样看到的下界 |
 
 每个计时样本保留一行，索引从 1 开始，微秒仍由 `monitor::spread::micros` 转换：
 

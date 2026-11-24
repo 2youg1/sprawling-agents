@@ -21,6 +21,7 @@ const PULSE_INTERVAL: Duration = Duration::from_secs(5);
 
 const PROBE_TIMEOUT: Duration = Duration::from_secs(2);
 const WSA_IO_PENDING: i32 = 997;
+const PENDING_READ_BACKOFF: Duration = Duration::from_millis(5);
 
 struct Timeouts {
     connect: Duration,
@@ -277,12 +278,12 @@ fn read_to_eof(
     ResponseTrace { pulse, path }: ResponseTrace<'_>,
     mut read: impl FnMut(&mut TcpStream, &mut [u8]) -> std::io::Result<usize>,
 ) -> Result<Vec<u8>> {
-    let deadline = Instant::now() + timeouts.io;
+    let mut last_pulse = Instant::now();
+    let deadline = last_pulse + timeouts.io;
     let mut response = Vec::new();
     let mut chunk = [0_u8; 8192];
     loop {
-        let started = Instant::now();
-        let remaining = deadline.saturating_duration_since(started);
+        let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
             return Err(Error::Diagnostic(
                 Diagnostic::new(
@@ -320,13 +321,19 @@ fn read_to_eof(
                 )
             })?),
             Err(err) if cfg!(windows) && err.raw_os_error() == Some(WSA_IO_PENDING) => {
-                std::thread::sleep(slice.saturating_sub(started.elapsed()));
-                write_pulse(pulse, path)?;
+                if last_pulse.elapsed() >= timeouts.pulse {
+                    write_pulse(pulse, path)?;
+                    last_pulse = Instant::now();
+                }
+                std::thread::sleep(
+                    PENDING_READ_BACKOFF.min(deadline.saturating_duration_since(Instant::now())),
+                );
             }
             Err(err)
                 if err.kind() == ErrorKind::WouldBlock || err.kind() == ErrorKind::TimedOut =>
             {
                 write_pulse(pulse, path)?;
+                last_pulse = Instant::now();
             }
             Err(err) => {
                 return Err(Error::Diagnostic(

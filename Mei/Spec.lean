@@ -446,9 +446,9 @@ doctor 测试用假探测/安装闭包和隔离缓存，不执行真实下载；
 /-! D19 图片仍经唯一 python 工具的 `show_image` 原语返回标准 image tool-result；理由：模型必须收到视觉块才能真正看图，base64 不进入 stdout 就不会挤占小结果预算。被否：第二图片工具、OCR/外部视觉 API 冒充 Mei 自身看图、把 base64 当普通文本。 -/
 /-! D20 默认 adaptive + high 只定义请求；实际 model/effort 仅以 Magpie route 为确认来源，未确认就标 requested。`requested` 是请求实际携带的值：`HARNESS_EXTRA` 覆盖 `model` 时，model 行与目录元数据都以请求为准，另一模型的 context/efforts 不沿用。`mei --describe` 只读查询目录及实际请求设置，将同一 `mei.obs model` 写到 stdout，供首次任务前的 effort 选择。它不运行 Python、不加载工作区指令、不发生成请求。被否：把路由组 ID 当最终模型、把支持级别列表当当前级别、为显示状态而伪报 default、把目录选择而非请求当 requested。 -/
 
-/-! D24 Windows 的 `WSA_IO_PENDING` 复用本次响应的读取截止时刻。若此错误早于本次读的等待窗口，
-等到该窗口结束再读，避免反复立即失败时占满线程并密集发存活观测。被否：把 997 当作连接失败，
-因为未读完的响应仍可能继续到达；重置预算会让慢速响应无限延长读取。 -/
+/-! D24 Windows 的 `WSA_IO_PENDING` 复用本次响应的读取截止时刻。遇到此错误时，至多退让
+5 ms，再由同一连接的阻塞读取等响应。连续立即返回该错误时，退让限制重读频率，存活观测仍按
+原有间隔发送。被否：等到整个读取片用尽再读。探测的读取片等于整个预算，截止前到达的响应会丢失。 -/
 
 /-! D23 Python 的私有帧传回异常标志，Mei 把异常标到 `tool_result.is_error`，仍将完整捕获内容送回模型。每个已经验证的调用执行前发 `mei.obs tool_start`。工作区指令成功读取时发 `mei.obs workspace`，只携带加载标志。交互运行把 PNG/JPEG 解码为有界灰阶字符预览，经 `mei.obs image` 发给 Calyx。原图片完整保留在工具结果里。理由：前端以真实运行结果识别状态，避免从 traceback 文本或普通 stderr 猜测；灰阶预览可在备用屏重排，不依赖宿主图形扩展。 -/
 /-! D21 任务进行中的 Steer 接到本波最新一条 tool_result 文本末尾，不打断当前工具调用。
