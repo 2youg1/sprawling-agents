@@ -88,6 +88,8 @@ pub fn build(b: *std.Build) void {
         }),
     });
     const test_step = b.step("test", "Run Calyx Zig leaf and shell tests");
-    test_step.dependOn(&b.addRunArtifact(leaf_tests).step);
+    const run_leaf = b.addRunArtifact(leaf_tests);
+    test_step.dependOn(&run_leaf.step);
+    b.step("fuzz", "Exercise the frame renderer").dependOn(&run_leaf.step);
     test_step.dependOn(&b.addRunArtifact(shell_tests).step);
 }

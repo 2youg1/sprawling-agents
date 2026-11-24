@@ -156,6 +156,7 @@ end ConsoleFfi
 正常触发此结果，提示应减少单帧文字。`Malformed` 提示报告缺陷，两者均不停止城市服务。`Screen::frame` 显示相应恢复提示，保留未显示的转写供下一帧重试；成功后才推进转写位置。连续相同拒绝只提示一次，避免每个事件重复刷屏。
 
 一致性检查：`lake build Calyx.ffi.Spec` 检查状态机性质并输出容量轨迹；将轨迹与 `src/leaf.rs` 的初始容量、Full 分支逐次对照。Rust 的 `tests/edges.rs` 通过真实叶子检查扩容、调用方大容量及 Malformed 清空输出；Zig 链接测试检查 URI 不带终端命令。
+Linux nightly 在 Calyx 目录运行 `zig build fuzz --fuzz=100K`。覆盖引导输入驱动真实 draw 入口与生产编码器，覆盖任意场景字节、编码成功的帧和不同输出容量。成功时报告的长度在容量内；容量外及失败时的结果记录保持原值。
 
 
 ```rust

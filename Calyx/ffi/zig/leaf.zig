@@ -68,3 +68,68 @@ test "hostile scene bytes never trap the draw export" {
         try std.testing.expect(status == @backingInt(part.Status.Drawn) or status == @backingInt(part.Status.Full) or status == @backingInt(part.Status.Malformed));
     }
 }
+
+test "fuzz: the draw export respects the output capacity" {
+    try std.testing.fuzz({}, fuzzDraw, .{});
+}
+
+fn fuzzDraw(_: void, smith: *std.testing.Smith) !void {
+    var bytes: [128]u8 = undefined;
+    const input = bytes[0..smith.slice(&bytes)];
+    const capacity = smith.valueRangeAtMost(u16, 0, 2048);
+    var into: [2049]u8 = undefined;
+    _ = try checkDraw(input, &into, capacity);
+
+    const columns = smith.valueRangeAtMost(u16, 1, 64);
+    const rows = smith.valueRangeAtMost(u16, 1, 12);
+    var encoded: [512]u8 = undefined;
+    var writer: std.Io.Writer = .fixed(&encoded);
+    if (smith.value(bool)) {
+        try write.writeInline(&writer, .{
+            .columns = columns,
+            .rows = rows,
+            .erase = 0,
+            .previous = null,
+            .entries = &.{.{ .note = input }},
+        });
+    } else {
+        try write.writeQuiet(&writer, .{ .columns = columns, .rows = rows, .url = "", .code = input });
+    }
+    const frame_bytes = writer.buffered();
+    var ample: [8193]u8 = undefined;
+    const rendered = switch (try checkDraw(frame_bytes, &ample, ample.len - 1)) {
+        .drawn => |output| output,
+        else => return error.ValidFrameRefused,
+    };
+    const actual = try checkDraw(frame_bytes, &into, capacity);
+    if (rendered.len <= capacity) {
+        switch (actual) {
+            .drawn => |output| try std.testing.expectEqualSlices(u8, rendered, output),
+            else => return error.FrameRefused,
+        }
+    } else {
+        try std.testing.expect(actual == .full);
+    }
+}
+
+const DrawResult = union(enum) { drawn: []const u8, full, malformed };
+
+fn checkDraw(input: []const u8, into: []u8, capacity: usize) !DrawResult {
+    const sentinel: u8 = 0xa5;
+    @memset(into[capacity..], sentinel);
+    const initial = Drawn{ .written = std.math.maxInt(usize), .cursor_row = std.math.maxInt(usize) };
+    var drawn = initial;
+    const status = sprawling_console_draw(input.ptr, input.len, into.ptr, capacity, &drawn);
+    try std.testing.expect(std.mem.allEqual(u8, into[capacity..], sentinel));
+    switch (status) {
+        @backingInt(part.Status.Drawn) => {
+            try std.testing.expect(drawn.written <= capacity);
+            return .{ .drawn = into[0..drawn.written] };
+        },
+        @backingInt(part.Status.Full), @backingInt(part.Status.Malformed) => {
+            try std.testing.expectEqual(initial, drawn);
+            return if (status == @backingInt(part.Status.Full)) .full else .malformed;
+        },
+        else => return error.UnknownDrawStatus,
+    }
+}
