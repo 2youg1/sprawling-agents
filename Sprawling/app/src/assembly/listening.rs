@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Port bind then one writer (`Sprawling/app/spec/Assembly/Listening.lean` §8-88);
-//! a refused serve leaves the Ledger as found.
-
 use std::sync::Arc;
 
 use kernel::{AxCode, AxError};
@@ -39,7 +36,6 @@ fn hearing(
     })
 }
 
-/// Port taken and writer open; does not answer until [`Listening::serve`].
 #[must_use = "a listening city answers nobody until it is served"]
 pub struct Listening {
     bound: wire::Bound,
@@ -56,13 +52,6 @@ pub struct Listening {
     ),
 }
 
-/// Takes the city's port, then opens its one writer.
-///
-/// # Errors
-/// Refuses before a writer exists when the address may not or cannot be
-/// bound (`E_CONFIG_INVALID`); refuses before anything is written when
-/// another process holds the city (`E_LEDGER_HELD`) or the city cannot
-/// be opened - an unreadable chain, a store that will not open.
 pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
     let Serving {
         city_root,
@@ -206,6 +195,7 @@ pub async fn listen(serving: Serving) -> Result<Listening, AxError> {
         acp: Arc::new(move |body, pairing| acp_dispatch(&acp_desk, body, pairing)),
         transcribe_sink: hearing(audio_views, audio_vault),
         drop_sink: super::dropping::dropping(city_root.to_path_buf()),
+        workspace: Some(super::workspace::workspace(city_root.to_path_buf())),
     };
     let doorstep = doorstep::Doorstep::kept(door, at.port(), &token)?;
     Ok(Listening {
@@ -236,11 +226,6 @@ fn handed(
 }
 
 impl Listening {
-    /// Answers until closed; returns after the writer handoff ends.
-    ///
-    /// # Errors
-    /// Propagates accept failures, an abnormal worker end, and a close
-    /// without handoff.
     pub async fn serve(self, console: Option<crate::console::Terminal>) -> Result<(), AxError> {
         let Listening {
             bound,

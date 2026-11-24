@@ -3,22 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What the frozen prefix carries: the building's rules, the project's
-//! own conventions, and the task - all as bytes rather than as pointers
-//! at bytes.
-
 #![allow(clippy::wildcard_enum_match_arm, reason = "test code")]
 
 use super::super::*;
 use crate::worker::fixture::*;
 use crate::worker::*;
 
-/// A building that was adopted rather than raised brings its own
-/// conventions with it, written for whoever works on that project, and
-/// `AGENTS.md` is the file they are written in. A resident that has to
-/// open it before it can follow it follows it one turn late, or not at
-/// all - the same sentence `building_segment` already carries about
-/// `RULES.toml`, and the same answer.
 #[test]
 fn a_project_that_came_with_its_own_conventions_has_them_in_the_prompt() {
     let dir = tempfile::tempdir().unwrap();
@@ -34,9 +24,6 @@ fn a_project_that_came_with_its_own_conventions_has_them_in_the_prompt() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         })
         .unwrap();
-    // Where the project keeps it: the building's own root, outside the
-    // reserved subtree, because it belongs to the project rather than
-    // to the city.
     std::fs::write(
         dir.path().join("lab").join("AGENTS.md"),
         "# AGENTS.md\n\nEvery measurement is recorded in millivolts.\n",
@@ -50,6 +37,8 @@ fn a_project_that_came_with_its_own_conventions_has_them_in_the_prompt() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -66,10 +55,6 @@ fn a_project_that_came_with_its_own_conventions_has_them_in_the_prompt() {
     );
 }
 
-/// A city formed around a project's own folder finds the project's
-/// `AGENTS.md` at the city root, and its buildings are that project's
-/// subfolders. Both files reach the prompt, the workspace's first and
-/// the building's after it, so the one nearest the work is read last.
 #[test]
 fn the_workspaces_conventions_come_before_the_buildings_own() {
     let dir = tempfile::tempdir().unwrap();
@@ -109,6 +94,8 @@ Every measurement is recorded in millivolts.
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -126,9 +113,6 @@ Every measurement is recorded in millivolts.
     );
 }
 
-/// A building with no `AGENTS.md` says nothing about one. The heading is
-/// written only when there is a file under it, so a resident is never
-/// told to follow conventions that do not exist.
 #[test]
 fn a_building_without_the_file_gets_no_heading_for_it() {
     let dir = tempfile::tempdir().unwrap();
@@ -152,6 +136,8 @@ fn a_building_without_the_file_gets_no_heading_for_it() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -179,9 +165,6 @@ fn the_prefix_carries_the_rules_and_the_task_rather_than_pointing_at_them() {
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"create"),
         })
         .unwrap();
-    // A handoff the last session actually wrote, as against the blank
-    // form a new room starts with. It is the room's, not the
-    // building's.
     let handoff = city::handoff_path(dir.path(), &room);
     if let Some(parent) = handoff.parent() {
         std::fs::create_dir_all(parent).unwrap();
@@ -199,6 +182,8 @@ fn the_prefix_carries_the_rules_and_the_task_rather_than_pointing_at_them() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -227,9 +212,6 @@ fn the_prefix_carries_the_rules_and_the_task_rather_than_pointing_at_them() {
     );
 }
 
-/// Every one of the four segments is interned: a hash on the ledger with
-/// nothing holding its bytes would leave "what was this agent told"
-/// without an answer. `Query::Prefix` is the read that proves it.
 #[test]
 fn every_segment_of_a_frozen_prompt_reads_back_as_text() {
     let dir = tempfile::tempdir().unwrap();
@@ -253,6 +235,8 @@ fn every_segment_of_a_frozen_prompt_reads_back_as_text() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -317,7 +301,6 @@ fn every_segment_of_a_frozen_prompt_reads_back_as_text() {
         building.sources
     );
 
-    // And the general store read reaches the same bytes by locator.
     let locator =
         kernel::Locator::parse(&format!("cas:b3-{}", building.hash)).expect("a stored segment");
     let wire::Answer::Content(content) =
@@ -328,9 +311,6 @@ fn every_segment_of_a_frozen_prompt_reads_back_as_text() {
     assert_eq!(content.text, building.text);
 }
 
-/// Dispatches one fixed job into a room under review in a new city and
-/// reads back the segments its prompt was assembled from, as
-/// `(slot, hash)`.
 fn segments_of_a_review_dispatch() -> Vec<(String, String)> {
     let dir = tempfile::tempdir().unwrap();
     let report = crate::worker::fixture::init_city(dir.path()).unwrap();
@@ -346,6 +326,8 @@ fn segments_of_a_review_dispatch() -> Vec<(String, String)> {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -375,14 +357,6 @@ fn segments_of_a_review_dispatch() -> Vec<(String, String)> {
         .collect()
 }
 
-/// Preparing a dispatch moves off the accounting thread without moving
-/// a byte of the prefix it freezes (`Sprawling/app/Spec.lean` §8-113): the hashes
-/// below were taken from the path that prepares everything on the
-/// accounting thread, and a room under review is where the move reaches
-/// furthest, because its tree is placed in the lane. A change that means
-/// to alter what a fresh city's prefix says takes the new hashes from
-/// this test's failure; a change that only moves work between threads
-/// leaves them as they are.
 #[test]
 fn a_review_dispatch_freezes_the_prefix_it_froze_on_the_accounting_thread() {
     let pinned = [

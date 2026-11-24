@@ -84,6 +84,8 @@ fn what_a_run_changes_is_changed_after_the_line_that_announces_it() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"order"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -161,6 +163,8 @@ fn a_resident_crosses_two_runs_with_the_same_identity_segment() {
                 policy: kernel::RunPolicy::of(kernel::Mode::Work),
                 idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, task.as_bytes()),
                 session: None,
+                resume: None,
+                images: Vec::new(),
                 effort: None,
                 model: None,
             })
@@ -208,6 +212,8 @@ fn the_views_answer_from_the_ledger_and_rebuild_to_the_same_answer() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -264,6 +270,8 @@ fn an_entropy_only_document_does_not_block_a_real_run() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"entropy"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -334,6 +342,8 @@ fn a_known_shape_refusal_is_queryable_after_a_real_run() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"shape"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -382,6 +392,8 @@ fn a_commit_the_city_made_says_which_run_wrote_it() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"whose"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: Some(kernel::Effort::High),
             model: None,
         })

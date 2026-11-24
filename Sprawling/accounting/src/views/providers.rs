@@ -250,8 +250,11 @@ pub(crate) fn config_answer(
     let context_lock_tokens = city::load(city_root, building.addr())?
         .context_lock()
         .map(|lock| lock.tokens().get());
+    let city_layer = city::stated_city_config(city_root)?;
     Ok(wire::ConfigAnswer {
         addr: addr.clone(),
+        city_effort: city_layer.effort(),
+        city_keep_warm: city_layer.keep_warm(),
         effort: city::settled_effort(city_root, addr)?.map(|(effort, layer)| wire::SettledEffort {
             effort,
             from: rung_of(layer),

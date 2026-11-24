@@ -98,6 +98,7 @@ impl Chartered {
             routing: None,
 
             agent: None,
+            pictures: &[],
         }
     }
 }

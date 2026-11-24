@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a fork writes and what it reads: the lineage line and the node
-//! the mother must own, and a branch rebuilt from the mother's own lines
-//! rather than from a verify of the whole history.
-
 #![allow(clippy::wildcard_enum_match_arm, reason = "test code")]
 
 use super::super::*;
@@ -28,11 +24,12 @@ fn a_fork_records_lineage_and_refuses_a_node_the_mother_does_not_own() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
         .unwrap();
-    // Find the mother's run_started node in the verified chain.
     let verified =
         runtime::replay::verify_ledger_dir(&kernel::layout::CityLayout::new(dir.path()).ledger())
             .unwrap();
@@ -48,10 +45,6 @@ fn a_fork_records_lineage_and_refuses_a_node_the_mother_does_not_own() {
             _ => None,
         })
         .expect("a dispatch writes run_started");
-    // Seq 0 is the genesis, a city event: not the mother's node, so a
-    // session cannot branch from it - and the refusal comes before the
-    // room is cleared, because a session that cannot inherit must not
-    // have cost the room its shape.
     let err = worker
         .handle(wire::Command::OpenSession {
             addr: room.clone(),
@@ -65,9 +58,6 @@ fn a_fork_records_lineage_and_refuses_a_node_the_mother_does_not_own() {
         .unwrap_err();
     assert!(err.subject().contains("not an event of run"), "{err}");
 
-    // The branch itself, and then the dispatch that inherits: the lineage
-    // is the *run's* fact, so it is written when a run begins - a session
-    // that never dispatches never has one.
     worker
         .handle(wire::Command::OpenSession {
             addr: room.clone(),
@@ -87,6 +77,8 @@ fn a_fork_records_lineage_and_refuses_a_node_the_mother_does_not_own() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"carry-on"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -126,14 +118,6 @@ fn a_fork_records_lineage_and_refuses_a_node_the_mother_does_not_own() {
     );
 }
 
-/// Rebuilding a branch's conversation reads the mother's own lines, not
-/// the history: the history was verified when the city opened, and a
-/// rebuild that verified it again would cost the whole ledger on every
-/// branch.
-///
-/// A chain broken after genesis is the witness: a verify refuses it, and
-/// the rebuild, which never reads that line, inherits as it would from an
-/// intact ledger.
 #[test]
 fn inheriting_a_branch_does_not_verify_the_history() {
     let dir = tempfile::tempdir().unwrap();
@@ -149,6 +133,8 @@ fn inheriting_a_branch_does_not_verify_the_history() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"mother"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -175,6 +161,8 @@ fn inheriting_a_branch_does_not_verify_the_history() {
     let at = Assignment {
         addr: Address::parse("lab/room1").unwrap(),
         session: None,
+        resume: None,
+        pictures: Vec::new(),
         effort: None,
         difficulty: None,
         model: None,
@@ -197,11 +185,6 @@ fn inheriting_a_branch_does_not_verify_the_history() {
     );
 }
 
-/// A provider reuses a cached prompt only for a prefix that matches byte
-/// for byte, so a branch in the same room opens with the bytes its
-/// mother last sent: the four frozen segments, every other key of the
-/// rendered request, and each message the mother exchanged
-/// (`Sprawling/app/Spec.lean` §8-141).
 #[test]
 fn a_branch_first_request_carries_the_bytes_of_the_mothers_last() {
     let dir = tempfile::tempdir().unwrap();
@@ -222,6 +205,8 @@ fn a_branch_first_request_carries_the_bytes_of_the_mothers_last() {
         policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, idem),
         session: None,
+        resume: None,
+        images: Vec::new(),
         effort: None,
         model: None,
     };

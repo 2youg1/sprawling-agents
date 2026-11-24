@@ -16,12 +16,12 @@ use super::super::*;
 use crate::worker::fixture::*;
 use crate::worker::*;
 
-/// A dispatch as the desk delivers one: a person's work, sent to a room
-/// that already exists.
 pub(super) fn asked(addr: &str) -> Assignment {
     Assignment {
         addr: Address::parse(addr).unwrap(),
         session: None,
+        resume: None,
+        pictures: Vec::new(),
         effort: None,
         difficulty: None,
         model: None,
@@ -34,7 +34,6 @@ pub(super) fn asked(addr: &str) -> Assignment {
     }
 }
 
-/// Every line of the city's history, parsed, oldest first.
 pub(super) fn history(ledger_dir: &std::path::Path) -> Vec<serde_json::Value> {
     runtime::replay::verify_ledger_dir(ledger_dir)
         .unwrap()
@@ -44,13 +43,6 @@ pub(super) fn history(ledger_dir: &std::path::Path) -> Vec<serde_json::Value> {
         .collect()
 }
 
-/// **Two pieces of work a person sent go into two lanes**, and the
-/// accounting thread lands both.
-///
-/// The assertion that bites is the count of lanes in the air before the
-/// loop that lands them runs: driven one at a time, the second waits.
-/// The history cannot say it, because each run prepares in its own lane
-/// and how its first line interleaves with the other's freeze is a race.
 #[test]
 fn two_dispatches_from_the_desk_drive_at_once() {
     let dir = tempfile::tempdir().unwrap();
@@ -72,8 +64,6 @@ fn two_dispatches_from_the_desk_drive_at_once() {
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
 
-    // Both drives are in the air before either is landed: this is the
-    // door the desk takes, and the loop that lands them is below.
     worker
         .dispatch_into_lane(
             asked("lab/east"),
@@ -99,8 +89,6 @@ fn two_dispatches_from_the_desk_drive_at_once() {
     drop(provider);
 
     let lines = history(&report.ledger_dir);
-    // The chain itself: `verify_ledger_dir` refuses a history whose
-    // seq or prev disagree, so reaching this line is that assertion.
     let seqs: Vec<u64> = lines
         .iter()
         .map(|line| line["seq"].as_u64().unwrap())
@@ -110,9 +98,6 @@ fn two_dispatches_from_the_desk_drive_at_once() {
         "two lanes write one ledger, and its seq only ever climbs: {seqs:?}"
     );
 
-    // Each run's own order, which the crossing is what guarantees: a
-    // relay that answered on hand-off would let a call reach the
-    // history before the run that made it.
     for kind in ["run_started", "model_called"] {
         let count = lines.iter().filter(|line| line["kind"] == kind).count();
         assert!(count >= 2, "both runs wrote {kind}: {count} lines");
@@ -138,9 +123,6 @@ fn two_dispatches_from_the_desk_drive_at_once() {
     assert_eq!(frozen, 2, "every run the desk started has to freeze");
 }
 
-/// A city that is closing waits for its lanes. A lane abandoned on an
-/// append loses lines the city had already told it were durable, and
-/// the handoff would then describe a history that is missing its end.
 #[test]
 fn a_closing_city_lands_the_runs_still_driving() {
     let dir = tempfile::tempdir().unwrap();
@@ -189,13 +171,6 @@ fn a_closing_city_lands_the_runs_still_driving() {
     );
 }
 
-/// **A Cancel posted while a lane drives reaches that lane.**
-///
-/// The accounting thread reads the desk on every wake, and a lane reads
-/// it only at its safe points, so the thread nearly always saw the
-/// Cancel first and refused it as though no run answered to it. The
-/// bite is the first assertion: a refusal reached the person while the
-/// run it named was still in its model call.
 #[test]
 fn a_cancel_posted_while_a_lane_drives_stops_that_run() {
     use std::sync::{Arc, Mutex, mpsc};
@@ -229,7 +204,7 @@ fn a_cancel_posted_while_a_lane_drives_stops_that_run() {
     let desk = Arc::new(crate::worker::CommandDesk::default());
     let asking = Arc::clone(&desk);
     worker.serve(only_interrupts(Arc::new(move |run| {
-        asking.interrupt_for(run)
+        asking.interrupt_for(run, None)
     })));
     let attending = {
         let desk = Arc::clone(&desk);
@@ -244,6 +219,8 @@ fn a_cancel_posted_while_a_lane_drives_stops_that_run() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: key(b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         },
@@ -272,8 +249,6 @@ fn a_cancel_posted_while_a_lane_drives_stops_that_run() {
         },
         heard(&for_the_run),
     );
-    // A Cancel no run answers to, posted behind it: once its refusal is
-    // back, the accounting thread has looked at everything before it.
     desk.post(
         wire::Command::Cancel {
             run: RunId::CITY,
@@ -281,8 +256,6 @@ fn a_cancel_posted_while_a_lane_drives_stops_that_run() {
         },
         heard(&for_nobody),
     );
-    // Counted looks rather than a clock, which test code may not read:
-    // each look sleeps `LOOK`, so the count bounds the wait at `WITHIN`.
     let looks = WITHIN.as_millis() / LOOK.as_millis();
     let mut looked = 0;
     while for_nobody.lock().unwrap().is_empty() {
@@ -328,10 +301,6 @@ fn a_cancel_posted_while_a_lane_drives_stops_that_run() {
     );
 }
 
-/// **A prepared run gets a lane at once** (`Sprawling/app/Spec.lean`
-/// D34). Six pieces of work sent at once all drive at once on a machine
-/// with memory to spare: none waits in the pool for a lane, because the
-/// pool holds no lane count, and all six still freeze.
 #[test]
 fn tp2_more_than_four_runs_start_at_once() {
     let dir = tempfile::tempdir().unwrap();

@@ -78,10 +78,10 @@ fn fold_run<'a>(
             EventKind::RunStarted => {
                 let started = record.data().read::<RunStarted>()?;
                 conversation.push_task_lines(
-                    &started.task,
-                    &started.goal,
+                    (&started.task, &started.goal),
                     rebuilt(&started),
                     &handed_down_by(&started),
+                    &started.pictures,
                 );
                 at = record.seq();
             }
@@ -126,6 +126,7 @@ fn fold_run<'a>(
                 conversation.push_steer(
                     &crate::conversation::Speaker::from_recorded(&steer.source)?,
                     &steer.text,
+                    &steer.pictures,
                 );
             }
 

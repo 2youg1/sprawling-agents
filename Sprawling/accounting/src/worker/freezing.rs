@@ -121,14 +121,19 @@ impl Freezing<'_> {
         at: &Assignment,
         brief: &city::RunBrief,
     ) -> Result<Assembled, AxError> {
-        let mut slot = Assembled::of_nothing(run_segment(
-            self.city_root,
-            brief,
-            Predecessor {
-                room: &at.addr,
-                run: at.predecessor().or(self.carried_from),
-            },
-        )?);
+        let words = if at.resume.is_some() {
+            brief.segment_text().as_bytes().to_vec()
+        } else {
+            run_segment(
+                self.city_root,
+                brief,
+                Predecessor {
+                    room: &at.addr,
+                    run: at.predecessor().or(self.carried_from),
+                },
+            )?
+        };
+        let mut slot = Assembled::of_nothing(words);
         if let Some(note) = model_note(
             self.city_root,
             site.building.addr(),
@@ -213,6 +218,11 @@ impl Freezing<'_> {
             routing: Some(site.routing.clone()),
             run_policy: workbench.take_policy()?,
             inherited: std::mem::take(&mut self.inherited),
+            pictures: at
+                .pictures
+                .iter()
+                .map(|picture| picture.reference.clone())
+                .collect(),
             shape: runtime::turn::CallShape {
                 model: site.model.id.clone(),
 
@@ -256,7 +266,7 @@ impl Freezing<'_> {
             must_read.push(Locator::cas(hash));
         }
         must_read.push(job);
-        let handoff = self.frozen_handoff(&plan, must_read)?;
+        let handoff = self.frozen_handoff(&plan, must_read, at.resume.is_none())?;
         Ok((plan, handoff))
     }
 }

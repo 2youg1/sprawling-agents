@@ -28,6 +28,8 @@ pub struct RunSummary {
     pub task: Option<String>,
 
     pub goal: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_began: Option<Seq>,
 
     #[serde(default)]
     pub waiting: Option<Waiting>,

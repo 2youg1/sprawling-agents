@@ -100,6 +100,8 @@ fn a_dispatch_leaves_nothing_the_projects_git_would_pick_up_as_work() {
                 policy: kernel::RunPolicy::of(kernel::Mode::Work),
                 idem: kernel::IdemKey::derive(&kernel::RunId::CITY, kernel::Seq::FIRST, idem),
                 session: None,
+                resume: None,
+                images: Vec::new(),
                 effort: None,
                 model: None,
             })

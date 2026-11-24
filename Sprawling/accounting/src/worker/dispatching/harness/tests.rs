@@ -174,6 +174,8 @@ fn dispatch(addr: &str, model: Option<&str>) -> wire::Command {
         policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: kernel::IdemKey::derive(&kernel::RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
         session: None,
+        resume: None,
+        images: Vec::new(),
         effort: None,
         model: model.map(str::to_owned),
     }

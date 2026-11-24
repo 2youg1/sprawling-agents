@@ -49,6 +49,8 @@ fn a_written_key_reaches_the_vault_and_not_the_file() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"write"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -113,6 +115,8 @@ fn a_key_a_tool_reads_reaches_the_vault_and_not_the_model() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"read"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
         })
         .unwrap();

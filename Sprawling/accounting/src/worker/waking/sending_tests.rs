@@ -14,16 +14,10 @@
     reason = "test code"
 )]
 
-//! What a signal does the moment it is sent, and the knock that waits
-//! for a working room to empty (collab D7, D11).
-
 use super::super::*;
 use super::tests::{move_in, runs_started};
 use crate::worker::fixture::*;
 
-/// D7: a signal takes effect when it is sent. Its `signal_enqueued`
-/// line reaches the history while the sender is still running, before
-/// that run's `run_frozen`, rather than when the sender lands.
 #[test]
 fn a_signal_is_on_the_history_before_the_sender_freezes() {
     let dir = tempfile::tempdir().unwrap();
@@ -62,6 +56,8 @@ fn a_signal_is_on_the_history_before_the_sender_freezes() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -81,11 +77,6 @@ fn a_signal_is_on_the_history_before_the_sender_freezes() {
     );
 }
 
-/// A knock at a room whose queue is out with a run starts nothing: a
-/// second run there would read a spare inbox that nothing is delivered
-/// into, while the signal waits for the holder. When the holder gives
-/// the queue back the same knock goes out, and the run it starts finds
-/// the signal at home (`Sprawling/app/Spec.lean` §8-46-12).
 #[test]
 fn a_knock_at_a_room_somebody_is_working_in_waits_for_them_to_leave() {
     let dir = tempfile::tempdir().unwrap();
@@ -96,8 +87,6 @@ fn a_knock_at_a_room_somebody_is_working_in_waits_for_them_to_leave() {
     let hana = Address::parse("market/hana").unwrap();
     let working = RunId::from_bytes([7u8; 16]);
     let lent = worker.collaborating.rooms.lend(&hana, working);
-    // What the knock is for: delivered while the room is lent, so it
-    // waits in the holder's slot and comes home with the queue.
     worker
         .collaborating
         .rooms
@@ -139,9 +128,6 @@ fn a_knock_at_a_room_somebody_is_working_in_waits_for_them_to_leave() {
     assert!(started[0].contains("market/hana"), "{}", started[0]);
 }
 
-/// D7: an empty room is knocked when the signal is delivered, not when
-/// its sender lands. The resident's run starts while the sender still
-/// drives, so its `run_started` precedes the sender's `run_frozen`.
 #[test]
 fn a_signal_to_an_empty_room_starts_its_run_before_the_sender_freezes() {
     let dir = tempfile::tempdir().unwrap();
@@ -154,11 +140,6 @@ fn a_signal_to_an_empty_room_starts_its_run_before_the_sender_freezes() {
     .unwrap();
     move_in(dir.path(), "market/ito");
     move_in(dir.path(), "market/hana");
-    // The provider holds its second call until a third arrives, so
-    // whichever of the sender's last call and the woken run's first
-    // comes second, the woken run has started before the sender can
-    // freeze: what is measured is where the knock goes out, not which
-    // lane wins a race.
     let calls = std::sync::Arc::new((std::sync::Mutex::new(0u32), std::sync::Condvar::new()));
     let pace: Pace = std::sync::Arc::new(move |request: &str| {
         if !request.starts_with("POST ") {
@@ -204,6 +185,8 @@ fn a_signal_to_an_empty_room_starts_its_run_before_the_sender_freezes() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -230,18 +213,14 @@ fn a_signal_to_an_empty_room_starts_its_run_before_the_sender_freezes() {
     );
 }
 
-/// How the receiving room stands when ito's letter to it is delivered.
 enum Receiver {
-    /// A run is working in `market/hana`.
     Working,
-    /// `market/hana` is a room with no resident: nobody to knock for.
+
     Unoccupied,
-    /// `market/hana` is a resident who is not working.
+
     Idle,
 }
 
-/// Ito sends one letter to `market/hana`; answers each `signal_enqueued`
-/// id paired with the landing of the `signal_landed` line that names it.
 fn landings_after_a_send(receiver: Receiver) -> Vec<(String, Option<String>)> {
     let dir = tempfile::tempdir().unwrap();
     let report = crate::worker::fixture::init_city(dir.path()).unwrap();
@@ -282,6 +261,8 @@ fn landings_after_a_send(receiver: Receiver) -> Vec<(String, Option<String>)> {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -313,8 +294,6 @@ fn landings_after_a_send(receiver: Receiver) -> Vec<(String, Option<String>)> {
         .collect()
 }
 
-/// collab D17, kernel D38: the delivery writes where the letter landed,
-/// once, paired to its signal by id.
 #[test]
 fn a_sent_letter_says_where_it_landed() {
     for (receiver, expected) in [

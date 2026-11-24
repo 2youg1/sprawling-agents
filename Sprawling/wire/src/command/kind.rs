@@ -38,6 +38,10 @@ pub enum Command<Secret = Sealed<String>> {
         idem: IdemKey,
 
         session: Option<SessionName>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        resume: Option<kernel::Seq>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        images: Vec<String>,
 
         effort: Option<Effort>,
 
@@ -118,6 +122,8 @@ pub enum Command<Secret = Sealed<String>> {
     Steer {
         run: RunId,
         text: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        images: Vec<String>,
         idem: IdemKey,
     },
     Cancel {

@@ -133,6 +133,8 @@ impl Session {
                     policy: wire::RunPolicy::of(wire::Mode::Work),
                     idem,
                     session: None,
+                    resume: None,
+                    images: Vec::new(),
                     effort: self.effort,
                     model: self.model.clone(),
                 };

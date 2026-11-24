@@ -16,6 +16,7 @@ use harness::*;
 
 use std::time::Duration;
 
+use futures_util::StreamExt;
 use kernel::{AxCode, EventKind, EventRecord, IdemKey, RunId, Seq};
 use remote_access::handshake::{CityFingerprint, Invitation};
 use remote_access::route::command::LOCAL_ENV;
@@ -124,6 +125,33 @@ fn a_device_reaches_the_city_through_the_door_over_real_sockets() {
     );
 }
 
+fn confirm_for(code: &str, n: &[u8], approval: Option<IdemKey>) -> String {
+    door_frame(wire::WireCommand::ConfirmRemoteDoor(wire::DoorAnswer {
+        approval,
+        code: code.to_owned(),
+        idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, n),
+    }))
+}
+
+async fn accepted(page: &mut Socket) -> Option<IdemKey> {
+    let deadline = tokio::time::Instant::now().checked_add(PATIENCE)?;
+    loop {
+        let message = tokio::time::timeout_at(deadline, page.next())
+            .await
+            .ok()??;
+        let Ok(text) = message.ok()?.into_text() else {
+            continue;
+        };
+        match serde_json::from_str(&text) {
+            Ok(wire::ServerFrame::Accepted(idem)) => return Some(idem),
+            Ok(wire::ServerFrame::Refusal(error)) => {
+                panic!("the expected acceptance was refused: {error}")
+            }
+            Ok(_) | Err(_) => {}
+        }
+    }
+}
+
 const SPACED: Duration = Duration::from_millis(remote_access::confirm::CONFIRM_SPACING_MS + 50);
 
 #[test]
@@ -142,16 +170,32 @@ fn a_page_opens_the_door_only_with_the_code_the_console_printed() {
         let mut printed = Vec::new();
         refusals.push(refused(&mut page, &open(b"open 1")).await);
         let asked = read_until(&city.printed, &["within two minutes"]).0;
-        let first = between(&asked, "type ", char::is_whitespace);
+        let first = between(asked.lines().last().unwrap(), "type ", char::is_whitespace);
         refusals.push(refused(&mut page, &confirm("aaaa-aaaa", b"wrong")).await);
 
         tokio::time::sleep(SPACED).await;
         refusals.push(refused(&mut page, &confirm(&first, b"late")).await);
         refusals.push(refused(&mut page, &open(b"open 2")).await);
         let asked = read_until(&city.printed, &["within two minutes"]).0;
-        let second = between(&asked, "type ", char::is_whitespace);
+        let second = between(asked.lines().last().unwrap(), "type ", char::is_whitespace);
         tokio::time::sleep(SPACED).await;
-        send_text(&mut page, &confirm(&second.to_uppercase(), b"right")).await;
+        let wrong = IdemKey::derive(&RunId::CITY, Seq::FIRST, b"open 1");
+        refusals.push(refused(&mut page, &confirm_for(&second, b"foreign", Some(wrong))).await);
+
+        refusals.push(refused(&mut page, &open(b"open 3")).await);
+        let asked = read_until(&city.printed, &["within two minutes"]).0;
+        let third = between(asked.lines().last().unwrap(), "type ", char::is_whitespace);
+        tokio::time::sleep(SPACED).await;
+        let approval = IdemKey::derive(&RunId::CITY, Seq::FIRST, b"open 3");
+        send_text(
+            &mut page,
+            &confirm_for(&third.to_uppercase(), b"right", Some(approval)),
+        )
+        .await;
+        assert_eq!(
+            accepted(&mut page).await,
+            Some(IdemKey::derive(&RunId::CITY, Seq::FIRST, b"right"))
+        );
         printed.push(
             read_until(&city.printed, &["the remote door is open"])
                 .1
@@ -164,6 +208,10 @@ fn a_page_opens_the_door_only_with_the_code_the_console_printed() {
             })),
         )
         .await;
+        assert_eq!(
+            accepted(&mut page).await,
+            Some(IdemKey::derive(&RunId::CITY, Seq::FIRST, b"close"))
+        );
         printed.push(
             read_until(&city.printed, &["the remote door is closed"])
                 .1
@@ -186,6 +234,8 @@ fn a_page_opens_the_door_only_with_the_code_the_console_printed() {
             vec![
                 Some(AxCode::ApprovalPending),
                 Some(AxCode::GateDenied),
+                Some(AxCode::GateDenied),
+                Some(AxCode::ApprovalPending),
                 Some(AxCode::GateDenied),
                 Some(AxCode::ApprovalPending),
             ],

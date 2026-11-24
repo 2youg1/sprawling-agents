@@ -11,6 +11,7 @@ mod privacy;
 mod production;
 mod remote_door;
 mod skill_audit;
+mod workspace;
 
 pub use listening::{Listening, listen};
 pub use production::{SystemClock, form_city, hands, init_city};

@@ -12,17 +12,10 @@
     reason = "test code"
 )]
 
-//! What `delegate` does the moment it is called (collab D7): the child
-//! starts while its parent still works.
-
 use super::super::*;
 use super::tests::move_in;
 use crate::worker::fixture::*;
 
-/// The provider holds the parent's second call until a third call
-/// arrives, so the child's first call has to come from a run started
-/// while the parent drives: what is measured is where the child is
-/// started, not which lane wins a race.
 fn holding_the_second_call_for_a_third() -> Pace {
     let calls = std::sync::Arc::new((std::sync::Mutex::new(0u32), std::sync::Condvar::new()));
     std::sync::Arc::new(move |request: &str| {
@@ -89,6 +82,8 @@ fn a_delegated_child_starts_before_its_parent_freezes() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -119,9 +114,6 @@ fn ledger_lines(ledger_dir: &std::path::Path) -> Vec<serde_json::Value> {
         .collect()
 }
 
-/// Whether a run started in `room` itself. The letter a refused child
-/// sends names it as the sender, so a run it wakes in the parent's room
-/// mentions it too.
 fn started_in(lines: &[serde_json::Value], room: &str) -> bool {
     lines
         .iter()
@@ -136,6 +128,8 @@ fn dispatch_lead(model: Option<&str>) -> wire::Command {
         policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
         session: None,
+        resume: None,
+        images: Vec::new(),
         effort: None,
         model: model.map(str::to_owned),
     }
@@ -154,8 +148,6 @@ fn delegating_to(room: &str, id: &str) -> String {
     )
 }
 
-/// A real parent delegates every difficulty and one call with none. The
-/// workspace, not the parent, turns those words into model and effort.
 #[test]
 fn workspace_policy_routes_every_difficulty_and_defaults_to_medium() {
     let dir = tempfile::tempdir().unwrap();
@@ -198,7 +190,6 @@ effort = "high"
         ("lab/medium", "medium-result", Some("medium")),
         ("lab/hard", "hard-result", Some("hard")),
         ("lab/default", "default-result", None),
-        // The same room already froze easy; a later hard request keeps it.
         ("lab/easy", "existing-result", Some("hard")),
     ];
     let mut parent = Vec::new();
@@ -283,12 +274,6 @@ effort = "high"
     }
 }
 
-/// collab D19, accounting D54: the parent runs on a model registered
-/// under `digest`, and no model is chosen for `main`, the tag a child
-/// that names no model runs on. The room's files admit the child, so
-/// the call answers; the hand-over refuses it, and the parent's room
-/// receives a stopped handback carrying the refusal's code and
-/// recovery instead of nothing.
 #[test]
 fn a_child_no_attached_model_may_serve_comes_back_to_its_parent_as_a_stopped_handback() {
     let dir = tempfile::tempdir().unwrap();
@@ -360,10 +345,6 @@ fn a_child_no_attached_model_may_serve_comes_back_to_its_parent_as_a_stopped_han
     assert!(handback.contains("pick a model for this tag"), "{handback}");
 }
 
-/// collab D18, accounting D53: what the room's files decide is judged
-/// before the tool answers. A room that does not parse and a room whose
-/// resident names no agent the city knows are refused as the tool
-/// result, and no child starts.
 #[test]
 fn a_delegation_to_a_malformed_room_or_an_unknown_resident_is_refused_as_the_tool_result() {
     let dir = tempfile::tempdir().unwrap();

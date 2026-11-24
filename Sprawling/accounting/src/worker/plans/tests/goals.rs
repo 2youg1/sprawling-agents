@@ -39,6 +39,8 @@ fn a_goal_that_lands_on_a_claimed_path_is_refused_with_the_level_that_decides_it
                     b"dispatch",
                 ),
                 session: None,
+                resume: None,
+                images: Vec::new(),
                 effort: None,
                 model: None,
             })
@@ -67,11 +69,6 @@ fn a_goal_that_lands_on_a_claimed_path_is_refused_with_the_level_that_decides_it
     );
 }
 
-/// Two runs dispatched side by side read one goal register. The
-/// accounting thread decides each registration at the call, so the
-/// second run to stake the same ground is refused before it spends
-/// another call, and the history holds the one registration and the
-/// clash (`Sprawling/app/Spec.lean` §8-42-8).
 #[test]
 fn two_runs_registering_one_ground_side_by_side_leave_one_holder() {
     use kernel::Tool;
@@ -150,9 +147,6 @@ fn two_runs_registering_one_ground_side_by_side_leave_one_holder() {
     );
 }
 
-/// A standing goal on a building with no plan would find no ready step
-/// and finish at once having done nothing, so it is refused instead, with
-/// the subject the client's form recovery reads.
 #[test]
 fn a_standing_goal_on_a_building_without_a_plan_is_refused_with_the_building_and_the_goal() {
     let dir = tempfile::tempdir().unwrap();
@@ -178,9 +172,6 @@ fn a_standing_goal_on_a_building_without_a_plan_is_refused_with_the_building_and
     );
 }
 
-/// A plan that is there but does not parse is a different fact from no
-/// plan: the refusal names the broken line instead of asking the mayor
-/// to write a plan over the one the person already wrote.
 #[test]
 fn a_standing_goal_on_a_malformed_plan_is_refused_with_the_broken_line() {
     let dir = tempfile::tempdir().unwrap();
@@ -215,10 +206,6 @@ fn a_standing_goal_on_a_malformed_plan_is_refused_with_the_broken_line() {
     );
 }
 
-/// Setting a pursuit starts its rows and gives the desk back: `Pause`,
-/// `Halt` and every other command are read by the main loop, and a
-/// pursuit that drove its rows to the end inside the command kept them
-/// all out. The rows still land, through the same loop.
 #[test]
 fn a_pursuit_gives_the_desk_back_while_its_rows_drive() {
     let dir = tempfile::tempdir().unwrap();

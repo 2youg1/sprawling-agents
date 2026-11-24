@@ -25,6 +25,7 @@ const AT: &str = "127.0.0.1:2501";
 
 fn config() -> ServeConfig {
     ServeConfig {
+        workspace: None,
         deltas: tokio::sync::broadcast::channel(16).0,
         logs: tokio::sync::broadcast::channel(16).0,
         outputs: tokio::sync::broadcast::channel(16).0,
@@ -136,7 +137,14 @@ async fn an_acting_door_refuses_a_page_on_another_port_of_this_machine() {
         ("origin", "http://127.0.0.1:5173"),
         ("sec-fetch-site", "same-site"),
     ];
-    for path in ["/transcribe", "/drop?name=a", "/enroll", "/acp"] {
+    for path in [
+        "/transcribe",
+        "/drop?name=a",
+        "/enroll",
+        "/acp",
+        "/workspace",
+        "/workspace/save",
+    ] {
         assert_eq!(status("POST", path, &headers).await, 403, "{path}");
     }
 }
@@ -149,4 +157,46 @@ async fn a_preflight_is_refused() {
         ("access-control-request-method", "POST"),
     ];
     assert_eq!(status("OPTIONS", "/enroll", &headers).await, 403);
+}
+
+#[tokio::test]
+async fn a_workspace_browser_must_hold_a_key_and_reach_the_loopback_listener() {
+    let at: SocketAddr = AT.parse().unwrap();
+    let key = kernel::B3Hash::digest(b"native-key");
+    for (face, bearer, expected) in [
+        (wire::BindFace::Loopback { key }, None, 403),
+        (
+            wire::BindFace::Exposed { key },
+            Some("Bearer native-key"),
+            403,
+        ),
+        (
+            wire::BindFace::Loopback { key },
+            Some("Bearer native-key"),
+            200,
+        ),
+    ] {
+        let mut config = config();
+        config.workspace = Some(Arc::new(|_| {
+            Ok(wire::WorkspaceReply::Workspaces(Vec::new()))
+        }));
+        let app = wire::router(&config, face, &wire::ListenerOrigins::of(at)).unwrap();
+        let mut request = Request::builder()
+            .method("POST")
+            .uri("/workspace")
+            .header("host", AT)
+            .header("content-type", "application/json");
+        if let Some(bearer) = bearer {
+            request = request.header("authorization", bearer);
+        }
+        let response = app
+            .oneshot(
+                request
+                    .body(Body::from(r#"{"kind":"workspaces"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status().as_u16(), expected);
+    }
 }

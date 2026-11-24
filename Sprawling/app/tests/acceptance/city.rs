@@ -120,6 +120,8 @@ pub(crate) fn dispatch(
         policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: idem(b"dispatch"),
         session: None,
+        resume: None,
+        images: Vec::new(),
         effort: None,
         model: None,
     })

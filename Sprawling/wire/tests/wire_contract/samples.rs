@@ -25,6 +25,8 @@ pub(super) fn sample_of_every_command() -> Vec<Command> {
             policy: wire::RunPolicy::of(Mode::Work),
             idem,
             session: Some(kernel::SessionName::parse("ship it").unwrap()),
+            resume: None,
+            images: Vec::new(),
             effort: Some(kernel::Effort::High),
             model: None,
         },
@@ -203,6 +205,7 @@ title = \"a window\"
         Command::Steer {
             run,
             text: "try the other branch".to_owned(),
+            images: Vec::new(),
             idem,
         },
         Command::Cancel { run, idem },
@@ -289,6 +292,7 @@ title = \"a window\"
         }),
         Command::ReplaceCityKey(wire::DoorStep { idem }),
         Command::ConfirmRemoteDoor(wire::DoorAnswer {
+            approval: None,
             code: "abcd-efgh".to_owned(),
             idem,
         }),

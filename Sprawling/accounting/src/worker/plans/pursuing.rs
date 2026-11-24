@@ -74,6 +74,8 @@ impl RunWorker {
                 Assignment {
                     addr: addr.clone(),
                     session: None,
+                    resume: None,
+                    pictures: Vec::new(),
                     effort: None,
                     difficulty: None,
                     model: None,

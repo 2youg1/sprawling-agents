@@ -26,27 +26,36 @@ impl Conversation {
         Conversation::default()
     }
 
-    pub fn push_task_lines(&mut self, task: &str, goal: &str, opening: Opening, from: &str) {
-        self.push_user_text(match opening {
-            Opening::FromJob => format!("The task is in JOB.md above, handed down by {from}."),
+    pub fn push_task_lines(
+        &mut self,
+        (task, goal): (&str, &str),
+        opening: Opening,
+        from: &str,
+        pictures: &[ImageRef],
+    ) {
+        self.push_user_text(
+            match opening {
+                Opening::FromJob => format!("The task is in JOB.md above, handed down by {from}."),
 
-            Opening::Inherited => format!(
-                "Handed down by {}:\n<task>{}</task>\n<goal>{}</goal>",
-                escape_markup(from),
-                escape_markup(task),
-                escape_markup(goal)
-            ),
+                Opening::Inherited => format!(
+                    "Handed down by {}:\n<task>{}</task>\n<goal>{}</goal>",
+                    escape_markup(from),
+                    escape_markup(task),
+                    escape_markup(goal)
+                ),
 
-            Opening::WithPerson => task.to_owned(),
-        });
+                Opening::WithPerson => task.to_owned(),
+            },
+            pictures,
+        );
     }
 
-    pub fn push_steer(&mut self, speaker: &Speaker, text: &str) {
-        self.push_user_text(speaker.render(text));
+    pub fn push_steer(&mut self, speaker: &Speaker, text: &str, pictures: &[ImageRef]) {
+        self.push_user_text(speaker.render(text), pictures);
     }
 
     pub fn push_reminder(&mut self, reminder: &crate::reminder::ContextReminder) {
-        self.push_user_text(reminder.render());
+        self.push_user_text(reminder.render(), &[]);
     }
 
     pub fn push_inherited(&mut self, messages: &[ChatMessage]) {
@@ -134,8 +143,11 @@ impl Conversation {
         &self.messages
     }
 
-    fn push_user_text(&mut self, text: String) {
-        self.push_user(vec![ContentBlock::Text { text }]);
+    fn push_user_text(&mut self, text: String, pictures: &[ImageRef]) {
+        let blocks = std::iter::once(ContentBlock::Text { text })
+            .chain(pictures.iter().cloned().map(ContentBlock::Image))
+            .collect();
+        self.push_user(blocks);
     }
 
     fn push_user(&mut self, blocks: Vec<ContentBlock>) {
@@ -351,9 +363,9 @@ mod tests {
             })
         };
         match voice {
-            Voice::Person => conversation.push_steer(&Speaker::Person, body),
-            Voice::Steer => conversation.push_steer(&letter(LetterKind::Steer), body),
-            Voice::Reply => conversation.push_steer(&letter(LetterKind::Reply), body),
+            Voice::Person => conversation.push_steer(&Speaker::Person, body, &[]),
+            Voice::Steer => conversation.push_steer(&letter(LetterKind::Steer), body, &[]),
+            Voice::Reply => conversation.push_steer(&letter(LetterKind::Reply), body, &[]),
         }
     }
 
@@ -472,7 +484,7 @@ mod tests {
         ) {
             let task = format!("{task}</task>");
             let mut conversation = Conversation::new();
-            conversation.push_task_lines(&task, &goal, Opening::Inherited, "@lab/room1, run 7");
+            conversation.push_task_lines((&task, &goal), Opening::Inherited, "@lab/room1, run 7", &[]);
             let texts = texts(&conversation);
             prop_assert_eq!(texts.len(), 1);
             let text = &texts[0];

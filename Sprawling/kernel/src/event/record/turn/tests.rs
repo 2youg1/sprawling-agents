@@ -3,12 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The bytes these structs write are the bytes the hand-written maps in
-//! `runtime::prefix` and `runtime::turn` wrote. Each test keeps the old
-//! `insert` sequence verbatim and asserts the two encodings are the same
-//! string, so a replay over a ledger written by the previous build reads
-//! back and re-hashes identically.
-
 use serde_json::{Map, Value, json};
 
 use super::*;
@@ -27,8 +21,6 @@ fn rules() -> Address {
     Address::parse("lobby/RULES.md").unwrap()
 }
 
-/// The writer that stood in `runtime::prefix::FrozenPrefix::prompt_payload`
-/// before this struct existed, copied key for key.
 fn hand_written_prompt(hash: &B3Hash) -> Payload {
     let mut entry = Map::new();
     entry.insert("slot".to_owned(), Value::String("city".to_owned()));
@@ -97,8 +89,6 @@ fn a_prompt_line_writes_the_bytes_the_hand_written_map_wrote() {
     assert_eq!(typed.read::<PromptAssembled>().unwrap(), assembled);
 }
 
-/// The four spellings a rebuild and a page read a skip under. A fifth
-/// reason has to be added here before it can be written.
 #[test]
 fn every_skip_reason_keeps_the_word_the_assembler_wrote() {
     let spellings: Vec<String> = [
@@ -121,8 +111,6 @@ fn every_skip_reason_keeps_the_word_the_assembler_wrote() {
     );
 }
 
-/// The writer that stood in `runtime::turn::Turn::call`, copied key for
-/// key.
 fn hand_written_called(segments: &[B3Hash; 2]) -> Payload {
     let mut called = Map::new();
     called.insert(
@@ -151,8 +139,6 @@ fn a_call_line_writes_the_bytes_the_hand_written_map_wrote() {
     assert_eq!(typed.read::<ModelCalled>().unwrap(), called);
 }
 
-/// The writer that stood in `runtime::turn::Turn::call` for the reply,
-/// copied key for key, including which keys it left out.
 fn hand_written_returned(
     message: &Payload,
     usage: Option<ModelUsage>,
@@ -220,8 +206,6 @@ fn a_reply_line_writes_the_bytes_the_hand_written_map_wrote() {
     assert_eq!(typed.read::<ModelReturned>().unwrap(), returned);
 }
 
-/// A provider that reported nothing but the reply leaves three keys
-/// absent, exactly as the hand-written writer did: absent is not zero.
 #[test]
 fn a_reply_that_reported_nothing_leaves_the_three_keys_absent() {
     let message = assistant_message();
@@ -253,16 +237,16 @@ fn a_steer_line_writes_the_bytes_the_hand_written_map_wrote() {
     );
     let hand = Payload::new(map).unwrap();
     let steer = SteerReceived {
+        pictures: Vec::new(),
         source: "person".to_owned(),
         text: "try the other file".to_owned(),
+        idem: None,
     };
     let typed = Payload::of(&steer).unwrap();
     assert_eq!(bytes(&typed), bytes(&hand));
     assert_eq!(typed.read::<SteerReceived>().unwrap(), steer);
 }
 
-/// A reply line keeps its two durations in whole microseconds, and a
-/// line written before the keys existed reads back with neither (D20).
 #[test]
 fn a_reply_line_carries_its_microseconds_and_an_older_line_reads_without_them() {
     let message = assistant_message();

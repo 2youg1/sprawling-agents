@@ -88,6 +88,8 @@ fn laid_out(
     let at = Assignment {
         addr: parent,
         session: None,
+        resume: None,
+        pictures: Vec::new(),
         effort: None,
         difficulty: None,
         model: None,

@@ -66,11 +66,7 @@ pub fn settled_search(
 }
 
 pub fn city_search(city_root: &Path) -> Result<Option<SearchConfiguration>, AxError> {
-    Ok(
-        super::ladder::stated(&CityLayout::new(city_root).city_config(), Layer::City)?
-            .search()
-            .cloned(),
-    )
+    Ok(super::stated_city_config(city_root)?.search().cloned())
 }
 
 pub fn write_search(city_root: &Path, configuration: &SearchConfiguration) -> Result<(), AxError> {

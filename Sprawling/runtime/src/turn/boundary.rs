@@ -12,8 +12,15 @@ pub enum Interrupt {
     None,
     Cancel,
 
-    Steer { speaker: Speaker, text: String },
-    Policy { policy: kernel::RunPolicy },
+    Steer {
+        speaker: Speaker,
+        text: String,
+        pictures: Vec<kernel::ImageRef>,
+        request: Option<kernel::IdemKey>,
+    },
+    Policy {
+        policy: kernel::RunPolicy,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

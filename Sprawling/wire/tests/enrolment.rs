@@ -60,6 +60,7 @@ async fn ask(worker: Worker, body: &str) -> (u16, String) {
     let (events, _held) = tokio::sync::broadcast::channel(16);
     let answering = events.clone();
     let config = ServeConfig {
+        workspace: None,
         deltas: tokio::sync::broadcast::channel(16).0,
         logs: tokio::sync::broadcast::channel(16).0,
         outputs: tokio::sync::broadcast::channel(16).0,

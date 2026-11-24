@@ -41,7 +41,7 @@ pub use catalog_session::{
     SessionCatalog, catalog_for_session, migrate_session_mcp_reference, migrate_session_skill_pin,
     previous_sessions,
 };
-pub use city_layer::{CitySetting, write_city_setting};
+pub use city_layer::{CitySetting, stated_city_config, write_city_setting};
 pub use ladder::Layer;
 pub use remote::{HostPermanence, RemoteRoute, remote_route};
 pub use resident::settled_harness;

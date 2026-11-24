@@ -59,8 +59,8 @@ impl Speaker {
     pub fn from_recorded(source: &str) -> Result<Speaker, AxError>;   // fork 把它读回来
 }
 impl Conversation {
-    pub fn push_steer(&mut self, speaker: &Speaker, text: &str);
-    pub fn push_task_lines(&mut self, task: &str, goal: &str, opening: Opening, from: &str);
+    pub fn push_steer(&mut self, speaker: &Speaker, text: &str, pictures: &[ImageRef]);
+    pub fn push_task_lines(&mut self, (task, goal): (&str, &str), opening: Opening, from: &str, pictures: &[ImageRef]);
 }
 ```
 

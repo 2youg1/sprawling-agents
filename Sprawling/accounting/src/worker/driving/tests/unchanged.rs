@@ -14,8 +14,6 @@
 use crate::worker::fixture::*;
 use crate::worker::*;
 
-/// The last tool answer the scripted model actually received. This
-/// checks rendered window bytes, not merely the ledger's JSON payload.
 fn latest_tool(body: &serde_json::Value) -> &str {
     body["messages"]
         .as_array()
@@ -103,6 +101,8 @@ fn a_real_agent_reuses_a_read_but_receives_the_full_text_after_its_edit() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -221,6 +221,8 @@ fn duplicate_reads_in_one_wave_both_return_text_before_the_next_wave_can_reuse_t
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })

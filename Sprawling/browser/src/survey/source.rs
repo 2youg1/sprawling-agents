@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-pub const DRAWN_IN: [&str; 3] = ["svelte", "ts", "html"];
+pub const DRAWN_IN: [&str; 3] = ["tsx", "ts", "html"];
 
 pub const ENOUGH: usize = 16;
 

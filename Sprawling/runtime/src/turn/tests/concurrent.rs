@@ -11,7 +11,6 @@ use crate::bench::{BenchOutcome, Clearance, Ticket, ToolBench};
 use crate::conversation::Opening;
 use kernel::{Effect, IdemKey, Seq, Tool, ToolOutcome};
 
-/// A read-only tool that answers every call with an empty payload.
 struct Read(kernel::ToolMeta);
 
 impl Tool for Read {
@@ -27,8 +26,6 @@ impl Tool for Read {
     }
 }
 
-/// A bench holding `read`, its calls keyed by their position in the
-/// wave, through the three stages a concurrent wave uses.
 pub(super) struct Placed {
     pub(super) bench: ToolBench,
     next: u64,
@@ -60,17 +57,12 @@ impl Placed {
         IdemKey::derive(&run_id(), Seq::new(at), b"read")
     }
 
-    /// The same calls one after another, each answered as it is
-    /// admitted: serial, with the registration still known.
     fn one_by_one(&mut self, call: &ToolCall, t: TimeMs) -> Result<ToolOutcome, AxError> {
         let key = self.key();
         self.bench.invoke(call, &key, t).and_then(answer)
     }
 }
 
-/// The serial reference: a face that runs each call where it admits it,
-/// so no read starts early, and that still names each tool's
-/// registration, as the lane's own face does.
 struct OneByOne(Placed);
 
 impl ConcurrentInvoke for OneByOne {
@@ -143,7 +135,6 @@ pub(super) fn wave_of(ledger: &mut TestLedger, calls: Vec<ToolCall>) -> Turn<'st
     waved(opened::<1>(), ledger, calls)
 }
 
-/// `turn`, assembled and called until it holds a wave of `calls`.
 pub(super) fn waved<'h>(
     turn: Turn<'h, Assembling>,
     ledger: &mut TestLedger,
@@ -152,10 +143,10 @@ pub(super) fn waved<'h>(
     let mut model = OneShotModel { calls };
     let mut conversation = Conversation::new();
     conversation.push_task_lines(
-        "read three files",
-        "three reads",
+        ("read three files", "three reads"),
         Opening::FromJob,
         "the User",
+        &[],
     );
     let turn = advance(
         turn.assemble(
@@ -221,8 +212,10 @@ fn a_steer_inside_the_reads_lands_where_the_serial_wave_writes_it() {
     let calls = || vec![call("c1", "read"), call("c2", "read"), call("c3", "read")];
     let steer_at_one = |index: u32| match index {
         1 => Interrupt::Steer {
+            pictures: Vec::new(),
             speaker: crate::conversation::Speaker::Person,
             text: "only the tests".into(),
+            request: None,
         },
         _ => Interrupt::None,
     };
@@ -297,17 +290,12 @@ fn a_call_line_carries_its_tools_registration() {
     );
 }
 
-/// Which way a wave reaches its calls: each through all three stages in
-/// turn, or the leading reads run at once.
 #[derive(Debug, Clone, Copy)]
 enum Path {
     OneAtATime,
     ReadsAtOnce,
 }
 
-/// A face that reads the driver's latest clock reading while it packages
-/// each answer, the way the lane's exec face renders a result's clock
-/// line (`Sprawling/runtime/spec/Clock.lean` §8-53).
 struct Stamping {
     placed: Placed,
     reading: crate::clock::ClockReading,
@@ -318,7 +306,6 @@ struct Stamping {
 impl ConcurrentInvoke for Stamping {
     fn meta_of(&self, call: &ToolCall) -> Option<&kernel::ToolMeta> {
         match self.path {
-            // A face that names no registration makes no call read-only.
             Path::OneAtATime => None,
             Path::ReadsAtOnce => self.placed.meta_of(call),
         }
@@ -343,9 +330,6 @@ impl ConcurrentInvoke for Stamping {
     }
 }
 
-/// The reading a face stamps a result with is the moment that call's
-/// `tool_result` records, on both ways through a wave: the turn reads
-/// the answer's moment before the face packages the answer.
 #[test]
 fn a_stamp_the_face_reads_is_the_moment_its_answer_records() {
     for path in [Path::OneAtATime, Path::ReadsAtOnce] {

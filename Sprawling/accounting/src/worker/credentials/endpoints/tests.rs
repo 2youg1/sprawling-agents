@@ -307,6 +307,8 @@ fn provider_accounts_keep_the_successful_session_after_reorder_and_restart() {
                 policy: kernel::RunPolicy::of(kernel::Mode::Work),
                 idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, marker),
                 session: None,
+                resume: None,
+                images: Vec::new(),
                 effort: None,
                 model: None,
             })

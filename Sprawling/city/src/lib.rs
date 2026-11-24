@@ -3,9 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Space and identity: buildings, residents, spine files, archive,
-//! library, building policy, schedule, wizard.
-
 mod archive;
 mod building;
 mod check;
@@ -57,6 +54,7 @@ pub use city_tool::CityTool;
 pub use config_layers::SessionShape;
 pub use config_layers::check_mcp_references;
 pub use config_layers::path as config_path;
+pub use config_layers::stated_city_config;
 pub use config_layers::write_second_threshold;
 pub use config_layers::{AgentRow, AgentRowSource, agent_rows, seat_agent, write_agent};
 pub use config_layers::{CitySetting, check_catalog, write_catalog, write_city_setting};
@@ -71,20 +69,17 @@ pub use config_layers::{migrate_mcp, migrate_mcp_reference, migrate_skill_pin};
 pub use config_layers::{migrate_session_mcp_reference, migrate_session_skill_pin};
 pub use config_layers::{search_supplier, settled_search, write_search};
 pub use config_layers::{write_mcp_references, write_skill_pins};
+pub use defaults::{CopyStanding, Edited, Shipped, follow_defaults, standing};
 pub use document::{Held, edit as edit_document, edit_against, revise as revise_document};
 pub use format::{FORMAT_KEY, Format, FormatFile, Forwarded, Rung, admit_format, bring_forward};
 pub use format::{Forwarding, bring_city_forward};
+pub use gitignore::place_city as ignore_city_records;
+pub use gitignore::place_everywhere as keep_records_out_of_git;
 pub use governed::{Governed, PREFERENCES_FILE, write_governed};
+pub use handoff_form::{HandoffSections, handoff_sections};
 pub use history::{History, has_history};
 pub use identity::{DisplayName, NAME_MAX_CHARS, Naming, NamingEdit, NamingWritten};
 pub use identity::{Unreadable, persona, read_naming, write_naming};
-// Where each of these files sits is `kernel::layout`'s answer, and the
-// names are re-exported rather than restated so that a caller reading
-// `city::CONFIG_TOML` and the layout that places it cannot disagree.
-pub use defaults::{CopyStanding, Edited, Shipped, follow_defaults, standing};
-pub use gitignore::place_city as ignore_city_records;
-pub use gitignore::place_everywhere as keep_records_out_of_git;
-pub use handoff_form::{HandoffSections, handoff_sections};
 pub use kernel::layout::{ARCHIVE_DIR, BUILDING_SHELF, CONFIG_FILE, LIBRARY_DIR, URBANITE_FILE};
 pub use library::skill_document;
 pub use library::{Admitted, MigrationHooks, admit_external, audit_skill};

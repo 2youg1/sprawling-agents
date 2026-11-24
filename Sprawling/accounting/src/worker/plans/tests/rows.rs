@@ -27,6 +27,8 @@ fn a_plan_that_cannot_be_read_is_refused_by_name_rather_than_blamed_on_a_neighbo
         policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"unreadable"),
         session: None,
+        resume: None,
+        images: Vec::new(),
         effort: None,
         model: None,
     });
@@ -73,6 +75,8 @@ fn a_line_the_history_refused_is_a_change_the_city_never_made() {
         policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"lost"),
         session: None,
+        resume: None,
+        images: Vec::new(),
         effort: None,
         model: None,
     });
@@ -118,6 +122,8 @@ fn a_run_takes_a_row_from_the_plan_and_the_next_run_cannot_take_the_same_one() {
                     b"dispatch",
                 ),
                 session: None,
+                resume: None,
+                images: Vec::new(),
                 effort: None,
                 model: None,
             })
@@ -185,6 +191,8 @@ fn a_node_handed_back_by_a_run_that_came_home_can_be_taken_by_the_next_run() {
                     b"dispatch",
                 ),
                 session: None,
+                resume: None,
+                images: Vec::new(),
                 effort: None,
                 model: None,
             })
@@ -246,6 +254,8 @@ fn a_finished_row_carries_evidence_a_reader_can_retrieve() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::new(0), b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -305,6 +315,8 @@ fn a_run_that_ends_holding_a_row_leaves_it_blocked_rather_than_in_progress() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"froze"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
         })
         .unwrap();

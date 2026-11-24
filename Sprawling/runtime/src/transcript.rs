@@ -159,10 +159,10 @@ mod tests {
     fn window_with_a_call() -> Conversation {
         let mut conversation = Conversation::new();
         conversation.push_task_lines(
-            "look",
-            "one call",
+            ("look", "one call"),
             crate::conversation::Opening::FromJob,
             "the User",
+            &[],
         );
         conversation.push_assistant(vec![ContentBlock::ToolUse {
             id: "tu_1".to_owned(),

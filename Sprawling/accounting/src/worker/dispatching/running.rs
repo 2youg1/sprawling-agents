@@ -63,10 +63,17 @@ impl RunWorker {
             }
 
             Seat::Harness(seat) => {
+                if !at.pictures.is_empty() {
+                    return Err(super::images::no_picture_input());
+                }
                 let given = self.give(&at, task, goal)?;
                 return self.stage_harness(at, seat, given, began);
             }
         };
+
+        if !at.pictures.is_empty() && agreed.model.input != kernel::InputKinds::TextImage {
+            return Err(super::images::no_picture_input());
+        }
 
         let generation = self.choose_shape(&at, &agreed.model, &agreed.provider)?;
         let given = self.give(&at, task, goal)?;
@@ -74,6 +81,15 @@ impl RunWorker {
         let job_locator = given.job.clone();
 
         let mut site = self.stand_up(agreed, &at, &given, generation)?;
+
+        super::images::store_images(
+            &mut self.cas,
+            &storage::BlockOrigin {
+                run: site.run_id,
+                building: at.addr.clone(),
+            },
+            &mut at.pictures,
+        )?;
 
         self.cas
             .put_for(
@@ -89,9 +105,13 @@ impl RunWorker {
         let desks = self.open_desks(&site, &at.addr, at.depth())?;
 
         let inherited = self.inherited(&at, site.run_id)?;
-        let carried_from = self.origins.carried_from(&at.addr);
-
-        self.origins.started(&at.addr, site.run_id);
+        let carried_from = if at.resume.is_none() {
+            let carried = self.origins.carried_from(&at.addr);
+            self.origins.started(&at.addr, site.run_id);
+            carried
+        } else {
+            None
+        };
 
         let member = match at.parent {
             Some(_) => Some(self.flight.backlog.enrol_run(

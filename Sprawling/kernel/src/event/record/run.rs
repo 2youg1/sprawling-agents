@@ -54,6 +54,9 @@ pub enum ModelSelectionSource {
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct RunStarted {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub pictures: Vec<crate::ImageRef>,
+
     #[serde(default)]
     pub task: String,
 

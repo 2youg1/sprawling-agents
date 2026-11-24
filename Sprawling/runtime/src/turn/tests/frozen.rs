@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What a running session refuses to send: a prefix whose bytes no
-//! longer match the hash the session froze, a request whose system
-//! blocks moved, and a call shape that changed under the session.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -19,15 +15,16 @@ use super::super::*;
 use super::helpers::*;
 use crate::conversation::Opening;
 
-/// The frozen prefix is a runtime invariant, not a laboratory one: the
-/// bytes a request will carry are rehashed every turn and compared with
-/// what the session froze, and a difference is a refusal with two ways
-/// out rather than a warning.
 #[test]
 fn a_prefix_whose_bytes_moved_is_refused_before_anything_is_assembled() {
     let mut ledger = TestLedger::new();
     let mut conversation = Conversation::new();
-    conversation.push_task_lines("probe the city", "one probe", Opening::FromJob, "the User");
+    conversation.push_task_lines(
+        ("probe the city", "one probe"),
+        Opening::FromJob,
+        "the User",
+        &[],
+    );
     let drifted = crate::prefix::FrozenPrefix::assemble(
         crate::prefix::FrozenSegment::mislabelled(
             crate::prefix::SegmentSlot::City,
@@ -63,10 +60,6 @@ fn a_prefix_whose_bytes_moved_is_refused_before_anything_is_assembled() {
     );
 }
 
-/// The second per-turn digest: the four system blocks the request carries
-/// must hash to the four the run froze, and keep the breakpoint plan -
-/// every segment edge before the tail carrying one, the tail edge carrying
-/// none because the tail anchor on the conversation holds the fourth.
 #[test]
 fn the_system_blocks_a_request_carries_are_checked_against_the_frozen_hashes() {
     let frozen: [B3Hash; 4] = [
@@ -127,10 +120,6 @@ fn the_system_blocks_a_request_carries_are_checked_against_the_frozen_hashes() {
     );
 }
 
-/// The model and the effort are the session's, not a form's. The runtime
-/// check is exported for the dispatch face to call before it writes a
-/// room's effort; `context_tokens` never reaches the wire and does not
-/// enter the comparison.
 #[test]
 fn a_call_shape_that_changed_mid_session_is_refused() {
     let frozen = shape();

@@ -16,8 +16,6 @@ use crate::prefix::{FrozenPrefix, FrozenSegment, SegmentSlot};
 use kernel::ledger::chain_hash;
 use kernel::{EventDraft, EventRef, GENESIS_PREV, RunId};
 
-/// Minimal in-memory ledger for turn tests (the citysim MemLedger is
-/// the real second adapter; this one keeps the crate's tests local).
 pub(super) struct TestLedger {
     pub(super) lines: Vec<Vec<u8>>,
     next: kernel::Seq,
@@ -82,29 +80,18 @@ pub(super) fn prefix() -> FrozenPrefix {
     .unwrap()
 }
 
-/// A conversation that outlives the turn borrowing it, for tests that
-/// assemble from nothing.
 pub(super) fn blank_conversation() -> &'static Conversation {
     Box::leak(Box::new(Conversation::new()))
 }
 
-/// A clock stopped at `at`: every reading a turn takes is the turn's own
-/// stamp, so a test that compares ledgers compares order and payloads.
 pub(super) fn stopped(at: u64) -> impl FnMut() -> Result<TimeMs, AxError> {
     move || Ok(TimeMs::new(at))
 }
 
-/// A turn opened at stamp `AT` on a clock stopped there, on lines of
-/// its own that nothing reads afterwards: what reaches the ledger is what
-/// the turn's own barriers carried. The clock captures nothing, so
-/// leaking its box allocates nothing, and the turn can outlive the test's
-/// own frames.
 pub(super) fn opened<const AT: u64>() -> Turn<'static, Assembling> {
     opened_on::<AT>(Box::leak(Box::new(lines())))
 }
 
-/// A turn opened at stamp `AT` on `lines`, which the test keeps so it can
-/// pay the barrier the run would pay after the turn.
 pub(super) fn opened_on<const AT: u64>(lines: &mut HeldLines) -> Turn<'_, Assembling> {
     let now: &'static mut dyn FnMut() -> Result<TimeMs, AxError> =
         Box::leak(Box::new(|| -> Result<TimeMs, AxError> {
@@ -113,7 +100,6 @@ pub(super) fn opened_on<const AT: u64>(lines: &mut HeldLines) -> Turn<'_, Assemb
     Turn::begin(lines, TimeMs::new(AT), now)
 }
 
-/// The lines of the run every turn test writes for.
 pub(super) fn lines() -> HeldLines {
     HeldLines::open(run_id(), "resident@sim.1".into())
 }
@@ -134,8 +120,6 @@ pub(super) fn shape() -> CallShape {
     }
 }
 
-/// Runs a wave that asks for nothing and closes the turn: the barrier
-/// that carries `model_returned` to the ledger.
 pub(super) fn closed(turn: Turn<'_, ToolWave>, ledger: &mut dyn Ledger) -> TurnReport {
     let recording = advance(
         turn.execute_concurrent(
@@ -169,10 +153,10 @@ pub(super) fn probe_call() -> ToolCall {
     }
 }
 
-/// The plan of the whole runs the held-run checks drive.
 pub(super) fn run_plan() -> crate::run::RunPlan {
     let addr = kernel::Address::parse("lab").unwrap();
     crate::run::RunPlan {
+        pictures: Vec::new(),
         run: run_id(),
         who: "lab".to_owned(),
         addr,

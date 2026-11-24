@@ -159,6 +159,8 @@ fn a_branching_session_opens_with_the_mothers_conversation() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"mother"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -201,6 +203,8 @@ fn a_branching_session_opens_with_the_mothers_conversation() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"carry-on"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -233,6 +237,8 @@ fn a_branching_session_opens_with_the_mothers_conversation() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"again"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -262,6 +268,8 @@ fn a_carried_session_names_the_previous_runs_transcript() {
         policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, key),
         session: None,
+        resume: None,
+        images: Vec::new(),
         effort: None,
     };
     worker.handle(dispatch("measure", b"one")).unwrap();
@@ -304,4 +312,79 @@ fn a_carried_session_names_the_previous_runs_transcript() {
         "the carried session's first request names {pointer}: {}",
         first.chars().take(600).collect::<String>()
     );
+}
+
+#[test]
+fn an_explicit_past_target_appends_to_the_same_session_after_reopen() {
+    let dir = tempfile::tempdir().unwrap();
+    init_city(dir.path()).unwrap();
+    let (base_url, provider) = fake_openai(
+        &["m-local"],
+        vec![
+            completion("older selection marker", None),
+            completion("recent session marker", None),
+            completion("historical reply", None),
+        ],
+    );
+    let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
+    let room = addr("lab/room1");
+    let dispatch = |task: &str, resume: Option<kernel::Seq>| wire::Command::Dispatch {
+        addr: room.clone(),
+        task: task.to_owned(),
+        goal: String::new(),
+        model: None,
+        policy: kernel::RunPolicy::of(kernel::Mode::Chat),
+        idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, task.as_bytes()),
+        session: None,
+        resume,
+        images: Vec::new(),
+        effort: None,
+    };
+    worker.handle(dispatch("original question", None)).unwrap();
+    let first = read_session_lines(dir.path(), &room)[0].began;
+    worker
+        .handle(wire::Command::OpenSession {
+            addr: room.clone(),
+            carry: wire::Carry::Nothing,
+            from: None,
+            idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"new"),
+        })
+        .unwrap();
+    worker.handle(dispatch("unrelated question", None)).unwrap();
+    let before = read_session_lines(dir.path(), &room);
+    assert_eq!(before.len(), 2);
+
+    worker
+        .handle(dispatch("historical follow-up", Some(first)))
+        .unwrap();
+    drop(worker);
+    let after = read_session_lines(dir.path(), &room);
+    assert_eq!(after.len(), 2);
+    assert_eq!(after[0], before[0]);
+    assert_eq!(after[1].began, first);
+    assert_eq!(after[1].runs, 2);
+    assert_eq!(after[1].preview.as_deref(), Some("historical reply"));
+    let bodies = provider.bodies();
+    let last = bodies.last().unwrap();
+    assert!(
+        last.contains("older selection marker"),
+        "original tail missing: {last}"
+    );
+    assert!(
+        !last.contains("recent session marker"),
+        "current session bled across: {last}"
+    );
+}
+
+fn read_session_lines(root: &Path, room: &Address) -> Vec<wire::SessionLine> {
+    let ledger =
+        runtime::replay::verify_ledger_dir(&kernel::layout::CityLayout::new(root).ledger())
+            .unwrap();
+    let mut projection = crate::views::sessions::RoomSessions::default();
+    for line in ledger.lines() {
+        if let runtime::replay::VerifiedLine::Known { record, .. } = line {
+            projection.absorb(record).unwrap();
+        }
+    }
+    projection.answer(room).sessions
 }

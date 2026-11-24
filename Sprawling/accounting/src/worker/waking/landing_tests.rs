@@ -12,17 +12,10 @@
     reason = "test code"
 )]
 
-//! Kernel D38 on the two paths that do not cross the relay: a child's
-//! handback and a settled landing's delivery each write one
-//! `signal_landed`, paired to its letter by `SignalId`
-//! (`Sprawling/collab/spec/Delivery.lean` property 8).
-
 use super::super::*;
 use super::tests::move_in;
 use crate::worker::fixture::*;
 
-/// Every `signal_enqueued` id in the ledger, each with the landings of
-/// the `signal_landed` lines that name it.
 fn landings(ledger_dir: &std::path::Path) -> Vec<(String, Vec<String>)> {
     let lines: Vec<serde_json::Value> = runtime::replay::verify_ledger_dir(ledger_dir)
         .unwrap()
@@ -62,8 +55,6 @@ fn letter(id: &str, to: &str) -> collab::SignalEffect {
     )
 }
 
-/// A settled landing delivers to an idle resident, which it knocks for,
-/// and to a room nobody lives in, where the letter waits in the queue.
 #[test]
 fn a_settled_landing_says_where_each_letter_landed() {
     let dir = tempfile::tempdir().unwrap();
@@ -84,6 +75,8 @@ fn a_settled_landing_says_where_each_letter_landed() {
         parent: None,
         succession: None,
         session: None,
+        resume: None,
+        pictures: Vec::new(),
         effort: None,
         difficulty: None,
         model: None,
@@ -110,8 +103,6 @@ fn a_settled_landing_says_where_each_letter_landed() {
     );
 }
 
-/// A delegated child lands and hands back: the handback letter to the
-/// parent's room has exactly one landing, like the letter that asked.
 #[test]
 fn a_handback_says_where_it_landed() {
     let dir = tempfile::tempdir().unwrap();
@@ -151,6 +142,8 @@ fn a_handback_says_where_it_landed() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })

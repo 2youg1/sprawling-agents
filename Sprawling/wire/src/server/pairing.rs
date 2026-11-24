@@ -50,9 +50,29 @@ pub struct SessionBody {
     pub signature: String,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub(super) enum SessionRequest {
+    Known(SessionBody),
+    Recover(RecoverySessionBody),
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct RecoverySessionBody {
+    pub public_key: String,
+    pub nonce: String,
+    pub signature: String,
+}
+
 #[derive(Debug, Serialize)]
 pub struct SessionAnswer {
     pub token: String,
+}
+
+#[derive(Debug, Serialize)]
+struct RecoveredSessionAnswer {
+    token: String,
+    device: DeviceId,
 }
 
 pub(super) async fn accept_pairing(
@@ -75,7 +95,7 @@ pub(super) async fn offer_challenge(State(state): State<Arc<ShellState>>) -> Res
 pub(super) async fn open_session(
     State(state): State<Arc<ShellState>>,
     headers: HeaderMap,
-    Json(body): Json<SessionBody>,
+    Json(body): Json<SessionRequest>,
 ) -> Response {
     let Some(origin) = headers.get(ORIGIN).and_then(|value| value.to_str().ok()) else {
         return refusal(
@@ -87,10 +107,25 @@ pub(super) async fn open_session(
             .with_recovery("open a session from the city's own page"),
         );
     };
-    match state.door.open_session(&body, origin) {
-        Ok(token) => (StatusCode::OK, Json(SessionAnswer { token })).into_response(),
-        Err(err) => refusal(&err),
-    }
+    let result = match body {
+        SessionRequest::Known(body) => state
+            .door
+            .open_session(&body, origin)
+            .map(|token| (StatusCode::OK, Json(SessionAnswer { token })).into_response()),
+        SessionRequest::Recover(body) => {
+            state
+                .door
+                .recover_session(body, origin)
+                .map(|(device, token)| {
+                    (
+                        StatusCode::OK,
+                        Json(RecoveredSessionAnswer { token, device }),
+                    )
+                        .into_response()
+                })
+        }
+    };
+    result.unwrap_or_else(|err| refusal(&err))
 }
 
 fn refusal(err: &AxError) -> Response {

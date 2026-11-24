@@ -23,7 +23,7 @@ pub struct Turn<'h, S> { /* journal（借来的 `HeldLines`、t、钟、redacted
 pub struct Assembling(/* 私有 */);  pub struct Calling { /* prefix 哈希 */ }
 pub struct ToolWave { /* calls */ }   pub struct Recording { /* refs */ }
 
-pub enum Interrupt { None, Cancel, Steer { source: String, text: String } }
+pub enum Interrupt { None, Cancel, Steer { speaker: Speaker, text: String, pictures: Vec<ImageRef>, request: Option<IdemKey> } }
 pub enum PhaseOutcome<Next> { Advanced(Next), Cancelled(TurnCancelled) }
 // PhaseOutcome 刻意穷尽：新结局必须逼每个执行器表态，不得掉 catch-all（全库枚举皆闭）。
 pub struct TurnCancelled { /* refs：含 cancel_received —— 私有，getter 取 */ }
@@ -118,8 +118,8 @@ typestate 四相、边界消费、事件序、私有字段三不变量不动；�
 pub enum Opening { FromJob, Inherited, WithPerson }   // 穷尽三臂，城在写 brief 时已决定；Inherited 只由 fork 选
 pub struct Conversation { /* messages、sent、held —— 私有；执行器持有，逐回合推进 */ }
 impl Conversation { pub fn new() -> Conversation;
-    pub fn push_task_lines(&mut self, task: &str, goal: &str, opening: Opening);  // 首轮，run_started 可重建
-    pub fn push_steer(&mut self, source: &str, text: &str);          // 「user」或「@ID」前缀形
+    pub fn push_task_lines(&mut self, (task, goal): (&str, &str), opening: Opening, from: &str, pictures: &[ImageRef]);  // 首轮，run_started 可重建
+    pub fn push_steer(&mut self, speaker: &Speaker, text: &str, pictures: &[ImageRef]);          // 「user」或「@ID」前缀形
     pub fn push_reminder(&mut self, reminder: &ContextReminder);    // §8-34
     pub fn push_inherited(&mut self, messages: &[ChatMessage]);     // 分支开场继承的那段（§8-2）
     pub fn push_assistant(&mut self, content: Vec<ContentBlock>);
@@ -148,7 +148,7 @@ impl Turn<Assembling> {
 pub struct RunPrompt<'r> { /* prefix: &'r FrozenPrefix, recorded: &'r mut PromptRecord */ }
 impl<'r> RunPrompt<'r> { pub fn new(prefix: &'r FrozenPrefix, recorded: &'r mut PromptRecord) -> RunPrompt<'r>; }
 #[derive(Default)] pub struct PromptRecord { /* written: Option<Payload> */ }   // 住 Run 的 Active 态，跨回合
-// Interrupt 增 Steer { source: String, text: String }：边界消费→追加 steer_received（in-window）→照常 Advanced（不终止回合）；
+// Interrupt 增 Steer { speaker: Speaker, text: String, pictures: Vec<ImageRef>, request: Option<IdemKey> }：边界消费→追加 steer_received（in-window）→照常 Advanced（不终止回合）；
 // 文本回折入 Window 归执行器（它持 Window 与 Steer 原文），呼应「追加在结果末尾」。
 // TurnReport 长入：model_content: Vec<ContentBlock>（助手内容）与 wave_results: Vec<ContentBlock>（ToolResult 块）——
 // 执行器据此折叠 Window；两份材料是收尾边界压缩后的 exchange（8-44），离线重建同源于

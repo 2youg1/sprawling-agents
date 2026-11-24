@@ -9,6 +9,8 @@ pub(super) struct Assignment {
     pub(super) addr: Address,
 
     pub(super) session: Option<kernel::SessionName>,
+    pub(super) resume: Option<kernel::Seq>,
+    pub(super) pictures: Vec<images::SelectedPicture>,
 
     pub(super) effort: Option<kernel::Effort>,
 
@@ -140,6 +142,7 @@ pub(super) mod custody;
 pub(super) mod handback;
 pub(super) mod harness;
 pub(super) mod heavy_landing;
+pub(super) mod images;
 pub(super) mod preparing;
 pub(super) mod routing;
 pub(super) mod running;

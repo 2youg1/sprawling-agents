@@ -3,18 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! What one verified pass rebuilds: the queues and the ground a worker
-//! inherits, the endpoint book a probe filled, and the scopes a person shut.
-
 use super::super::*;
 use crate::views::governance::BlockedJob;
 use crate::worker::fixture::*;
 use crate::worker::*;
 use kernel::Locator;
 
-/// What a working worker holds and what a restarted one rebuilds are
-/// one thing folded by one rule, or they are two things that happen
-/// to agree. This asks which.
 #[test]
 fn what_a_worker_holds_is_what_a_restart_rebuilds() {
     let dir = tempfile::tempdir().unwrap();
@@ -49,6 +43,8 @@ fn what_a_worker_holds_is_what_a_restart_rebuilds() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -83,12 +79,6 @@ fn what_a_worker_holds_is_what_a_restart_rebuilds() {
         "the register of open requests is folded from one rule"
     );
 
-    // What each waiting item is holding up. This is the half the
-    // handoff left open: the origin is process memory, and a
-    // restarted worker rebuilds from the ledger, so an item raised
-    // before a restart and answered after it has to find the same
-    // work. It does, because the origin is folded by `absorb` out of
-    // the same two lines a restart reads.
     let item = kernel::ApprovalItem {
         id: kernel::ApprovalId::new("item-held").unwrap(),
         actor: "market/ito".to_owned(),
@@ -147,8 +137,6 @@ fn what_a_worker_holds_is_what_a_restart_rebuilds() {
     );
 }
 
-/// A person could not see what a key bought until they had already
-/// registered it, and could not register part of what it bought.
 #[test]
 fn a_provider_can_be_asked_what_it_serves_and_only_part_of_it_admitted() {
     let dir = tempfile::tempdir().unwrap();
@@ -217,10 +205,6 @@ fn a_provider_can_be_asked_what_it_serves_and_only_part_of_it_admitted() {
     );
 }
 
-/// Halting is admission control: it refuses new work and says which
-/// scope refused, and a release opens the same scope again. Both
-/// survive a restart, because the worker folds them from the ledger
-/// rather than holding them only in memory.
 #[test]
 fn a_halted_scope_refuses_new_work_and_a_release_takes_it_again() {
     let dir = tempfile::tempdir().unwrap();
@@ -235,6 +219,8 @@ fn a_halted_scope_refuses_new_work_and_a_release_takes_it_again() {
         policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, tag),
         session: None,
+        resume: None,
+        images: Vec::new(),
         effort: None,
         model: None,
     };
@@ -260,7 +246,6 @@ fn a_halted_scope_refuses_new_work_and_a_release_takes_it_again() {
         "a refused dispatch leaves no task in a room no run opened"
     );
 
-    // A different building is not covered by that halt.
     worker
         .handle(wire::Command::CreateBuilding {
             addr: Address::parse("shop").unwrap(),
@@ -284,19 +269,12 @@ fn a_halted_scope_refuses_new_work_and_a_release_takes_it_again() {
         .unwrap();
     worker.handle(work(b"three")).unwrap();
 
-    // The posture is history, not a field: a second worker over the
-    // same ledger knows the building is open again.
     let restarted = Standing::fold(&kernel::layout::CityLayout::new(dir.path()).ledger())
         .unwrap()
         .governance;
     assert!(restarted.halted.is_empty());
 }
 
-/// A ledger an older build wrote while it still signed in to
-/// subscriptions still folds: its capture with an expiry, its
-/// `login_started` and its endpoint attached under a harness word all
-/// read, and the endpoint comes back on the face its vendor answered
-/// on (`Sprawling/gateway/Spec.lean` §8-5).
 #[test]
 fn a_ledger_an_older_build_wrote_with_a_subscription_login_still_folds() {
     let dir = tempfile::tempdir().unwrap();
@@ -335,9 +313,6 @@ fn a_ledger_an_older_build_wrote_with_a_subscription_login_still_folds() {
     );
 }
 
-/// A line this build cannot read is a line the account is missing, so
-/// the fold says so rather than opening a city with one approval fewer
-/// than its history holds.
 #[test]
 fn an_unreadable_approval_item_stops_the_fold() {
     let mut governance = Governance::empty();

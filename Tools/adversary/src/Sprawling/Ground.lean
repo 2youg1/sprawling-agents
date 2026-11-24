@@ -236,7 +236,7 @@ def withGround (door : Door) (act : Ground → IO α) : IO α := do
     -- it has no home, and the person's layer would have nowhere to land.
     let home := root / "home"
     IO.FS.createDirAll home
-    door.raise city
+    door.raise city home
     servingAt door city home .killed act
   finally
     try IO.FS.removeDirAll root catch _ => pure ()

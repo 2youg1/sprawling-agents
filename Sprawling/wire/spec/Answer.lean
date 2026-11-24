@@ -66,7 +66,7 @@ pub enum EntryKind { Directory, File { bytes: u64 } }          // 目录在前�
 pub struct CityAnswer { …, pub halted: Vec<HaltScope> }   // 原为 Vec<String>
 ```
 
-**根缺陷是同一件事的两种拼法，而读到两种拼法的那个读者刚好把它们比错了。** 一个 scope 在这座城里有两处书写方式，这是 `kernel::event::scope` 记下的分工：**账本**持 `city`／`building:<addr>`／`workshop:<addr>`，因为每一份已写下的历史都是这样；而**命令帧**持 §8-40 的 `HaltScope` 那样的带标签形状。答案面此前把它降成账本的那个串，于是客户端拿到的是 `building:lab` 与裸 `lab` 两个东西，`views/building.svelte:115` 拿后者去比前者——**被停的楼永远读成未停，release 永远不出现**，而两侧各自诚实，没有任何测试会红。
+**根缺陷是同一件事的两种拼法，而读到两种拼法的那个读者刚好把它们比错了。** 一个 scope 在这座城里有两处书写方式，这是 `kernel::event::scope` 记下的分工：**账本**持 `city`／`building:<addr>`／`workshop:<addr>`，因为每一份已写下的历史都是这样；而**命令帧**持 §8-40 的 `HaltScope` 那样的带标签形状。答案面此前把它降成账本的那个串，于是客户端拿到的是 `building:lab` 与裸 `lab` 两个东西，`views/building.solid.tsx` 拿后者去比前者——**被停的楼永远读成未停，release 永远不出现**，而两侧各自诚实，没有任何测试会红。
 
 **答案用命令面的类型，因为那是提问的词汇。** 一页宁可拿 `HaltScope` 去比 `HaltScope`，也不要为了知道看的是哪栋楼而把一个字符串拆开——拆开就是给文法安第二个家，而这正是这一笔在关的东西。转换只发生在服务端一处（`views::answering` 的 `named`），账本的书写方式一个字未动。
 

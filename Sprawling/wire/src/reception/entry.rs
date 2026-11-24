@@ -315,7 +315,7 @@ mod tests {
         ListenerOrigins::of("127.0.0.1:2501".parse().unwrap())
     }
 
-    const ARRIVALS: [Arrival; 8] = [
+    const ARRIVALS: [Arrival; 9] = [
         Arrival::Page,
         Arrival::Preflight,
         Arrival::Socket,
@@ -323,6 +323,7 @@ mod tests {
         Arrival::Door(Door::Enroll),
         Arrival::Door(Door::Acp),
         Arrival::Door(Door::Drop),
+        Arrival::Door(Door::Workspace),
         Arrival::Pairing,
     ];
 

@@ -29,8 +29,14 @@ use super::support::*;
 
 use super::meeting::*;
 
-/// The production driver runs a wave's leading reads at once, and the
-/// ledger it leaves is the one the same calls leave one after another.
+fn window_ends_in(window: &str, expected: &str) -> bool {
+    let messages: Vec<kernel::ChatMessage> = serde_json::from_str(window).unwrap();
+    matches!(
+        messages.last().and_then(|message| message.content.last()),
+        Some(ContentBlock::Text { text }) if text == expected
+    )
+}
+
 #[test]
 fn three_reads_a_run_makes_in_one_wave_are_in_flight_together_and_leave_the_serial_ledger() {
     let serial = three_reads_driven(&mut OneByOne(Placed::with(None)));
@@ -43,7 +49,6 @@ fn three_reads_a_run_makes_in_one_wave_are_in_flight_together_and_leave_the_seri
     let concurrent = three_reads_driven(&mut Placed::with(Some(meeting.clone())));
 
     assert_eq!(concurrent.lines, serial.lines);
-    // In a serial wave the first read finishes before the second starts.
     assert_eq!(*meeting.fewest_seen.lock().unwrap(), READS);
 }
 
@@ -58,8 +63,10 @@ fn a_steer_after_assembly_leaves_the_sent_request_untouched() {
     let mut now = counter();
     let mut interrupt = |point: SafePoint| match point {
         SafePoint::BeforeCall { turn: 0 } => Interrupt::Steer {
+            pictures: Vec::new(),
             speaker: runtime::conversation::Speaker::Person,
             text: "measure it in metres".to_owned(),
+            request: None,
         },
         _ => Interrupt::None,
     };
@@ -83,9 +90,6 @@ fn a_steer_after_assembly_leaves_the_sent_request_untouched() {
     drive(plan(), &mut ledger, &mut model, &mut hooks, &handoff()).unwrap();
 
     let seen = seen.borrow();
-    // The breakpoint is a request-side annotation, so a message prints
-    // the same in every request that carries it: every byte before the
-    // closing bracket is the request already sent.
     let first = seen[0].strip_suffix(']').unwrap();
     assert!(
         seen[1].starts_with(first),
@@ -94,15 +98,12 @@ fn a_steer_after_assembly_leaves_the_sent_request_untouched() {
         seen[1]
     );
     assert!(
-        seen[1].ends_with("Text { text: \"user: measure it in metres\" }] }]"),
+        window_ends_in(&seen[1], "user: measure it in metres"),
         "the steer lands after the result it arrived during: {}",
         seen[1]
     );
 }
 
-/// A policy change that reaches the run before its call is taken at the
-/// wave, and the model reads of it after that wave's results: every byte
-/// the first request sent is the start of the second (runtime §8-62).
 #[test]
 fn a_policy_change_is_told_after_the_wave_and_leaves_the_sent_request_untouched() {
     let mut ledger = RecordingLedger::new();
@@ -150,18 +151,16 @@ fn a_policy_change_is_told_after_the_wave_and_leaves_the_sent_request_untouched(
         seen[1]
     );
     assert!(
-        seen[1].ends_with(
-            "Text { text: \"city: The User changed this run's policy; from the next tool call \
-             on: mode work, write create, admission standing, landing ordinary.\" }] }]"
+        window_ends_in(
+            &seen[1],
+            "city: The User changed this run's policy; from the next tool call \
+             on: mode work, write create, admission standing, landing ordinary."
         ),
         "the note lands after the results of the wave it was taken at: {}",
         seen[1]
     );
 }
 
-/// A policy change that reaches a running run gates the next wave's
-/// edit: the tool reads the run's policy cell at the call, not the write
-/// limit the run was dispatched under (runtime §8-62).
 #[test]
 fn a_policy_changed_mid_run_gates_the_next_waves_edit() {
     let tmp = tempfile::tempdir().unwrap();
@@ -236,12 +235,9 @@ fn a_policy_changed_mid_run_gates_the_next_waves_edit() {
     );
 }
 
-/// How long the generating model writes text after it hands its read
-/// over, and how long that read takes to answer.
 pub(super) const WRITING: std::time::Duration = std::time::Duration::from_millis(500);
 pub(super) const READING: std::time::Duration = std::time::Duration::from_millis(500);
 
-/// A read-only tool that takes `READING` to answer.
 pub(super) struct SlowRead;
 
 impl kernel::Tool for SlowRead {
@@ -259,8 +255,6 @@ impl kernel::Tool for SlowRead {
     }
 }
 
-/// A streaming model that hands each call of its wave over as the call
-/// completes, then writes text for `WRITING` before its answer settles.
 pub(super) struct GeneratingModel {
     pub(super) waves: Vec<Vec<ToolCall>>,
 }

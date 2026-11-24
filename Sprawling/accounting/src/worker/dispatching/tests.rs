@@ -68,6 +68,8 @@ fn a_steer_from_a_resident_lands_in_the_window_as_that_resident() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -103,6 +105,8 @@ fn a_dispatch_the_city_will_not_take_leaves_no_room_behind() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: Some(kernel::SessionName::parse("one").unwrap()),
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -134,6 +138,8 @@ fn a_dispatch_with_no_goal_leaves_no_job_file_and_says_the_person_is_here() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"talk"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -171,6 +177,8 @@ fn a_bare_building_is_named_by_rule_and_the_run_is_the_first_call() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -228,6 +236,8 @@ fn a_room_that_asks_for_keep_warm_keeps_its_door_under_a_city_that_states_nothin
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -315,6 +325,8 @@ fn a_dispatch_says_what_it_spent_before_the_drive() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })

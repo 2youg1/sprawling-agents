@@ -51,6 +51,8 @@ fn a_halted_city_names_the_halt_and_not_the_configuration() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"step2"),
             session: Some(kernel::SessionName::parse("one").unwrap()),
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -74,6 +76,8 @@ fn a_halted_city_names_the_halt_and_not_the_configuration() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, b"step4"),
             session: Some(kernel::SessionName::parse("two").unwrap()),
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })

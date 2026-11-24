@@ -75,7 +75,7 @@ fn the_schema_hash_is_stable_across_calls_and_covers_the_wire_version() {
         "schema hash changed - update `Sprawling/wire/spec/Frames.lean` §8-1 in the same commit"
     );
     assert_eq!(
-        WIRE_V, 81,
+        WIRE_V, 82,
         "WIRE_V rises once between two pushes, for a shape change under names that stay (wire D1)"
     );
 }
@@ -94,7 +94,7 @@ fn the_schema_hash_covers_every_event_kind_name() {
     assert_eq!(schema_hash(), kernel::B3Hash::digest(&material));
 }
 
-const WIRE_SCHEMA_GOLDEN: &str = "13c28a66810d6e35a9b477ccd507c25e458a39811c5fa86e6f574ee331dfd593";
+const WIRE_SCHEMA_GOLDEN: &str = "0cd623cf7723a33c6da58ef8b20067537171ff33452a13c52f8825c8962ed136";
 
 #[cfg(feature = "schema")]
 #[test]
@@ -126,7 +126,7 @@ fn strip_prose(value: &mut serde_json::Value) {
 }
 
 #[cfg(feature = "schema")]
-const WIRE_SHAPE_GOLDEN: &str = "d2642389c18f2f4664543ac9dc549dbf0b67476800ff96e569dd1c975115c5cf";
+const WIRE_SHAPE_GOLDEN: &str = "d6120720a01350d1c3a6e797e89d7be720360a3cfcfbe27f055d19cc1ea7f049";
 
 #[cfg(feature = "server")]
 #[test]
@@ -435,6 +435,8 @@ fn a_dispatch_frame_carries_no_spend_ceiling() {
         policy: wire::RunPolicy::of(Mode::Work),
         idem: kernel::IdemKey::derive(&run, Seq::new(1), b"sample"),
         session: None,
+        resume: None,
+        images: Vec::new(),
         effort: None,
         model: None,
     };

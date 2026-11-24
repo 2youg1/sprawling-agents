@@ -160,9 +160,9 @@ Native 不可给时 E_SANDBOX_DENIED，不退到 copied_tree；CopiedTree 明确
 -/
 
 /-! container 设置覆盖：kernel 声明文法，building 的 sandbox 卡片写整份 `[sandbox.container]`。
-settings-control ContainerLimits.image RefRain/src/views/building/sandbox.svelte
-settings-control ContainerLimits.user RefRain/src/views/building/sandbox.svelte
-settings-control ContainerLimits.cpu_millis RefRain/src/views/building/sandbox.svelte
-settings-control ContainerLimits.memory_bytes RefRain/src/views/building/sandbox.svelte
-settings-control ContainerLimits.pids RefRain/src/views/building/sandbox.svelte
+settings-control ContainerLimits.image RefRain/src/views/building/sandbox.solid.tsx
+settings-control ContainerLimits.user RefRain/src/views/building/sandbox.solid.tsx
+settings-control ContainerLimits.cpu_millis RefRain/src/views/building/sandbox.solid.tsx
+settings-control ContainerLimits.memory_bytes RefRain/src/views/building/sandbox.solid.tsx
+settings-control ContainerLimits.pids RefRain/src/views/building/sandbox.solid.tsx
 -/

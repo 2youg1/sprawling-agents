@@ -30,6 +30,7 @@ struct ErrorDetail {
     account: AccountDisposition,        // 缺省 Keep 即不写出；Advance 只随 Retry::No 出现（D53）
     gate: Option<GateRefusal>,
     provider: Option<ProviderFailureKind>, // 缺席时不上线
+    request: Option<IdemKey>,              // 对端原请求身份；缺席时不上线
 }
 
 /// 同一个请求能否再发一次，连同它的效果是否已经落地；线上拼作 "yes"／"no"／"unknown"。

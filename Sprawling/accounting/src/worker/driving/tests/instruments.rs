@@ -268,6 +268,8 @@ pub(super) fn dispatch(addr: &str, task: &str, key: &[u8]) -> wire::Command {
         policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, key),
         session: None,
+        resume: None,
+        images: Vec::new(),
         effort: None,
         model: None,
     }

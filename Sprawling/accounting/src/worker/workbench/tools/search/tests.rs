@@ -12,20 +12,15 @@ use crate::worker::fixture::*;
 mod live;
 mod rounds;
 
-/// What the loopback supplier answers one request with.
 #[derive(Clone, Copy)]
 enum Reply {
-    /// The method's ordinary answer.
     Answer,
-    /// This status and no body.
+
     Status(u16),
-    /// A 200 whose body is not text, so the answer is lost after the
-    /// server took the request.
+
     Unread,
 }
 
-/// One request the loopback supplier was sent: the key its
-/// `x-api-key` header carried, and the JSON-RPC message.
 #[derive(Debug, Clone)]
 struct Sent {
     key: Option<String>,
@@ -40,9 +35,6 @@ impl Sent {
 
 type Decide = fn(&Sent) -> Reply;
 
-/// A supplier on a loopback port offering one tool, `remote`, with
-/// `schema` as its `inputSchema`. `decide` picks each answer; every
-/// request is kept in arrival order.
 fn hosted(
     remote: &'static str,
     schema: serde_json::Value,
@@ -114,7 +106,6 @@ fn hosted(
     (url, seen)
 }
 
-/// The schema of a supplier that takes `q`, and an optional `count`.
 fn vendor_schema() -> serde_json::Value {
     serde_json::json!({
         "type": "object",
@@ -131,8 +122,6 @@ fn account(id: &str) -> ProviderAccount {
     }
 }
 
-/// A custom supplier at `url` whose remote tool is `vendor_search`,
-/// sending from `accounts` in their order.
 fn vendor(url: &str, accounts: &[&str]) -> SearchConfiguration {
     let id = ServerLabel::parse("vendor").unwrap();
     SearchConfiguration::Custom {
@@ -149,8 +138,6 @@ fn vendor(url: &str, accounts: &[&str]) -> SearchConfiguration {
     }
 }
 
-/// A worker whose vault holds `key-<id>` under `secret:search/<id>`
-/// for each of `ids`.
 fn worker_holding(city_root: &Path, ids: &[&str]) -> RunWorker {
     init_city(city_root).unwrap();
     let mut worker =
@@ -198,9 +185,6 @@ fn calls_from(seen: &Mutex<Vec<Sent>>, key: &str) -> Vec<Sent> {
         .collect()
 }
 
-/// The call reaches the selected supplier's url as one `tools/call` of
-/// its remote tool, with each argument under the remote name the
-/// mapping gives it and the key of the first account in its header.
 #[test]
 fn web_search_calls_the_selected_supplier_with_the_mapped_arguments_and_its_key() {
     let dir = tempfile::tempdir().unwrap();
@@ -232,8 +216,6 @@ fn web_search_calls_the_selected_supplier_with_the_mapped_arguments_and_its_key(
     );
 }
 
-/// Absent `[search]` offers the declared default, Exa, reached
-/// anonymously; a confidential building and `Off` are offered nothing.
 #[test]
 fn web_search_defaults_to_exa_and_is_not_offered_when_confidential_or_off() {
     let dir = tempfile::tempdir().unwrap();
@@ -274,8 +256,6 @@ fn web_search_defaults_to_exa_and_is_not_offered_when_confidential_or_off() {
     }
 }
 
-/// A custom supplier that cannot be reached is the failed result: no
-/// request goes to the default supplier or anywhere else.
 #[test]
 fn web_search_never_falls_back_when_the_custom_supplier_cannot_be_reached() {
     struct Recording(
@@ -322,8 +302,6 @@ fn web_search_never_falls_back_when_the_custom_supplier_cannot_be_reached() {
     );
 }
 
-/// A mapping the remote schema does not take is refused before any
-/// `tools/call` is sent.
 #[test]
 fn web_search_refuses_a_mapping_the_remote_tool_does_not_take_before_the_call() {
     let dir = tempfile::tempdir().unwrap();
@@ -357,10 +335,6 @@ fn web_search_refuses_a_mapping_the_remote_tool_does_not_take_before_the_call() 
     );
 }
 
-/// The tool joins the bench a run is laid out with: an ordinary
-/// building's model is told about the `web` namespace `web_search` is
-/// filed under, with the default supplier, without anything being sent
-/// to it.
 #[test]
 fn an_ordinary_building_offers_web_search_to_its_model() {
     let dir = tempfile::tempdir().unwrap();
@@ -375,6 +349,8 @@ fn an_ordinary_building_offers_web_search_to_its_model() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })

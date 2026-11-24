@@ -17,7 +17,7 @@ pub mod start;
 
 use start::SnapshotFold;
 
-const VIEWS_FOLD_RULES: &str = "views-fold-0376b6783767b594";
+const VIEWS_FOLD_RULES: &str = "views-fold-8dc0c8abbde1dff1";
 
 pub(crate) fn views_fold_version() -> u32 {
     let rules = [env!("CARGO_PKG_VERSION"), VIEWS_FOLD_RULES].join("\n");

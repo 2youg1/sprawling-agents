@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use kernel::config::SearchConfiguration;
-use kernel::{Address, Effort, Proxying, ServerLabel};
+use kernel::{Address, Effort, KeepWarm, Proxying, ServerLabel};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -64,6 +64,12 @@ pub struct ConfigAnswer {
     pub addr: Address,
 
     pub effort: Option<SettledEffort>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub city_effort: Option<Effort>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub city_keep_warm: Option<KeepWarm>,
 
     pub second: SettledSecond,
 

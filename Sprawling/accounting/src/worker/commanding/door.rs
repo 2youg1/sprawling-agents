@@ -122,6 +122,10 @@ impl RunWorker {
             return;
         }
         let key = command.idem().copied();
+        let speech = matches!(
+            command,
+            wire::Command::Dispatch { .. } | wire::Command::Steer { .. }
+        );
         if let Some(first) = key.and_then(|key| self.doorstep.entrance.answered(&key)) {
             let said = super::entrance::repeated(command.name());
             self.note(
@@ -129,8 +133,16 @@ impl RunWorker {
                 "accounting::worker",
                 &said,
             );
-            if let Err(err) = first {
-                self.hand_back(&reply, err);
+            match first {
+                Err(err) => self.hand_back(&reply, err),
+                Ok(()) if speech => {
+                    if let Some(key) =
+                        key.filter(|key| self.doorstep.entrance.accepted_speech(*key))
+                    {
+                        let _delivered = reply.accept(key);
+                    }
+                }
+                Ok(()) => {}
             }
             return;
         }
@@ -138,6 +150,11 @@ impl RunWorker {
             self.doorstep.entrance.begin(key);
         }
 
+        let reply = if speech {
+            reply.for_request(key)
+        } else {
+            reply
+        };
         let outcome = self.carry_out(command, reply.clone());
         self.doorstep.entrance.settle(&outcome);
         if let Err(err) = outcome {
@@ -158,6 +175,12 @@ impl RunWorker {
     }
 
     pub(in crate::worker) fn hand_back(&mut self, reply: &wire::Reply, error: AxError) {
+        if let Some(key) = reply
+            .request()
+            .filter(|key| !self.doorstep.entrance.accepted_speech(*key))
+        {
+            self.doorstep.entrance.refused_later(key, &error);
+        }
         match reply.refuse(error) {
             wire::Delivered::ToThePeer | wire::Delivered::NobodyAsked => {}
             wire::Delivered::PeerGone => self.note(

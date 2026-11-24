@@ -12,6 +12,51 @@ use kernel::{Address, AxCode, AxError, EventKind, Payload, Seq};
 use super::super::RunWorker;
 
 impl RunWorker {
+    pub(super) fn resume_session(
+        &mut self,
+        room: &Address,
+        resume: Option<Seq>,
+        name: Option<&kernel::SessionName>,
+    ) -> Result<Option<(Seq, Option<kernel::Origin>)>, AxError> {
+        let Some(began) = resume else { return Ok(None) };
+        let refusal = |recovery| {
+            AxError::failure(
+                AxCode::InvalidArgs,
+                "continue a session",
+                format!("{room}:{}", began.value()),
+            )
+            .with_recovery(recovery)
+        };
+        if name.is_some() || !room.as_str().contains('/') {
+            return Err(refusal(
+                "choose an existing session in this room before continuing",
+            ));
+        }
+        let dir = kernel::layout::CityLayout::new(&self.city_root).ledger();
+        self.index
+            .refresh(&dir)
+            .map_err(storage::StorageError::into_ax)?;
+        let mut sessions = crate::views::sessions::RoomSessions::default();
+        let mut reader = self.index.reader(&dir);
+        for seq in self.index.seqs() {
+            let bytes = reader
+                .line_at(seq)
+                .map_err(storage::StorageError::into_ax)?;
+            if let storage::CheckedLine::Known(record) = storage::read_line(&bytes)
+                .map_err(|error| error.into_ax(seq.value().saturating_add(1)))?
+                && sessions.in_room(room, &record)
+            {
+                sessions.absorb(&record)?;
+            }
+        }
+        let Some((current, line)) = sessions.line(room, began) else {
+            return Err(refusal(
+                "reopen the session list and choose the original session again",
+            ));
+        };
+        Ok((!current).then_some((began, line.tail)))
+    }
+
     pub(in crate::worker) fn open_session(
         &mut self,
         addr: &Address,

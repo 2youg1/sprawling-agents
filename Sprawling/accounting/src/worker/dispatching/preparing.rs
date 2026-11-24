@@ -11,7 +11,7 @@ use kernel::{AxCode, AxError, Ledger, Locator, Payload, RunId};
 
 use super::super::driving::Sieving;
 use super::super::driving::harness::{HarnessDriven, HarnessHalf, drive_harness};
-use super::super::recording::Notes;
+use super::super::recording::{Notes, RunOpening};
 use super::super::workbench::{BenchDesks, Laying, Placing, held};
 use super::super::{Assignment, DriveContext, Driven, Driving, Given, Site, Stamping, drive_run};
 use super::heavy_landing::{HeavyLanding, Swept};
@@ -97,9 +97,15 @@ impl Staged {
                     notes: lane.laying.notes.clone(),
                     staged_at: lane.laying.staged_at,
                 };
+                let mut ledger = RunOpening {
+                    ledger,
+                    command: lane.command,
+                    session: at.resume,
+                    image_input: site.model.input == kernel::InputKinds::TextImage,
+                };
                 let driven = lane
-                    .prepare(&at, &mut site, ledger, &context)
-                    .and_then(|driving| drive_run(driving, ledger, context));
+                    .prepare(&at, &mut site, &mut ledger, &context)
+                    .and_then(|driving| drive_run(driving, &mut ledger, context));
                 let swept = heavy.carry_out(&at, &site, &driven);
                 let restock = restock.owed_by(site.lease.as_ref());
                 (
@@ -118,7 +124,13 @@ impl Staged {
                     notes: half.notes.clone(),
                     staged_at: half.staged_at,
                 };
-                let driven = drive_harness(half, ledger, context);
+                let mut ledger = RunOpening {
+                    ledger,
+                    command: half.command,
+                    session: at.resume,
+                    image_input: false,
+                };
+                let driven = drive_harness(half, &mut ledger, context);
                 let restock = restock.owed_by(driven.lease.as_ref());
                 (Flown::Harness { at, driven }, restock)
             }

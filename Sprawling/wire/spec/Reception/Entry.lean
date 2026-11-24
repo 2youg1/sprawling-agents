@@ -64,7 +64,7 @@ D54 每个调用方都要非环境凭据，入口先判 Host 与 Origin。
 一套头，每个监听器把它转成 HTTP 头一次、作为参数交给 `bundle_routes`：`Content-Security-Policy`（`default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data: blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`）、`X-Frame-Options: DENY`、`X-Content-Type-Options: nosniff`、`Referrer-Policy: no-referrer`、`Cross-Origin-Opener-Policy: same-origin`、`Cross-Origin-Resource-Policy: same-origin`；不是页面字节的答复另加 `Cache-Control: no-store`。
 
 - **`connect-src 'self'`，不逐个列 `ws://<Host>`**：CSP Level 3 让 `'self'` 在 `http:` 页上认同一主机与端口的 `ws:`、在 `https:` 页上认 `wss:`，配对要用的 WebCrypto Ed25519 在 Chromium 137、Gecko 129、WebKit 17 才有，这几版都按这条规则匹配。于是城自己的端口与远程监听器（经隧道的公网名到达，名字在这里不可知）送的是同一套头，D20「同样的字节、同样的头」仍成立。被否：按监听器列出每个 Host 的 `ws://`——远程监听器列不出，未指定地址的监听器也列不出，两张表只会让同一个页面在两扇门后受两种策略。
-- `'wasm-unsafe-eval'` 给 pdf.js 的 wasm 解码器，`'unsafe-inline'` 给 Svelte 写在元素上的样式；页面不再需要它们时删掉。
+- `'wasm-unsafe-eval'` 给 pdf.js 的 wasm 解码器，`'unsafe-inline'` 给视图写在元素上的计算样式；页面不再需要它们时删掉。
 -/
 
 namespace Wire.Reception.Entry

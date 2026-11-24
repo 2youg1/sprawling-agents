@@ -3,17 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The first request a branch sends opens with the bytes of the last
-//! request its mother sent (`Sprawling/runtime/spec/Fork.lean` §8-2): a provider reuses a
-//! cached prompt only for a prefix that matches byte for byte, so a
-//! branch that re-worded any message its mother sent pays for the whole
-//! conversation again.
-//!
-//! Both runs are driven for real, through `drive`, onto a ledger on
-//! disk; the branch is rebuilt from that ledger by
-//! `inherited_indexed`, the door the city takes. What is compared is
-//! each message as the model seam received it, serialised.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -33,8 +22,6 @@ use crate::prefix::{FrozenPrefix, FrozenSegment, SegmentSlot};
 use crate::turn::{CallShape, Interrupt};
 use crate::{Handoff, RunHooks, RunPlan, SafePoint, drive};
 
-/// A model that answers from a script and keeps, for every request,
-/// each message it was sent, serialised.
 struct Recorded {
     replies: Vec<ModelReturn>,
     sent: Vec<Vec<String>>,
@@ -87,18 +74,19 @@ fn a_branch_first_request_opens_with_the_same_bytes_pictures_included() {
         width: 8,
         height: 8,
     };
-    run_answering(
-        &mut ledger,
-        &mut mother,
-        plan(RunId::from_bytes([1; 16]), "measure the meter", Vec::new()),
-        &|_: &ToolCall| {
-            Ok(ToolOutcome {
-                result: Payload::of(&serde_json::json!({ "image": picture.locator.to_string() }))
-                    .unwrap(),
-                attachments: vec![picture.clone(), picture.clone()],
-            })
-        },
-    );
+    let selection = ImageRef {
+        locator: Locator::parse(&format!("cas:b3-{}", "cd".repeat(32))).unwrap(),
+        ..picture.clone()
+    };
+    let mut opening = plan(RunId::from_bytes([1; 16]), "measure the meter", Vec::new());
+    opening.pictures = vec![selection.clone()];
+    run_answering(&mut ledger, &mut mother, opening, &|_: &ToolCall| {
+        Ok(ToolOutcome {
+            result: Payload::of(&serde_json::json!({ "image": picture.locator.to_string() }))
+                .unwrap(),
+            attachments: vec![picture.clone(), picture.clone()],
+        })
+    });
 
     let mut index = storage::LedgerIndex::empty();
     index.refresh(dir.path()).unwrap();
@@ -118,6 +106,14 @@ fn a_branch_first_request_opens_with_the_same_bytes_pictures_included() {
         ),
     );
 
+    assert!(
+        mother
+            .sent
+            .first()
+            .unwrap()
+            .join("\n")
+            .contains(&selection.locator.to_string())
+    );
     let last = mother.sent.last().unwrap();
     let shown = last.join("\n");
     assert!(
@@ -132,9 +128,6 @@ fn a_branch_first_request_opens_with_the_same_bytes_pictures_included() {
     assert_eq!(first.get(..last.len()), Some(&last[..]));
 }
 
-/// A read the renderer draws as a header and a marked body, and a refusal
-/// it draws as one line, reach a branch as the bytes the mother was
-/// shown: the rebuild draws each line with the renderer it records.
 #[test]
 fn a_branch_is_shown_the_mothers_reads_and_refusals_as_she_was() {
     let dir = tempfile::tempdir().unwrap();
@@ -195,13 +188,10 @@ fn a_branch_is_shown_the_mothers_reads_and_refusals_as_she_was() {
     let first = &daughter.sent[0];
     assert_eq!(first.get(..last.len()), Some(&last[..]));
     let shown = last.join("\n");
-    // The version an earlier read recorded is not drawn: edit takes none.
     assert!(shown.contains("lab/a.md lines 1-14 of 14") && !shown.contains("cas:b3-00"));
     assert!(shown.contains("E_INVALID_ARGS search: missing string argument"));
 }
 
-/// Drives one run onto `ledger` with nothing interrupting it and every
-/// call answered with the same reading.
 fn run(ledger: &mut storage::JsonlLedger, model: &mut Recorded, plan: RunPlan) {
     run_answering(ledger, model, plan, &|_: &ToolCall| {
         Ok(ToolOutcome {
@@ -211,7 +201,6 @@ fn run(ledger: &mut storage::JsonlLedger, model: &mut Recorded, plan: RunPlan) {
     });
 }
 
-/// Drives one run onto `ledger`, every call answered by `answer`.
 fn run_answering(
     ledger: &mut storage::JsonlLedger,
     model: &mut Recorded,
@@ -254,10 +243,9 @@ fn job(addr: &Address) -> Locator {
     Locator::parse(&format!("file:{}/JOB.md@{}", addr.as_str(), "a".repeat(40))).unwrap()
 }
 
-/// One run the person dispatched in `lab/room1`, opening with what they
-/// typed, after `inherited` when it is a branch.
 fn plan(run: RunId, task: &str, inherited: Vec<ChatMessage>) -> RunPlan {
     RunPlan {
+        pictures: Vec::new(),
         run,
         who: "lab/room1".to_owned(),
         addr: room(),

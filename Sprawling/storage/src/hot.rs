@@ -36,6 +36,8 @@ pub struct RunHot {
     pub task: Option<String>,
 
     pub goal: Option<String>,
+    #[serde(default)]
+    pub session_began: Option<Seq>,
 
     #[serde(default)]
     pub waiting: Option<RunWaiting>,
@@ -76,6 +78,7 @@ impl RunHot {
             ask: None,
             task: None,
             goal: None,
+            session_began: None,
             waiting: None,
         }
     }
@@ -90,6 +93,12 @@ impl RunHot {
         if kind == EventKind::RunStarted {
             self.addr = record.addr().cloned();
             self.started = Some(record.t());
+            self.session_began = record
+                .data()
+                .as_map()
+                .get("session_began")
+                .and_then(serde_json::Value::as_u64)
+                .map(Seq::new);
         }
         let stated = |field: &str| {
             record

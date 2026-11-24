@@ -33,6 +33,8 @@ impl RunWorker {
 
             origin: None,
             session: None,
+            resume: None,
+            pictures: Vec::new(),
             effort: None,
             difficulty: None,
             model: None,

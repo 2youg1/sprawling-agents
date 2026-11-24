@@ -31,6 +31,7 @@ enum Hearing {
 async fn send(hearing: Hearing, media: Option<&str>, bytes: &[u8]) -> (u16, String) {
     let (events, _held) = tokio::sync::broadcast::channel(16);
     let config = ServeConfig {
+        workspace: None,
         deltas: tokio::sync::broadcast::channel(16).0,
         logs: tokio::sync::broadcast::channel(16).0,
         outputs: tokio::sync::broadcast::channel(16).0,

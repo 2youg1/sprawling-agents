@@ -17,10 +17,6 @@
 use super::super::*;
 use crate::worker::fixture::*;
 
-/// A resident who is signalled and has no run open gets one, and its
-/// brief names the resident who spoke rather than reading like the
-/// person. Two residents can therefore hold a conversation without
-/// somebody dispatching each turn of it by hand.
 #[test]
 fn a_signal_wakes_the_resident_it_was_sent_to_and_says_who_spoke() {
     let dir = tempfile::tempdir().unwrap();
@@ -33,7 +29,6 @@ fn a_signal_wakes_the_resident_it_was_sent_to_and_says_who_spoke() {
     .unwrap();
     move_in(dir.path(), "market/ito");
     move_in(dir.path(), "market/hana");
-    // A room with nobody in it, to prove the other half of the rule.
     std::fs::create_dir_all(dir.path().join("market").join("store")).unwrap();
 
     let (base_url, provider) = fake_openai(
@@ -71,6 +66,8 @@ fn a_signal_wakes_the_resident_it_was_sent_to_and_says_who_spoke() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -102,11 +99,6 @@ fn a_signal_wakes_the_resident_it_was_sent_to_and_says_who_spoke() {
     );
 }
 
-/// A knock that would carry one conversation past its ceiling starts
-/// nothing: the signal is already in the room's inbox, and the chain
-/// ends here rather than with another run nobody asked for
-/// (`Sprawling/app/Spec.lean` §8-46-12). The first test above is the other side
-/// of the boundary: a knock below the ceiling wakes its resident.
 #[test]
 fn a_knock_past_the_conversation_ceiling_starts_no_run() {
     let dir = tempfile::tempdir().unwrap();
@@ -222,15 +214,6 @@ addr = \"lab/room1\"
     );
 }
 
-/// Outside content that starts work starts it tainted, and the taint
-/// has to reach the door that judges `exec`: a run a web page or a pull
-/// request set going must not run a command on the city's machine.
-///
-/// Through the production path - arrival, dispatch, the bench the
-/// workbench lays out - because the defect this pins was a bench that
-/// never learned the run was tainted, which no unit of the bench shows.
-/// The refusal names the source the work arrived from, so the taint the
-/// door read is the arrival's own label rather than one made up later.
 #[test]
 fn an_arrival_that_starts_work_is_refused_exec() {
     let dir = tempfile::tempdir().unwrap();
@@ -270,7 +253,6 @@ fn an_arrival_that_starts_work_is_refused_exec() {
     );
 }
 
-/// Every `run_started` line the history holds, oldest first.
 pub(super) fn runs_started(ledger_dir: &std::path::Path) -> Vec<String> {
     runtime::replay::verify_ledger_dir(ledger_dir)
         .unwrap()
@@ -281,7 +263,6 @@ pub(super) fn runs_started(ledger_dir: &std::path::Path) -> Vec<String> {
         .collect()
 }
 
-/// Gives the room at `addr` somebody to wake.
 pub(super) fn move_in(city: &std::path::Path, addr: &str) {
     let room = addr
         .split('/')
@@ -294,10 +275,6 @@ pub(super) fn move_in(city: &std::path::Path, addr: &str) {
     .unwrap();
 }
 
-/// What a delegate hands back wakes the resident who asked for it, by
-/// the same decision an ordinary signal takes: the brief names the room
-/// that spoke, so the parent's next turn is a run of its own rather
-/// than a person dispatching it again (`Sprawling/app/Spec.lean` §8-46-12).
 #[test]
 fn what_comes_back_wakes_the_resident_who_asked_for_it() {
     let dir = tempfile::tempdir().unwrap();
@@ -336,6 +313,8 @@ fn what_comes_back_wakes_the_resident_who_asked_for_it() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })

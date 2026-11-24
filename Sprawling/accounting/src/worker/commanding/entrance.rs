@@ -5,13 +5,14 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use kernel::{AxError, IdemKey, Payload};
+use kernel::{AxError, EventKind, IdemKey, Payload};
 
 pub(in crate::worker) const IDEM_FIELD: &str = "idem";
 
 #[derive(Default, serde::Serialize, serde::Deserialize)]
 pub(in crate::worker) struct Entrance {
     seen: BTreeSet<IdemKey>,
+    speech_accepted: BTreeSet<IdemKey>,
 
     #[serde(
         serialize_with = "crate::worker::folds::as_json_text",
@@ -57,13 +58,20 @@ impl Entrance {
         self.refused.insert(key, refusal.clone());
     }
 
-    pub(in crate::worker) fn absorb(&mut self, data: &Payload) {
+    pub(in crate::worker) fn accepted_speech(&self, key: IdemKey) -> bool {
+        self.speech_accepted.contains(&key)
+    }
+
+    pub(in crate::worker) fn absorb(&mut self, kind: EventKind, data: &Payload) {
         let Some(value) = data.as_map().get(IDEM_FIELD) else {
             return;
         };
 
         if let Ok(key) = serde_json::from_value::<IdemKey>(value.clone()) {
             self.seen.insert(key);
+            if matches!(kind, EventKind::RunStarted | EventKind::SteerReceived) {
+                self.speech_accepted.insert(key);
+            }
         }
     }
 }

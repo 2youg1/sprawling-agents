@@ -7,10 +7,6 @@ use super::super::*;
 use crate::worker::fixture::*;
 use crate::worker::*;
 
-/// The merge is the last change in the city that still outran the
-/// line announcing it. `trees.merge` moved the trunk and only then
-/// wrote `pr_merged`, so a refused line left the building standing on
-/// work its own history says was never brought in.
 #[test]
 fn a_merge_the_history_refused_leaves_the_building_where_it_was() {
     let dir = tempfile::tempdir().unwrap();
@@ -59,6 +55,8 @@ fn a_merge_the_history_refused_leaves_the_building_where_it_was() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"one"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -81,8 +79,6 @@ fn a_merge_the_history_refused_leaves_the_building_where_it_was() {
         found.expect("opening a request leaves a record naming the branch")
     };
 
-    // The checking run works over a ledger that will lose exactly the
-    // line saying the work was merged.
     let (base_url, _second) = fake_openai(
         &["m-local"],
         vec![
@@ -144,6 +140,8 @@ fn a_merge_the_history_refused_leaves_the_building_where_it_was() {
         policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"two"),
         session: None,
+        resume: None,
+        images: Vec::new(),
         effort: None,
         model: None,
     });

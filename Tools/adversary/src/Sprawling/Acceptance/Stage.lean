@@ -37,7 +37,7 @@ def Stage.raise (door : Door) : IO Stage := do
   let root ← IO.FS.createTempDir
   let stage : Stage := { root, city := root / "city", home := root / "home" }
   IO.FS.createDirAll stage.home
-  door.raise stage.city
+  door.raise stage.city stage.home
   return stage
 
 /-- Throws the folder away. -/

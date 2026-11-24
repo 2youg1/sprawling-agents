@@ -56,6 +56,7 @@ import Sprawling.wire.spec.Server.Committed
 import Sprawling.wire.spec.Server.Listener
 import Sprawling.wire.spec.Server.Sessions
 import Sprawling.wire.spec.Server.Socket
+import Sprawling.wire.spec.Server.Workspace
 import Sprawling.wire.spec.Slash
 
 /-! # wire 的规格
@@ -284,6 +285,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | 8-84 | `Sprawling/wire/spec/Preference.lean` |
 | 8-85 | `Sprawling/wire/spec/Answer/Endpoints.lean` |
 | 8-86 | `Sprawling/wire/spec/Answer/Config.lean` |
+| 8-86a | `Sprawling/wire/spec/Answer/Config.lean` |
 | 8-87 | `Sprawling/wire/spec/Privacy.lean` |
 | 8-88 | `Sprawling/wire/spec/Privacy.lean` |
 | 8-89 | `Sprawling/wire/spec/Privacy.lean` |
@@ -292,6 +294,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | 8-92 | `Sprawling/wire/spec/Answer/Endpoints.lean` |
 | 8-93 | `Sprawling/wire/spec/Server.lean` |
 | 8-93s | `Sprawling/wire/spec/Server/Sessions.lean` |
+| 8-95a | `Sprawling/wire/spec/Server/Workspace.lean` |
 | 8-94 | `Sprawling/wire/spec/Reception/Entry.lean` |
 | 8-95 | `Sprawling/wire/spec/Reception/Pairing.lean` |
 | 8-96 | `Sprawling/wire/spec/Slash.lean` |

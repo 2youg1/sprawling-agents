@@ -34,6 +34,9 @@ agent_protocols = { workspace = true }
 # The remote listener answers its two WebSocket paths and the page on one
 # port (Sprawling/remote_access/Spec.lean §8-10).
 axum = { workspace = true, features = ["ws"] }
+cap-fs-ext = { workspace = true }
+cap-std = { workspace = true }
+notify = "=8.2.0"
 crossterm = { workspace = true }
 # The terminal shell: frame leaf and City/Mei console backends (`Calyx/Spec.lean`).
 calyx = { workspace = true }
@@ -83,6 +86,9 @@ tikv-jemallocator = { version = "0.7", features = ["background_threads"] }
 
 # The peak memory a command `sprawling gauge` measured reached, read
 # after it exits and before its handle closes (`Sprawling/app/Spec.lean` §8-129-4).
+[target.'cfg(unix)'.dependencies]
+rustix = { version = "1.1.5", features = ["fs"] }
+
 [target.'cfg(windows)'.dependencies]
 win32job = { workspace = true }
 # Windows self-uninstall releases the installed name before exit (Install.lean D53).

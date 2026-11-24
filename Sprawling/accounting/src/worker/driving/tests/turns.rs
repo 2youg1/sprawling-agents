@@ -36,10 +36,8 @@ fn a_socket_that_carried_no_request_spends_no_scripted_reply() {
         .trim_end_matches("/v1")
         .to_owned();
 
-    // Opened and abandoned: a pooled socket nobody wrote to.
     drop(std::net::TcpStream::connect(&addr).unwrap());
 
-    // Opened and cut short: a body that stops before content-length.
     let mut cut = std::net::TcpStream::connect(&addr).unwrap();
     std::io::Write::write_all(
         &mut cut,
@@ -48,7 +46,6 @@ fn a_socket_that_carried_no_request_spends_no_scripted_reply() {
     .unwrap();
     drop(cut);
 
-    // The first socket that actually asked gets the first reply.
     let body = "{\"model\":\"m-local\"}";
     let mut asking = std::net::TcpStream::connect(&addr).unwrap();
     std::io::Write::write_all(
@@ -103,6 +100,8 @@ fn a_dispatch_runs_a_whole_turn_loop_and_the_chain_still_verifies() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -117,14 +116,11 @@ fn a_dispatch_runs_a_whole_turn_loop_and_the_chain_still_verifies() {
     assert!(kinds.contains(&EventKind::HandoffWritten), "{kinds:?}");
     assert!(kinds.contains(&EventKind::RunFrozen), "{kinds:?}");
 
-    // The effect, not only the freeze: the canary edit really landed.
-    // Asserting kinds alone once passed while every edit was refused.
     assert_eq!(
         std::fs::read_to_string(dir.path().join("lab/room1/notes.md")).unwrap(),
         "noted\n"
     );
 
-    // The whole thing is one verifiable chain, genesis included.
     let verified = runtime::replay::verify_ledger_dir(&report.ledger_dir).unwrap();
     assert!(verified.raw_lines().len() > kinds.len());
 }
@@ -133,9 +129,6 @@ fn a_cancel_reaches_the_run_it_cancels_without_waiting_for_it_to_end() {
     let desk = CommandDesk::default();
     let mine = RunId::CITY;
     let other = kernel::RunId::from_bytes([7u8; 16]);
-    // One key per ask, the way every client mints them: the desk
-    // now reads the key, so three commands sharing one would be one
-    // command repeated twice (section 8-33).
     let key = |material: &[u8]| kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, material);
 
     let nobody = || wire::Reply::nowhere();
@@ -143,6 +136,7 @@ fn a_cancel_reaches_the_run_it_cancels_without_waiting_for_it_to_end() {
         wire::Command::Steer {
             run: other,
             text: "not for me".to_owned(),
+            images: Vec::new(),
             idem: key(b"not for me"),
         },
         nobody(),
@@ -151,6 +145,7 @@ fn a_cancel_reaches_the_run_it_cancels_without_waiting_for_it_to_end() {
         wire::Command::Steer {
             run: mine,
             text: "  measure it in metres  ".to_owned(),
+            images: Vec::new(),
             idem: key(b"measure it in metres"),
         },
         nobody(),
@@ -163,17 +158,14 @@ fn a_cancel_reaches_the_run_it_cancels_without_waiting_for_it_to_end() {
         nobody(),
     );
 
-    // Cancel outranks a steer that arrived first: stopping and
-    // changing course are exclusive, and stopping cannot be undone.
-    assert!(matches!(desk.interrupt_for(mine), Interrupt::Cancel));
-    let Interrupt::Steer { speaker, text } = desk.interrupt_for(mine) else {
+    assert!(matches!(desk.interrupt_for(mine, None), Interrupt::Cancel));
+    let Interrupt::Steer { speaker, text, .. } = desk.interrupt_for(mine, None) else {
         panic!("the steer for this run is still waiting");
     };
     assert_eq!(speaker, runtime::conversation::Speaker::Person);
     assert_eq!(text, "measure it in metres");
-    assert!(matches!(desk.interrupt_for(mine), Interrupt::None));
+    assert!(matches!(desk.interrupt_for(mine, None), Interrupt::None));
 
-    // And the other run's command kept its place in line.
     let Some(wire::Command::Steer { run, .. }) = desk.take() else {
         panic!("a command for another run is not consumed by this one");
     };
@@ -191,10 +183,6 @@ fn a_steer_lands_at_the_end_of_the_next_tool_result() {
         ],
     );
     let mut worker = worker_with_provider(dir.path(), &base_url, "m-local").unwrap();
-    // One steer, delivered at the first safe point that asks.
-    // A count the source can spend without owning it: N runs may ask
-    // this one source at once, so it answers by `Fn` rather than by
-    // `FnMut` (`Sprawling/app/Spec.lean` §8-46-1).
     let left = std::sync::Arc::new(std::sync::atomic::AtomicU32::new(1));
     worker.serve(only_interrupts(std::sync::Arc::new(move |_| {
         if left
@@ -208,6 +196,8 @@ fn a_steer_lands_at_the_end_of_the_next_tool_result() {
             return Interrupt::Steer {
                 speaker: runtime::conversation::Speaker::Person,
                 text: "measure it in metres".to_owned(),
+                request: None,
+                pictures: Vec::new(),
             };
         }
         Interrupt::None
@@ -220,6 +210,8 @@ fn a_steer_lands_at_the_end_of_the_next_tool_result() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -245,14 +237,10 @@ fn a_steer_lands_at_the_end_of_the_next_tool_result() {
     );
 }
 
-/// Deleting one file, in this platform's own words. The point of the
-/// test is the sweep, and the sweep does not care which command did
-/// it — which is exactly why the sweep is the defence.
 #[test]
 fn a_provider_failure_freezes_the_run_instead_of_hanging_it() {
     let dir = tempfile::tempdir().unwrap();
     crate::worker::fixture::init_city(dir.path()).unwrap();
-    // A provider that lists a model, then answers 401 to every chat.
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let addr = listener.local_addr().unwrap();
     std::thread::spawn(move || {
@@ -298,8 +286,6 @@ fn a_provider_failure_freezes_the_run_instead_of_hanging_it() {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .push(record.kind());
     }));
-    // The command surface must not error out: the failure belongs to
-    // the run's own account, not to the person's keystroke.
     worker
         .handle(wire::Command::Dispatch {
             addr: Address::parse("lab/room1").unwrap(),
@@ -308,6 +294,8 @@ fn a_provider_failure_freezes_the_run_instead_of_hanging_it() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -316,9 +304,6 @@ fn a_provider_failure_freezes_the_run_instead_of_hanging_it() {
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .clone();
-    // Before the drive backstop: events stopped at model_called and
-    // the run never froze - a browser watching the stream saw it go
-    // quiet forever.
     assert!(
         kinds.contains(&EventKind::ProviderDegraded),
         "the failure is written under its carrier: {kinds:?}"
@@ -329,11 +314,6 @@ fn a_provider_failure_freezes_the_run_instead_of_hanging_it() {
     );
 }
 
-/// What one drive is handed can leave the thread that built it
-/// (`Sprawling/app/Spec.lean` §8-44), and owns everything it runs on, so a lane can
-/// be handed one (`Sprawling/app/Spec.lean` §8-46-1). A bound rather than a run: a
-/// value that cannot be sent is a compile error here before it is a
-/// design error in the pool.
 #[test]
 fn a_drive_can_be_handed_to_another_thread() {
     fn crosses_threads<T: Send + 'static>() {}

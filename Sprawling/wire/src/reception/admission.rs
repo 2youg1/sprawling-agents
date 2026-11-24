@@ -63,6 +63,8 @@ pub enum Door {
     Acp,
 
     Drop,
+
+    Workspace,
 }
 
 #[derive(Debug)]
@@ -79,6 +81,7 @@ pub fn decide_admission(door: Door, pairing: Pairing) -> Admission {
         (Pairing::Absent, Door::Transcribe) => "transcribe a recording",
         (Pairing::Absent, Door::Enroll) => "enrol a credential",
         (Pairing::Absent, Door::Drop) => "keep a dropped file",
+        (Pairing::Absent, Door::Workspace) => "open local workspace files",
     };
     Admission::Refuse(
         AxError::failure(
@@ -110,7 +113,7 @@ mod tests {
 
     #[test]
     fn the_acting_doors_refuse_an_empty_hand_and_the_editor_door_carries_the_bit() {
-        for door in [Door::Transcribe, Door::Enroll, Door::Drop] {
+        for door in [Door::Transcribe, Door::Enroll, Door::Drop, Door::Workspace] {
             let Admission::Refuse(err) = decide_admission(door, Pairing::Absent) else {
                 panic!("{door:?} acts on a request, so it refuses an unpaired one");
             };

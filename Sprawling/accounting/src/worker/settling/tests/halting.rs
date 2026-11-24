@@ -14,16 +14,6 @@
 use crate::worker::fixture::*;
 use crate::worker::*;
 
-/// A run a resident handed down is a member of the backlog, so a halt
-/// on its scope reaches it (`Sprawling/runtime/Spec.lean` §8-28-2).
-///
-/// Before this, the table held background commands only: a halted
-/// building's delegated run went on to its freeze as if nobody had
-/// said stop. The interrupt source stands in for the accounting
-/// thread here - it halts the building the moment a run member is
-/// standing in it, which is the moment the child asks at its first
-/// safe point - and the child must freeze cancelled without spending
-/// a model call.
 #[test]
 fn a_halt_on_the_building_stops_the_run_a_resident_handed_down() {
     let dir = tempfile::tempdir().unwrap();
@@ -88,6 +78,8 @@ fn a_halt_on_the_building_stops_the_run_a_resident_handed_down() {
             policy: kernel::RunPolicy::of(kernel::Mode::Work),
             idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"dispatch"),
             session: None,
+            resume: None,
+            images: Vec::new(),
             effort: None,
             model: None,
         })
@@ -109,8 +101,6 @@ fn a_halt_on_the_building_stops_the_run_a_resident_handed_down() {
         helper_frozen.contains("cancelled"),
         "the delegated run went on after its building was halted: {helper_frozen}"
     );
-    // The parent carried on for one more call after approval; the
-    // child, stopped at its first safe point, made none of its own.
     let child_calls = provider
         .bodies()
         .iter()
@@ -129,9 +119,6 @@ fn a_halt_on_the_building_stops_the_run_a_resident_handed_down() {
     );
 }
 
-/// A served city hands what a running command writes to the page while
-/// it still writes it (`Sprawling/runtime/Spec.lean` §8-28-3), through the same backlog a
-/// halt reaches.
 #[test]
 #[expect(clippy::disallowed_methods, reason = "test fixture (child D4)")]
 fn a_served_city_hands_a_running_commands_output_to_the_page() {

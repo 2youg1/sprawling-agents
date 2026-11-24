@@ -5,9 +5,6 @@
 
 use crate::worker::*;
 
-/// A claim lands through the run that made it (`record_for`), and the
-/// worker's own table of who holds which node reads it at once, as a
-/// restart folding the same history does (`Sprawling/app/Spec.lean` §8-111).
 #[test]
 fn a_claim_a_run_lands_reaches_the_holders_the_worker_reads() {
     let dir = tempfile::tempdir().unwrap();
@@ -53,10 +50,6 @@ fn a_claim_a_run_lands_reaches_the_holders_the_worker_reads() {
     );
 }
 
-/// A claim booked at the call reaches the ledger through the gate the
-/// lanes write through, and the worker's own holders read it before the
-/// claiming run lands, as a restart folding the same history does
-/// (`Sprawling/app/Spec.lean` §8-42-8, §8-110).
 #[test]
 fn a_claim_booked_through_the_gate_reaches_the_live_holders_before_its_run_lands() {
     use kernel::Tool;
@@ -117,11 +110,6 @@ fn a_claim_booked_through_the_gate_reaches_the_live_holders_before_its_run_lands
     );
 }
 
-/// A claim's line is written when the model makes it, so a run whose
-/// landing fails before its plan settles still owes the history the
-/// line that closes it: the claim, then the node handed back
-/// (`Sprawling/app/Spec.lean` §8-42-8). The plan's own closing line is the
-/// one lost here, so the landing fails at the plan.
 #[test]
 fn a_claim_whose_landing_failed_is_handed_back() {
     use crate::worker::fixture::*;
@@ -157,6 +145,8 @@ fn a_claim_whose_landing_failed_is_handed_back() {
         policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, b"lost goal"),
         session: None,
+        resume: None,
+        images: Vec::new(),
         effort: None,
         model: None,
     });
@@ -181,10 +171,6 @@ fn a_claim_whose_landing_failed_is_handed_back() {
     );
 }
 
-/// The plan's closing line reaches the ledger before the roadmap file is
-/// rewritten, so a refused rewrite leaves that line on the history; the
-/// claim is closed by it, and no hand-back line follows for a node the
-/// history already shows closed (`Sprawling/app/Spec.lean` §8-42-8).
 #[test]
 fn a_claim_closed_on_the_ledger_is_not_handed_back_when_the_roadmap_write_fails() {
     use crate::worker::fixture::*;
@@ -224,11 +210,6 @@ fn a_claim_closed_on_the_ledger_is_not_handed_back_when_the_roadmap_write_fails(
     );
 }
 
-/// A claim closes when its own closing line reaches the ledger, so a
-/// ledger that takes a landing's first closing line and refuses its
-/// second owes a hand-back line for the second node alone: the first
-/// node's release is already the last line the history holds for it
-/// (`Sprawling/app/Spec.lean` §8-42-8).
 #[test]
 fn a_landing_refused_part_way_hands_back_only_the_nodes_it_did_not_close() {
     use crate::worker::fixture::*;
@@ -277,11 +258,6 @@ fn a_landing_refused_part_way_hands_back_only_the_nodes_it_did_not_close() {
     );
 }
 
-/// A run that claims a node and splits it holds nothing afterwards, and
-/// the split line is the parent's fate: a landing that succeeds owes no
-/// hand-back line after it, and neither the live holders nor a restart's
-/// fold of the same history show the parent held (`Sprawling/app/Spec.lean`
-/// §8-42-8, §8-111).
 #[test]
 fn a_split_closes_the_claim_on_its_parent() {
     use crate::worker::fixture::*;
@@ -308,8 +284,6 @@ fn a_split_closes_the_claim_on_its_parent() {
             completion("done", None),
         ],
     );
-    // On disk rather than over a fault layer, because the restart's fold
-    // reads the ledger directory.
     let worker = RunWorker::new(
         dir.path(),
         runtime::diagnostics::Diagnostics::off(),
@@ -326,10 +300,6 @@ fn a_split_closes_the_claim_on_its_parent() {
         .plan_holders
         .in_building(&building);
 
-    // The rebuilt fold is what guards the split today. The worker half
-    // holds trivially until `RelayGate::serve` passes the claim it books
-    // through `RunWorker::absorb`: the live table never sees the
-    // call-time `roadmap_claimed`, so it is empty with or without a split.
     assert_eq!(
         (
             landed.is_ok(),
@@ -347,7 +317,6 @@ fn a_split_closes_the_claim_on_its_parent() {
     );
 }
 
-/// A city whose building `lab` has `plan` as its roadmap.
 fn city_with_plan(plan: &str) -> tempfile::TempDir {
     let dir = tempfile::tempdir().unwrap();
     crate::worker::fixture::init_city(dir.path()).unwrap();
@@ -364,12 +333,13 @@ fn dispatch(key: &[u8]) -> wire::Command {
         policy: kernel::RunPolicy::of(kernel::Mode::Work),
         idem: kernel::IdemKey::derive(&RunId::CITY, kernel::Seq::FIRST, key),
         session: None,
+        resume: None,
+        images: Vec::new(),
         effort: None,
         model: None,
     }
 }
 
-/// Each `roadmap_*` line on the history: its kind and the node it names.
 fn plan_lines(worker: &RunWorker) -> Vec<(String, String)> {
     worker
         .ledger

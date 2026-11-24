@@ -52,13 +52,17 @@ impl SessionOrigins {
                 Ok(())
             }
             EventKind::RunStarted => {
-                if let Some(addr) = addr {
+                if let Some(addr) = addr
+                    && crate::views::sessions::historical_target(data).is_none()
+                {
                     self.started(addr, run);
                 }
                 Ok(())
             }
             EventKind::RunForked => {
-                if let Some(addr) = addr {
+                if let Some(addr) = addr
+                    && crate::views::sessions::historical_target(data).is_none()
+                {
                     self.spent(addr);
                 }
                 Ok(())

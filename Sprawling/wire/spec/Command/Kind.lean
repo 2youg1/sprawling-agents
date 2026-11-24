@@ -3,6 +3,10 @@
 -- file, You can obtain one at https://mozilla.org/MPL/2.0/.
 -- Copyright (c) 2026 2youg1 and the sprawling contributors
 
+/-! `Dispatch.resume` 可指定同房间会话的起始 seq。过往会话续聊在原会话尾部加入 run；其记录带 `session_began`，回放沿用这项身份，不增添会话。普通派遣不发送该字段，读回仍以原顺序归档。 -/
+
+/-! `Dispatch.images` 与 `Steer.images` 可携用户选中的 PNG 字节（标准 Base64，最多四张，每张编码至 2 MiB）。后端检查目标模型的图像能力与 PNG 内容，保留裁图原始字节于 CAS，并将引用放入对应的人类输入。图片不可用的拒绝携原请求键，草稿仍可编辑。 -/
+
 /-!
 # wire::command::kind
 
@@ -60,7 +64,7 @@
 |---|---|---|---|---|---|
 | `OpenRemoteDoor` | `lasting_ms: u64`、`idem`（一分钟到七天，与控制台 `--for` 同一条界） | `client` | `LocalOnly` | 控制台确认 | `Confirm::request`，在控制台印出确认码，答 `E_APPROVAL_PENDING` |
 | `ReplaceCityKey` | `idem` | `client` | `LocalOnly` | 控制台确认 | 同上 |
-| `ConfirmRemoteDoor` | `code: String`（控制台印出的确认码，大小写、空白与连字符不论）、`idem` | `client` | `LocalOnly` | 它自己就是确认 | `Confirm::confirm` 取回动词：开门走 `Doorway::open` 与远程监听，同 `/remote open`；换钥匙走 `Doorway::replace_key`，同 `/remote replace-key`，门开着时以 `E_BUSY` 拒（`Sprawling/app/spec/Outside.lean` §8-140） |
+| `ConfirmRemoteDoor` | `code: String`（控制台印出的确认码，大小写、空白与连字符不论）、`idem`、新客户端带的 `approval: Option IdemKey`（原请求标识） | `client` | `LocalOnly` | 它自己就是确认 | `Confirm::confirm` 取回动词：开门走 `Doorway::open` 与远程监听，同 `/remote open`；换钥匙走 `Doorway::replace_key`，同 `/remote replace-key`，门开着时以 `E_BUSY` 拒（`Sprawling/app/spec/Outside.lean` §8-140） |
 | `CloseRemoteDoor` | `idem` | `client` | `LocalOnly` | 无 | `Doorway::close(Console)`，同 `/remote close` |
 
 - **守卫一列说一帧到了执行者之后还要什么**：「控制台确认」的请求本身什么也不做，城取一个确认码、只印在城的控制台上，紧接着的一帧 `ConfirmRemoteDoor` 带回它、且在它到期之前（期限写在 Sprawling/remote_access/Spec.lean §3），城才做那个动词（Sprawling/remote_access/spec/Confirm.lean）。理由：城的回环端口上任何本地客户端都发得出这几帧，包括驱动页面的浏览器工具，而控制台的输出不进任何一帧，所以只有读得到控制台的那一位能确认。关门不要守卫，因为它只减少访问（remote_access D5）。改一个动词的守卫是这一格与执行者里的一臂。

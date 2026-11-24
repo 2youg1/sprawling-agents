@@ -257,7 +257,7 @@ inductive Answer | accepted (frames : List Frame) | denied (complaint : Complain
 inductive Ending | reply | record (kind : String) | silence  -- 一次 `call` 在什么到达时结束（D9）
 def Verb.ending  : Verb → Ending
 def discover     : IO (Option Door)
-def Door.raise   : Door → System.FilePath → IO Unit
+def Door.raise   : Door → (city home : System.FilePath) → IO Unit
 def Door.serve   : Door → System.FilePath → Port → System.FilePath → IO Serving  -- 城、端口、给城的 home；有 launcher 时经它起城
 def Door.ask     : Door → Port → Verb → IO Answer
 def Door.verify  : Door → System.FilePath → IO (Except String Nat)

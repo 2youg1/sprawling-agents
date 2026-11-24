@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The `playback` city tool (`Sprawling/app/Spec.lean` §8-132): its catalogue
-//! episode, and two residents of one building - a reporter who writes
-//! the day as a playback page, and an editor who checks it against the
-//! city - with the report kept where the city keeps exports.
-
 use kernel::event::record::ToolAnswer;
 use kernel::layout::CityLayout;
 use kernel::{Address, AxError, IdemKey, RunId, Seq};
@@ -17,13 +12,8 @@ use crate::city::{self, History};
 use crate::episodes::{Episode, Observed};
 use crate::script::{self, Step};
 
-/// The playback skill's reference page, which a resident's page starts
-/// from: the export refuses it if it ever fails the structure or the
-/// static offline check.
 const TEMPLATE: &str = include_str!("../../../city/skills/playback/template.html");
 
-/// The catalogue episode: an export of the bundle into this building's
-/// playback exports.
 pub(crate) fn episode() -> Episode {
     Episode {
         step: Step {
@@ -111,8 +101,6 @@ fn a_reporter_writes_the_day_and_an_editor_checks_it_against_the_city() {
     );
 }
 
-/// Sends `room` its task, keyed by the room so two dispatches in one
-/// city are two.
 fn dispatch(worker: &mut accounting::worker::RunWorker, room: &str) -> Result<(), AxError> {
     worker.handle(wire::Command::Dispatch {
         addr: Address::parse(room).unwrap(),
@@ -121,13 +109,13 @@ fn dispatch(worker: &mut accounting::worker::RunWorker, room: &str) -> Result<()
         policy: kernel::RunPolicy::of(kernel::Mode::Chat),
         idem: IdemKey::derive(&RunId::CITY, Seq::FIRST, room.as_bytes()),
         session: None,
+        resume: None,
+        images: Vec::new(),
         effort: None,
         model: None,
     })
 }
 
-/// What the first `playback` call of the run started at `room` was
-/// answered with.
 fn result_at(history: &History, room: &str) -> Map<String, Value> {
     history
         .started()

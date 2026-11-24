@@ -5,9 +5,6 @@
 
 use super::*;
 
-/// A steer recorded after the request was assembled reached the mother at
-/// the end of the next tool results, and the branch rebuilds it there: the
-/// task message she sent stays the bytes she sent.
 #[test]
 fn a_steer_after_assembly_is_inherited_after_the_results() {
     let mut drafts = mother_drafts();
@@ -18,8 +15,10 @@ fn a_steer_after_assembly_is_inherited_after_the_results() {
             line(
                 EventKind::SteerReceived,
                 Payload::of(&SteerReceived {
+                    pictures: Vec::new(),
                     source: "user".to_owned(),
                     text: "in metres".to_owned(),
+                    idem: None,
                 })
                 .unwrap(),
             ),
@@ -29,10 +28,10 @@ fn a_steer_after_assembly_is_inherited_after_the_results() {
 
     let mut expected = crate::conversation::Conversation::new();
     expected.push_task_lines(
-        "measure the meter",
-        "a number is written down",
+        ("measure the meter", "a number is written down"),
         crate::conversation::Opening::WithPerson,
         "the User",
+        &[],
     );
     expected.push_assistant(vec![ContentBlock::Text {
         text: "reading it now".to_owned(),
@@ -51,10 +50,6 @@ fn a_steer_after_assembly_is_inherited_after_the_results() {
     assert_eq!(inherited.messages, expected.messages().to_vec());
 }
 
-/// A line written before a result named its renderer is rebuilt as the
-/// JSON its model was shown, and the same answer drawn by version 2 is
-/// rebuilt as version 2 draws it: each line keeps the bytes its model
-/// read, whichever build wrote it.
 #[test]
 fn each_result_line_is_rebuilt_by_the_renderer_it_names() {
     let read = serde_json::json!({ "path": "lab/a.md", "bytes": 3, "text": "hi\n" });
@@ -91,8 +86,6 @@ fn each_result_line_is_rebuilt_by_the_renderer_it_names() {
     );
 }
 
-/// The rebuild is the mother's own window, folded through the same type
-/// the live loop folds through.
 #[test]
 fn a_branch_inherits_the_mother_window_message_for_message() {
     let inherited = mother().inherited(Seq::new(3)).unwrap();
@@ -100,10 +93,10 @@ fn a_branch_inherits_the_mother_window_message_for_message() {
 
     let mut expected = crate::conversation::Conversation::new();
     expected.push_task_lines(
-        "measure the meter",
-        "a number is written down",
+        ("measure the meter", "a number is written down"),
         crate::conversation::Opening::WithPerson,
         "the User",
+        &[],
     );
     expected.push_assistant(vec![ContentBlock::Text {
         text: "reading it now".to_owned(),
@@ -120,9 +113,6 @@ fn a_branch_inherits_the_mother_window_message_for_message() {
     assert_eq!(inherited.messages[2].role, Role::User);
 }
 
-/// A branch of a branch opened with only its mother's own turns: the
-/// conversation the mother had inherited from its own mother was folded
-/// into the mother's window but never into a rebuild of it.
 #[test]
 fn a_branch_of_a_branch_keeps_the_grandmother_conversation() {
     let daughter = RunId::from_bytes([7; 16]);
@@ -171,10 +161,10 @@ fn a_branch_of_a_branch_keeps_the_grandmother_conversation() {
     let mut expected = crate::conversation::Conversation::new();
     expected.push_inherited(&grandmother.messages);
     expected.push_task_lines(
-        "write it down twice",
-        "two numbers",
+        ("write it down twice", "two numbers"),
         crate::conversation::Opening::WithPerson,
         "the User",
+        &[],
     );
     expected.push_assistant(vec![ContentBlock::Text {
         text: "written".to_owned(),

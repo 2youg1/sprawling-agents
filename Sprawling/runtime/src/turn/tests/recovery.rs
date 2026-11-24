@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The model-call recovery pipeline's segment contract: the relay order,
-//! the three answers, what a skip hands on, and the one production
-//! repair driven through both doors.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -22,8 +18,6 @@ use super::super::recovery::{ModelCall, Segment, SegmentOutcome, recover};
 use super::super::*;
 use super::helpers::*;
 
-/// A scripted segment: it records the order it was consulted in and the
-/// failure it was offered, then answers what the scenario says.
 struct Scripted<'t> {
     name: &'static str,
     trace: &'t RefCell<Vec<(&'static str, AxCode)>>,
@@ -195,9 +189,6 @@ fn a_segment_that_cannot_repair_ends_the_relay_with_its_own_code() {
     );
 }
 
-/// The one production segment: a reply the streaming door's parser
-/// refused is asked for again through the blocking door, and every
-/// attempt is on the ledger before it is made.
 #[test]
 fn a_wire_mismatch_on_the_streaming_door_is_repaired_through_the_blocking_door() {
     struct TwoDoors {
@@ -226,10 +217,10 @@ fn a_wire_mismatch_on_the_streaming_door_is_repaired_through_the_blocking_door()
     };
     let mut conversation = Conversation::new();
     conversation.push_task_lines(
-        "probe the city",
-        "one probe",
+        ("probe the city", "one probe"),
         crate::conversation::Opening::FromJob,
         "the User",
+        &[],
     );
     let mut lines = lines();
     let turn = opened_on::<1>(&mut lines);
@@ -283,9 +274,6 @@ fn a_wire_mismatch_on_the_streaming_door_is_repaired_through_the_blocking_door()
     );
 }
 
-/// A failure no segment repairs reaches the watchdog layer exactly as it
-/// arrived: same code, still retriable, same recovery sentence, and no
-/// second attempt anywhere behind it.
 #[test]
 fn a_retriable_failure_passes_through_to_the_watchdog_untouched() {
     struct Refusing {

@@ -3,10 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The two judgements a control surface owns: which frames intervene in a
-//! running Run and what an intervention must leave behind, and whether the
-//! peer presenting a pairing token is the one we minted it for.
-
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -28,16 +24,13 @@ fn run() -> RunId {
     RunId::from_bytes([9u8; 16])
 }
 
-// ------------------------------------------------------------------- control
-
 #[test]
 fn interrupting_a_live_run_always_owes_a_handoff() {
-    // Constitution 1.7: "any interruption ends with a Handoff, so whoever
-    // comes next - human or Agent - receives the complete scene."
     let interrupting = [
         Command::Steer {
             run: run(),
             text: "try the other branch".to_owned(),
+            images: Vec::new(),
             idem: key(),
         },
         Command::Cancel {
@@ -94,8 +87,6 @@ fn the_verbs_are_exactly_the_ones_the_control_surface_shows() {
         Intervention::Halt,
         Intervention::Release,
     ];
-    // Three verbs that reach work already running, plus Release - the
-    // return path for Halt.
     assert_eq!(verbs.len(), 4);
     let mut names: Vec<&str> = verbs.iter().map(|v| v.as_str()).collect();
     names.sort_unstable();
@@ -117,11 +108,10 @@ fn dispatching_work_is_not_an_intervention() {
 
 #[test]
 fn steering_with_nothing_to_say_is_refused_rather_than_recorded() {
-    // An empty Steer would append an empty block to the next result
-    // envelope: a real event that teaches the model nothing.
     let command = Command::Steer {
         run: run(),
         text: "   ".to_owned(),
+        images: Vec::new(),
         idem: key(),
     };
     let ControlVerdict::Refuse(err) = classify(&command) else {
@@ -129,8 +119,6 @@ fn steering_with_nothing_to_say_is_refused_rather_than_recorded() {
     };
     assert!(!err.recovery().is_empty());
 }
-
-// ---------------------------------------------------------------------- auth
 
 #[test]
 fn a_minted_token_verifies_against_its_own_digest_and_nothing_else() {
@@ -147,8 +135,6 @@ fn a_minted_token_verifies_against_its_own_digest_and_nothing_else() {
 
 #[test]
 fn minting_is_a_function_of_its_entropy_not_of_the_clock() {
-    // Determinism rule 4: seeded RNG is handed down from assembly; this
-    // module samples nothing, so the same entropy mints the same token.
     let (left, left_code) = PairingToken::mint([0x22u8; 32]);
     let (right, right_code) = PairingToken::mint([0x22u8; 32]);
     assert_eq!(left.digest(), right.digest());
