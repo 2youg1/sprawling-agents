@@ -23,7 +23,6 @@ note: required by a bound in `to_value`
  --> $CARGO/serde_json-$VERSION/src/value/mod.rs
   |
   | pub fn to_value<T>(value: T) -> Result<Value, Error>
-  |        -------- required by a bound in this function
   | where
   |     T: Serialize,
   |        ^^^^^^^^^ required by this bound in `to_value`
