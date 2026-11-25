@@ -58,7 +58,7 @@ Buildings, floors and rooms are the directory tree itself. An address such as `l
   </tr>
 </table>
 
-**Version <!-- xtask:begin workspace_version -->0.18.1<!-- xtask:end -->**: the three numbers name maturity, the whole-repository release and an individual package release, in that order. Data formats, the wire and the interface will still change between versions.
+**Version <!-- xtask:begin workspace_version -->0.18.2<!-- xtask:end -->**: the three numbers name maturity, the whole-repository release and an individual package release, in that order. Data formats, the wire and the interface will still change between versions.
 
 **Strengths**: one small file; few concepts, with a directory tree for an org chart; built for a multi-agent team rather than one agent with a ring of extensions.
 

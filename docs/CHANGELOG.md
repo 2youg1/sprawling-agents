@@ -20,6 +20,15 @@ release notes and their commits.
 
 ---
 
+## v0.18.2-261126
+
+- RefRain autosaves Markdown after four seconds of inactivity while preserving undo history. PDF position survives reopening, and layout changes and zoom use the same page coordinate (#392).
+- RefRain shows previews while scrolling through large PDFs. Magnification and region attachments retain original pixels (#396).
+- Mei reduces waits in tool execution and event delivery (#395).
+
+Wire stays at 82, ledger format stays at 2, and configuration formats stay at 1.
+
+
 ## v0.18.1-261125
 
 - **RefRain uses device fonts for CJK.** Paper Mono, Maple Mono and Libron still ship with the client. The full bundled CJK font made the compressed `sprawling` package too large for crates.io.
