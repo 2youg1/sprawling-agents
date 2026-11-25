@@ -340,3 +340,57 @@ fn the_model_rejects_each_kind_of_missing_citation() {
         );
     }
 }
+
+const MODEL_FILES: [&str; 8] = [
+    ".github/scripts/refresh.task",
+    "deps.lock",
+    "install.ps1",
+    "install.sh",
+    "justfile",
+    "scripts/check.sh",
+    "scripts/inputs.lock",
+    "scripts/run.cmd",
+];
+
+fn checked_model_files(label: &str, files_on_disk: &[&str]) -> Result<Vec<String>, String> {
+    use std::fmt::Write as _;
+
+    let root = crate::root::fixture::relocated(label);
+    let write = |path: &str, text: &str| crate::root::fixture::write(&root, path, text);
+    write("tools/k/k-SPEC.md", "# k\n");
+    write("crates/j/Spec.lean", "");
+    for path in files_on_disk {
+        write(path, "");
+    }
+    let mut model = String::from(
+        "| `cargo` | `cargo xtask gates spec` | `sh scripts/check.sh` | `--locked` | `ledger_append` | `ledger_append.budget_p50_us` | `watch/act` |\n",
+    );
+    for path in MODEL_FILES {
+        writeln!(model, "| `{path}` |").unwrap();
+    }
+    write("docs/threat-model.md", &model);
+    judged(&root)
+}
+
+#[test]
+fn the_model_reports_each_missing_script_lockfile_and_named_file() {
+    let expected: Vec<String> = MODEL_FILES
+        .iter()
+        .zip(2..)
+        .map(|(path, line)| {
+            format!("docs/threat-model.md:{line}: file citation `{path}` does not resolve")
+        })
+        .collect();
+    assert_eq!(
+        checked_model_files("spec-model-files-missing", &[]),
+        Ok(expected)
+    );
+}
+
+#[test]
+fn the_model_accepts_existing_files_without_mistaking_commands_for_paths() {
+    assert_eq!(
+        checked_model_files("spec-model-files-present", &MODEL_FILES),
+        Ok(Vec::new())
+    );
+}

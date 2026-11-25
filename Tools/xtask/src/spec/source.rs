@@ -23,6 +23,21 @@ const TOOLCHAIN: [&str; 3] = ["Init", "Std", "Lean"];
 
 pub(super) const THREAT_MODEL: &str = "docs/threat-model.md";
 
+const MODEL_FILE_EXTENSIONS: &[&str] = &[
+    ".cmd", ".js", ".lock", ".mjs", ".nix", ".ps1", ".py", ".sh", ".ts", ".tsx", ".yaml", ".yml",
+    ".zig",
+];
+
+const MODEL_FILE_NAMES: &[&str] = &[
+    ".git-blame-ignore-revs",
+    ".gitattributes",
+    ".gitignore",
+    "LICENSE",
+    "justfile",
+    "lean-toolchain",
+    "zig-version",
+];
+
 #[derive(Clone, Copy)]
 enum Owner<'a> {
     Checker,
@@ -264,12 +279,20 @@ fn unresolved_citation(
             return (!found).then_some("Lean theorem or lemma");
         }
     }
-    let cited = release::path_tokens(span).as_slice() == [span]
-        && release::CITED_EXTENSIONS
+    (is_model_file_citation(span) && !repository_file_exists(root, span)).then_some("file")
+}
+
+fn is_model_file_citation(span: &str) -> bool {
+    if release::path_tokens(span).as_slice() != [span] {
+        return false;
+    }
+    let basename = span.rsplit('/').next().unwrap_or(span);
+    MODEL_FILE_NAMES.contains(&basename)
+        || (basename != span && basename.contains('.'))
+        || release::CITED_EXTENSIONS
             .iter()
-            .chain([&".ts", &".tsx", &".yml", &".yaml"])
-            .any(|ext| span.ends_with(ext));
-    (cited && !repository_file_exists(root, span)).then_some("file")
+            .chain(MODEL_FILE_EXTENSIONS)
+            .any(|ext| basename.ends_with(ext))
 }
 
 fn repository_file_exists(root: &Path, path: &str) -> bool {
