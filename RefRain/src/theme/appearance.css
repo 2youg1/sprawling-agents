@@ -104,22 +104,13 @@
 
 :root[data-file-palette]:not([data-file-palette="inherit"]) [data-refrain-file-editor] {
   --file-reading-spread: 0.02;
-  --color-reading-canvas: oklch(
+  --file-canvas: oklch(
     from var(--file-paper) calc(l + (var(--reading-level) - 0.5) * var(--file-reading-spread)) c h
   );
-  --color-page: var(--file-paper);
-  --color-text: var(--file-ink);
-  --color-text-quiet: color-mix(in oklch, var(--file-ink) 92%, var(--file-paper));
-  --color-text-faint: color-mix(in oklch, var(--file-ink) 84%, var(--file-paper));
-  --color-raised: color-mix(in oklch, var(--file-paper) 98.5%, var(--file-ink));
-  --color-raised-hover: var(--file-selection);
-  --color-edge: color-mix(in oklch, var(--file-paper) 75%, var(--file-ink));
-  --color-edge-input: color-mix(in oklch, var(--file-paper) 52%, var(--file-ink));
-  --color-accent: var(--file-accent);
-  --color-markdown-marker: var(--file-link);
-  --color-markdown-link: var(--file-link);
-  --color-file-metadata: var(--color-text);
-  --color-file-selection-edge: var(--file-accent);
+  --file-faint-ink: color-mix(in oklch, var(--file-ink) 84%, var(--file-paper));
+  --file-raised: color-mix(in oklch, var(--file-paper) 98.5%, var(--file-ink));
+  --file-edge: color-mix(in oklch, var(--file-paper) 75%, var(--file-ink));
+  --file-edge-input: color-mix(in oklch, var(--file-paper) 52%, var(--file-ink));
 }
 
 @media (forced-colors: active) {
@@ -142,12 +133,11 @@
     --file-ink: CanvasText;
     --file-link: LinkText;
     --file-accent: Highlight;
-    --color-reading-canvas: Canvas;
-    --color-raised: Canvas;
-    --color-raised-hover: Canvas;
-    --color-text-quiet: CanvasText;
-    --color-text-faint: GrayText;
-    --color-edge: CanvasText;
-    --color-edge-input: CanvasText;
+    --file-canvas: Canvas;
+    --file-raised: Canvas;
+    --file-selection: Canvas;
+    --file-faint-ink: GrayText;
+    --file-edge: CanvasText;
+    --file-edge-input: CanvasText;
   }
 }

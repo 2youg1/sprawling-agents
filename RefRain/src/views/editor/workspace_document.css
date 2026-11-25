@@ -12,8 +12,8 @@
   min-block-size: 0;
   block-size: 100%;
   inline-size: 100%;
-  background-color: var(--color-reading-canvas, var(--color-page));
-  color: var(--color-text);
+  background-color: var(--file-canvas, var(--color-reading-canvas, var(--color-page)));
+  color: var(--file-ink, var(--color-text));
 }
 
 @container shell (inline-size >= 768px) {
@@ -31,8 +31,8 @@
   gap: var(--spacing-tight) var(--spacing-snug);
   align-items: center;
   padding: var(--spacing-tight) var(--spacing-pane);
-  border-block-end: 1px solid var(--color-edge);
-  background: var(--color-reading-canvas, var(--color-page));
+  border-block-end: 1px solid var(--file-edge, var(--color-edge));
+  background: var(--file-canvas, var(--color-reading-canvas, var(--color-page)));
   font-size: var(--text-note);
 }
 
@@ -42,19 +42,27 @@
   gap: var(--spacing-tight);
   min-height: var(--spacing-control);
   padding-inline: var(--spacing-snug);
-  border: 1px solid var(--color-edge);
+  border: 1px solid var(--file-edge, var(--color-edge));
   border-radius: var(--radius-control);
-  background: var(--color-raised);
-  color: var(--color-text);
+  background: var(--file-raised, var(--color-raised));
+  color: var(--file-ink, var(--color-text));
+}
+
+:where(
+    .workspace-document-tools button,
+    .workspace-document-error button,
+    .workspace-proposal-actions button
+  ):is(:hover, :active, [data-control-keydown]):not(:disabled, [aria-busy="true"]) {
+  background: var(--file-selection, var(--color-raised-hover));
 }
 
 .workspace-document-tools button[aria-pressed="true"] {
-  border-color: var(--color-accent);
-  background: var(--color-raised-hover);
+  border-color: var(--file-accent, var(--color-accent));
+  background: var(--file-selection, var(--color-raised-hover));
 }
 
 .workspace-document-tools button:disabled {
-  color: var(--color-text-faint);
+  color: var(--file-faint-ink, var(--color-text-faint));
 }
 
 .workspace-document-tools label {
@@ -66,7 +74,7 @@
 
 .workspace-document-version {
   font-family: var(--font-mono);
-  color: var(--color-file-metadata, var(--color-text-quiet));
+  color: var(--file-ink, var(--color-text-quiet));
 }
 
 .workspace-editor-host,
@@ -74,7 +82,7 @@
   flex: 1;
   min-height: 0;
   min-width: 0;
-  background: var(--color-reading-canvas, var(--color-page));
+  background: var(--file-canvas, var(--color-reading-canvas, var(--color-page)));
 }
 
 .workspace-document-tools,
@@ -90,10 +98,10 @@
   align-items: center;
   gap: var(--spacing-tight) var(--spacing-base);
   padding: var(--spacing-tight) var(--spacing-snug);
-  background: var(--color-reading-canvas, var(--color-page));
-  color: var(--color-file-metadata, var(--color-text-quiet));
+  background: var(--file-canvas, var(--color-reading-canvas, var(--color-page)));
+  color: var(--file-ink, var(--color-text-quiet));
   font-size: var(--text-note);
-  border-block-start: 1px solid var(--color-edge);
+  border-block-start: 1px solid var(--file-edge, var(--color-edge));
 }
 
 @container shell (inline-size < 768px) {
@@ -104,8 +112,8 @@
 
 .workspace-editor-host .cm-editor {
   block-size: 100%;
-  color: var(--color-text);
-  background: var(--color-reading-canvas, var(--color-page));
+  color: var(--file-ink, var(--color-text));
+  background: var(--file-canvas, var(--color-reading-canvas, var(--color-page)));
 }
 
 .workspace-editor-host .cm-scroller {
@@ -114,29 +122,22 @@
 }
 
 .workspace-editor-host .cm-gutters {
-  background: var(--color-reading-canvas, var(--color-page));
-  color: var(--color-file-metadata, var(--color-text-faint));
-  border-color: var(--color-edge);
+  background: var(--file-canvas, var(--color-reading-canvas, var(--color-page)));
+  color: var(--file-ink, var(--color-text-faint));
+  border-color: var(--file-edge, var(--color-edge));
 }
 
 .workspace-editor-host .cm-activeLine {
-  background: var(--color-raised);
+  background: var(--file-raised, var(--color-raised));
 }
 
 .workspace-editor-host .cm-editor:has(.cm-selectionBackground) .cm-activeLine {
   background: transparent;
 }
 
-@media (forced-colors: active) {
-  .workspace-editor-host .cm-editor > .cm-scroller > .cm-selectionLayer .cm-selectionBackground {
-    forced-color-adjust: none;
-    box-shadow: inset 0 calc(-1 * var(--spacing-hair)) Highlight;
-  }
-}
-
 .workspace-editor-host .cm-content {
   min-inline-size: 0;
-  caret-color: var(--color-accent);
+  caret-color: var(--file-accent, var(--color-accent));
 }
 
 .workspace-editor-host .cm-line {
@@ -161,17 +162,24 @@
 }
 
 .workspace-editor-host .cm-editor .cm-dropCursor {
-  border-inline-start: var(--spacing-hair) solid var(--color-accent);
+  border-inline-start: var(--spacing-hair) solid var(--file-accent, var(--color-accent));
   pointer-events: none;
 }
 
 .workspace-editor-host .cm-cursor {
-  border-inline-start-color: var(--color-accent);
+  border-inline-start-color: var(--file-accent, var(--color-accent));
 }
 
 .workspace-editor-host .cm-editor > .cm-scroller > .cm-selectionLayer .cm-selectionBackground {
-  background: var(--color-raised-hover);
-  box-shadow: inset 0 calc(-1 * var(--spacing-hair)) var(--color-file-selection-edge, transparent);
+  background: var(--file-selection, var(--color-raised-hover));
+  box-shadow: inset 0 calc(-1 * var(--spacing-hair)) var(--file-accent, transparent);
+}
+
+@media (forced-colors: active) {
+  .workspace-editor-host .cm-editor > .cm-scroller > .cm-selectionLayer .cm-selectionBackground {
+    forced-color-adjust: none;
+    box-shadow: inset 0 calc(-1 * var(--spacing-hair)) Highlight;
+  }
 }
 
 .workspace-format-preview {
@@ -208,7 +216,7 @@
 }
 
 .cm-markdown-marker {
-  color: var(--color-markdown-marker, var(--color-text-quiet));
+  color: var(--file-link, var(--color-markdown-marker, var(--color-text-quiet)));
 }
 
 .cm-markdown-heading {
@@ -222,12 +230,12 @@
 }
 
 .cm-markdown-link {
-  color: var(--color-markdown-link, var(--color-accent));
+  color: var(--file-link, var(--color-accent));
   text-decoration: underline;
 }
 
 .cm-markdown-code {
-  background: var(--color-raised);
+  background: var(--file-raised, var(--color-raised));
 }
 
 .cm-markdown-display,
@@ -240,7 +248,7 @@
 
 .cm-markdown-table :is(th, td) {
   padding: var(--spacing-tight) var(--spacing-snug);
-  border: 1px solid var(--color-edge);
+  border: 1px solid var(--file-edge, var(--color-edge));
 }
 
 .cm-markdown-table th {
@@ -253,8 +261,8 @@
   max-block-size: 45%;
   overflow: auto;
   padding: var(--spacing-snug) var(--spacing-pane);
-  border-block-end: 1px solid var(--color-edge);
-  background: var(--color-raised);
+  border-block-end: 1px solid var(--file-edge, var(--color-edge));
+  background: var(--file-raised, var(--color-raised));
 }
 
 .workspace-proposal h3 {
@@ -278,9 +286,9 @@
 }
 
 .workspace-proposal-text textarea {
-  background: var(--color-page);
-  color: var(--color-text);
-  border: 1px solid var(--color-edge-input);
+  background: var(--file-paper, var(--color-page));
+  color: var(--file-ink, var(--color-text));
+  border: 1px solid var(--file-edge-input, var(--color-edge-input));
 }
 
 .workspace-proposal-actions {
@@ -296,10 +304,10 @@
   gap: var(--spacing-tight);
   min-height: var(--spacing-control);
   padding-inline: var(--spacing-snug);
-  border: 1px solid var(--color-edge-input);
+  border: 1px solid var(--file-edge-input, var(--color-edge-input));
   border-radius: var(--radius-control);
-  background: var(--color-raised);
-  color: var(--color-text);
+  background: var(--file-raised, var(--color-raised));
+  color: var(--file-ink, var(--color-text));
 }
 
 .workspace-proposal-actions button:disabled {
