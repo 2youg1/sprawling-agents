@@ -221,7 +221,8 @@ fn read_tree(root: &Path) -> Result<Tree, XtaskError> {
         markdown: BTreeMap::new(),
     };
     for file in walk::files(root)? {
-        let rel = walk::rel(root, &file);
+        let walked = walk::rel(root, &file);
+        let rel = super::checker_rel(&walked);
         let bucket = match file.extension().and_then(|ext| ext.to_str()) {
             Some("lean") => &mut tree.lean,
             Some("rs") => &mut tree.rust,
@@ -229,7 +230,7 @@ fn read_tree(root: &Path) -> Result<Tree, XtaskError> {
             Some(_) | None => continue,
         };
         if !walk::in_isolation_zone(&rel) {
-            bucket.insert(rel, walk::read_text(&file)?);
+            bucket.insert(rel.into_owned(), walk::read_text(&file)?);
         }
     }
     Ok(tree)

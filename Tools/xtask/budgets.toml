@@ -391,34 +391,42 @@ status = "gated by just mutants-score, not by just check; on-demand run 37120210
 
 [remote_hybrid_agreement]
 what = "X25519 and ML-KEM-768 per remote pairing or session handshake, by peer"
+measured_by = "not instrumented: separate key agreement from transcript signing and transport on each peer"
 status = "not measured"
 
 [remote_hybrid_signature]
 what = "Ed25519 and ML-DSA-44 signing and verification per remote handshake proof, by peer"
+measured_by = "not instrumented: time signing and verification separately for each signature half and peer"
 status = "not measured"
 
 [remote_sha256]
 what = "SHA-256 per remote transcript or pairing fingerprint, by peer"
+measured_by = "not instrumented: time the digest alone at transcript and fingerprint input sizes"
 status = "not measured"
 
 [remote_hkdf]
 what = "HKDF-SHA256 per remote session key derivation or identity seed expansion, by peer"
+measured_by = "not instrumented: time session derivation and seed expansion separately from their callers"
 status = "not measured"
 
 [remote_frame_seal]
 what = "AES-256-GCM per outbound seal or inbound open, by peer and frame size"
+measured_by = "not instrumented: time seal and open separately with session keys already loaded"
 status = "not measured"
 
 [vault_file_kdf]
 what = "Argon2id per file Vault open or creation"
+measured_by = "not instrumented: time derivation at the file format's parameters outside file I/O"
 status = "not measured"
 
 [vault_file_aead]
 what = "ChaCha20-Poly1305 per file Vault entry seal or open, by entry size"
+measured_by = "not instrumented: time sealing and opening an entry outside derivation and file I/O"
 status = "not measured"
 
 [cas_blake3]
 what = "BLAKE3 per CAS write or verified full read, by object size"
+measured_by = "not instrumented: time hashing object bytes independently of lookup and disk I/O"
 status = "not measured"
 
 [ledger_append]

@@ -322,7 +322,7 @@ fn the_model_rejects_each_kind_of_missing_citation() {
             "mod checks { #[test] fn present() {} fn ordinary_helper() {} }\n",
         );
         write(
-            "Tools/adversary/spec/Proof.lean",
+            "tools/adversary/spec/Proof.lean",
             "theorem present : True := trivial\n-- theorem imaginary : True := trivial\n",
         );
         write(
