@@ -176,7 +176,6 @@ export function pdfPicking(door: PickingDoor) {
       return;
     }
     const page = numbered(pages, picked.page);
-    if (page === null || page.hidden) return;
     const anchor = { page: picked.page, region: picked.region, version: source };
     if (picked.text !== undefined) {
       committing = true;
@@ -186,7 +185,7 @@ export function pdfPicking(door: PickingDoor) {
       committing = false;
       return;
     }
-    const canvas = page.querySelector<HTMLCanvasElement>(".pdf-original");
+    const canvas = page?.querySelector<HTMLCanvasElement>(".pdf-original");
     if (canvas == null) {
       setProblem("pdf_crop_failed");
       return;

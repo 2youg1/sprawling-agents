@@ -281,16 +281,18 @@ async function attachmentState(page) {
 
 async function position(page) {
   return surface(page).evaluate((scroller) => {
+    const top = scroller.getBoundingClientRect().top;
     const row =
       [...scroller.querySelectorAll(".pdf-sheet")]
         .reverse()
-        .find((candidate) => candidate.offsetTop <= scroller.scrollTop) ??
+        .find((candidate) => candidate.getBoundingClientRect().top <= top + 0.5) ??
       scroller.querySelector(".pdf-sheet");
+    const bounds = row.getBoundingClientRect();
     return {
       page: Number(row.dataset.page),
-      offset: Math.max(0, (scroller.scrollTop - row.offsetTop) / row.offsetHeight),
-      width: row.getBoundingClientRect().width,
-      screenTop: row.getBoundingClientRect().top,
+      offset: Math.max(0, (top - bounds.top) / bounds.height),
+      width: bounds.width,
+      screenTop: bounds.top,
     };
   });
 }
@@ -552,7 +554,7 @@ async function openDocument(page, name, root) {
     );
   });
   await entry.click();
-  await sheet(page, 1).locator(".pdf-original").waitFor();
+  await sheet(page, 1).locator(".pdf-clear").waitFor();
 }
 
 async function crop(page) {
@@ -791,7 +793,8 @@ try {
   });
   await sheet(page, 3).evaluate((row) => {
     const scroller = row.closest(".pdf-scroll");
-    scroller.scrollTop = row.offsetTop + row.offsetHeight * 0.24;
+    const bounds = row.getBoundingClientRect();
+    scroller.scrollTop += bounds.top - scroller.getBoundingClientRect().top + bounds.height * 0.24;
   });
   await stored;
   evidence.anchor = await position(page);
@@ -897,7 +900,8 @@ try {
   await layout.selectOption("single");
   assert.deepEqual(await shownPages(), [5]);
   await layout.selectOption("continuous");
-  assert.equal((await shownPages()).length, 8);
+  const mounted = await shownPages();
+  assert.ok(mounted.includes(5) && mounted.length < 8, "only nearby pages are mounted");
   assert.equal((await position(restored)).page, 5);
   evidence.frames = await page.evaluate(() =>
     window.refrainPdfPaints.map((frame) => ({
@@ -918,7 +922,8 @@ try {
   await reference.click();
   await sheet(page, 1).locator(".pdf-reference").waitFor();
   await sheet(page, 2).evaluate((row) => {
-    row.closest(".pdf-scroll").scrollTop = row.offsetTop;
+    const scroller = row.closest(".pdf-scroll");
+    scroller.scrollTop += row.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
   });
   evidence.referenceControl = await readingControls(page, ["reference"]);
   await keyboardTools(page);
@@ -935,8 +940,16 @@ try {
     assert.ok(Number.isSafeInteger(SCAN_PAGE) && SCAN_PAGE > 0, "choose a one-based scan page");
     await openDocument(restored, SCAN);
     const scanned = sheet(restored, SCAN_PAGE);
+    await surface(restored).evaluate((scroller, number) => {
+      const first = scroller.querySelector('.pdf-sheet[data-page="1"]');
+      const strip = scroller.querySelector(".pdf-pages");
+      const stride =
+        first.getBoundingClientRect().height + parseFloat(getComputedStyle(strip).rowGap);
+      scroller.scrollTop = stride * (number - 1);
+    }, SCAN_PAGE);
     await scanned.evaluate((row) => {
-      row.closest(".pdf-scroll").scrollTop = row.offsetTop;
+      const scroller = row.closest(".pdf-scroll");
+      scroller.scrollTop += row.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
     });
     await scanned.locator(".pdf-clear").waitFor();
     evidence.scan = {

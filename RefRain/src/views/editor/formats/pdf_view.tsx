@@ -11,27 +11,30 @@ import {
   createUniqueId,
   flush,
   For,
+  onCleanup,
   onSettled,
   Show,
   untrack,
 } from "solid-js";
 
-import { fill, say } from "../../../core/lang";
+import { say } from "../../../core/lang";
 import { scopedUi } from "../../../ui";
 import { attachContextTools, ContextTools, createContextTools } from "../../parts/context_tools";
 import Glyph from "../../parts/glyph.solid";
-import type { Size } from "./pdf";
-import { pointAt, readableRegion, regionStyle } from "./pdf_anchor";
+import type { PdfDetail, Size } from "./pdf";
+import { pointAt, readableRegion, unit } from "./pdf_anchor";
 import type { PdfProgress, PdfRegion, Point } from "./pdf_anchor";
-import { PdfPage } from "./pdf_page_view";
+import { PdfSheet } from "./pdf_page_view";
 import type { Graphics, PdfProps } from "./pdf_loading";
 import { PdfToneFilter } from "./pdf_palette";
 import { pdfPicking, type Picked } from "./pdf_pick";
+import { pdfWindow } from "./pdf_window";
+import { PdfRasterCache } from "./pdf_raster_cache";
 import {
   firstPdfPage,
+  numbered,
   pagesPerTurn,
-  positionAt,
-  scrollToPosition,
+  PdfPageHeights,
   type PdfLayout,
 } from "./pdf_position";
 import { pdfActions, PdfReaderControls, PdfZoom } from "./pdf_tools";
@@ -39,6 +42,7 @@ import "./pdf.css";
 
 interface ReadingProps extends PdfProps {
   readonly pdf: PDFDocumentProxy;
+  readonly detailDocument: PdfDetail;
   readonly graphics: Graphics | undefined;
 }
 
@@ -47,37 +51,44 @@ interface Zoomed {
   readonly anchor: Point;
 }
 
-const FALLBACK = { width: 595, height: 842 };
-const MAX_NEARBY = 5;
-
 export function PdfReading(props: ReadingProps) {
   const tone = createUniqueId();
   const onProgress = untrack(() => props.onProgress);
-  const [sizes, setSizes] = createSignal<ReadonlyMap<number, Size>>(new Map());
-  const [visible, setVisible] = createSignal<ReadonlySet<number>>(new Set());
+  const count = untrack(() => props.pdf.numPages);
+  const heights = new PdfPageHeights(count);
+  const rasters = new PdfRasterCache();
+  onCleanup(() => rasters.close());
+  const [sizeRevision, setSizeRevision] = createSignal(0);
   const [width, setWidth] = createSignal(0);
   const [layout, setLayout] = createSignal<PdfLayout>("continuous");
   const [scale, setScale] = createSignal(100);
   const [pageAt, setPageAt] = createSignal(1);
   const first = () => firstPdfPage(layout(), pageAt());
   const turns = () => pagesPerTurn(layout());
-  const shown = (page: number) =>
-    layout() === "continuous" || (page >= first() && page < first() + turns());
+  const continuous = () => layout() === "continuous";
   const [original, setOriginal] = createSignal(false);
   const [zoom, setZoom] = createSignal<Zoomed>();
   let scroller: HTMLDivElement | undefined;
   let pages: HTMLDivElement | undefined;
-  let surface: HTMLDivElement | undefined;
   const menus = createContextTools();
   const canChangeBrightness = scopedUi() === undefined;
   let availableWidth = 0;
+  let viewportHeight = 0;
+  let paddingTop = 0;
+  let gap = 0;
   let placed: { readonly point: PdfProgress; readonly top: number } | undefined;
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
   let nextProgress: PdfProgress | undefined;
 
-  const count = createMemo(() => props.pdf.numPages);
-  const numbers = createMemo(() => Array.from({ length: count() }, (_, index) => index + 1));
-  const sizeOf = (page: number): Size => sizes().get(page) ?? sizes().get(1) ?? FALLBACK;
+  const sizeOf = (page: number): Size => {
+    sizeRevision();
+    return heights.size(page);
+  };
+  const pageTop = (page: number): number => {
+    sizeRevision();
+    return heights.top(page, width(), gap);
+  };
+  const stripHeight = () => pageTop(count + 1) - gap;
   const highlight = createMemo(() => {
     const reference = props.reference;
     return reference != null &&
@@ -85,15 +96,19 @@ export function PdfReading(props: ReadingProps) {
       readableRegion(reference.region) &&
       Number.isSafeInteger(reference.page) &&
       reference.page >= 1 &&
-      reference.page <= count()
+      reference.page <= count
       ? reference
       : null;
   });
 
   function position(height = 0): PdfProgress | null {
     if (scroller === undefined || pages === undefined || availableWidth === 0) return null;
-    const page = layout() === "continuous" ? undefined : pageAt();
-    return positionAt(scroller, pages, height, page);
+    const top = scroller.scrollTop + height;
+    if (continuous()) return heights.position(top - paddingTop, width(), gap);
+    const page = pageAt();
+    const node = numbered(pages, page);
+    if (node === null || node.offsetHeight === 0) return null;
+    return { page, offset: unit((top - node.offsetTop) / node.offsetHeight) };
   }
 
   function center(): PdfProgress | null {
@@ -106,24 +121,43 @@ export function PdfReading(props: ReadingProps) {
 
   function scroll(point: PdfProgress): void {
     if (scroller === undefined || pages === undefined) return;
-    scrollToPosition(scroller, pages, point);
+    const { page, offset } = point;
+    if (page === 1 && offset <= 0) scroller.scrollTop = 0;
+    else if (continuous())
+      scroller.scrollTop =
+        paddingTop + pageTop(page) + unit(offset) * heights.height(page, width());
+    else {
+      const node = numbered(pages, page);
+      if (node !== null) scroller.scrollTop = node.offsetTop + unit(offset) * node.offsetHeight;
+    }
     placed = { point, top: scroller.scrollTop };
+    windowed.placed(scroller.scrollTop);
+    updateWindow();
+  }
+
+  function updateWindow(): void {
+    if (scroller === undefined || availableWidth === 0 || !continuous()) return;
+    const top = scroller.scrollTop - paddingTop;
+    windowed.show(
+      heights.pageAt(top, width(), gap),
+      heights.pageAt(top + viewportHeight, width(), gap),
+    );
   }
 
   function place(point: PdfProgress, nextLayout = layout(), nextScale = scale()): void {
     const view = scroller;
     const list = pages;
     if (view === undefined || list === undefined || availableWidth === 0) return;
-    const page = Math.min(count(), Math.max(1, point.page));
+    const page = Math.min(count, Math.max(1, point.page));
     const columns = pagesPerTurn(nextLayout);
     if (nextLayout !== "continuous") {
       const start = firstPdfPage(nextLayout, page);
       pick.keepVisible((selected) => selected >= start && selected < start + columns);
     }
+    windowed.settle();
     setPageAt(page);
     setLayout(nextLayout);
     setScale(nextScale);
-    const gap = Number.parseFloat(getComputedStyle(list).columnGap) || 0;
     setWidth((Math.max(1, (availableWidth - (columns - 1) * gap) / columns) * nextScale) / 100);
     flush();
     scroll({ page, offset: point.offset });
@@ -157,6 +191,15 @@ export function PdfReading(props: ReadingProps) {
     },
   });
 
+  const windowed = pdfWindow({
+    count,
+    width,
+    continuous,
+    first,
+    turns,
+    picked: () => pick.box()?.page,
+  });
+
   function saveProgress(): void {
     clearTimeout(saveTimer);
     const recorded = nextProgress;
@@ -176,19 +219,22 @@ export function PdfReading(props: ReadingProps) {
   onSettled(() => {
     const view = scroller;
     const list = pages;
-    const host = surface;
-    if (view === undefined || list === undefined || host === undefined) return;
+    if (view === undefined || list === undefined) return;
 
     let resizeFrame: number | undefined;
-    const nearby = new Set<number>();
     function readWidth(): void {
       if (view === undefined || list === undefined) return;
       const style = getComputedStyle(view);
+      viewportHeight = view.clientHeight;
       const available =
         view.clientWidth -
         Number.parseFloat(style.paddingLeft) -
         Number.parseFloat(style.paddingRight);
-      if (available <= 0 || available === availableWidth) return;
+      if (available <= 0) return;
+      if (available === availableWidth) {
+        updateWindow();
+        return;
+      }
       const source = highlight();
       const desired =
         availableWidth > 0
@@ -197,6 +243,8 @@ export function PdfReading(props: ReadingProps) {
             ? props.progress
             : { page: source.page, offset: source.region.y };
       availableWidth = available;
+      paddingTop = Number.parseFloat(style.paddingTop);
+      gap = Number.parseFloat(getComputedStyle(list).rowGap) || 0;
       place(desired ?? { page: 1, offset: 0 });
     }
     const observer = new ResizeObserver(() => {
@@ -206,28 +254,11 @@ export function PdfReading(props: ReadingProps) {
         readWidth();
       });
     });
-    const intersection = new IntersectionObserver(
-      (entries) => {
-        if (view.clientWidth === 0) return;
-        for (const entry of entries) {
-          if (!(entry.target instanceof HTMLElement)) continue;
-          const page = Number(entry.target.dataset.page);
-          if (entry.isIntersecting) nearby.add(page);
-          else nearby.delete(page);
-        }
-        const centre = center()?.page ?? 1;
-        setVisible(
-          new Set(
-            [...nearby]
-              .sort((a, b) => Math.abs(a - centre) - Math.abs(b - centre))
-              .slice(0, MAX_NEARBY),
-          ),
-        );
-      },
-      { root: view, rootMargin: "33% 0px" },
-    );
+    let closed = false;
+    queueMicrotask(() => {
+      if (!closed) readWidth();
+    });
     observer.observe(view);
-    for (const page of list.children) intersection.observe(page);
     view.addEventListener("keydown", pick.keyDown);
     const closeTools = attachContextTools(
       view,
@@ -256,9 +287,9 @@ export function PdfReading(props: ReadingProps) {
     window.addEventListener("pagehide", saveProgress);
     return () => {
       saveProgress();
+      closed = true;
       if (resizeFrame !== undefined) window.cancelAnimationFrame(resizeFrame);
       observer.disconnect();
-      intersection.disconnect();
       view.removeEventListener("keydown", pick.keyDown);
       closeTools();
       window.removeEventListener("pagehide", saveProgress);
@@ -274,33 +305,30 @@ export function PdfReading(props: ReadingProps) {
         return;
       }
       pick.setProblem(undefined);
-      const deferred = window.requestAnimationFrame(() => {
+      let cancelled = false;
+      queueMicrotask(() => {
+        if (cancelled) return;
         place({ page: source.page, offset: source.region.y });
         recordScroll();
       });
       return () => {
-        window.cancelAnimationFrame(deferred);
+        cancelled = true;
       };
     },
   );
 
   function measure(page: number, size: Size): void {
-    const known = sizes();
-    const prior = known.get(page);
-    if (prior?.width === size.width && prior.height === size.height) return;
-    const view = scroller;
-    const list = pages;
-    const before = readingPoint();
-    setSizes(new Map(known).set(page, size));
-    if (
-      view !== undefined &&
-      list !== undefined &&
-      before !== null &&
-      (page === 1 || before.page >= page)
-    ) {
+    const prior = heights.size(page);
+    const base = heights.size(0);
+    const changed = prior.height / prior.width !== size.height / size.width;
+    const before = changed ? readingPoint() : null;
+    heights.measure(page, size);
+    if (!changed) return;
+    setSizeRevision((revision) => revision + 1);
+    if (before !== null && (page <= before.page || heights.size(0) !== base)) {
       flush();
       scroll(before);
-    }
+    } else updateWindow();
   }
 
   function openZoom(target?: Zoomed): void {
@@ -342,7 +370,7 @@ export function PdfReading(props: ReadingProps) {
               place({ page: source.page, offset: source.region.y });
               recordScroll();
             },
-      details: () => ({ lang: props.lang, version: props.version, width: width(), pages: count() }),
+      details: () => ({ lang: props.lang, version: props.version, width: width(), pages: count }),
     });
     const anchor = selected === undefined ? undefined : pick.anchor(selected);
     return { tools, label: props.name, anchor, restore: focusReader };
@@ -364,9 +392,6 @@ export function PdfReading(props: ReadingProps) {
       data-webgl2={String(props.graphics?.webgl2 ?? false)}
       data-webgpu={String(props.graphics?.webgpu ?? false)}
       style={{ "--pdf-tone-filter": `url(#${tone})` }}
-      ref={(node) => {
-        surface = node;
-      }}
       role="group"
       aria-label={props.name}
     >
@@ -376,8 +401,8 @@ export function PdfReading(props: ReadingProps) {
         layout={layout()}
         scale={scale()}
         first={first()}
-        last={Math.min(first() + turns() - 1, count())}
-        total={count()}
+        last={Math.min(first() + turns() - 1, count)}
+        total={count}
         onLayout={(next) => moveReading(next, scale())}
         onScale={(next) => moveReading(layout(), next)}
         onTurn={turn}
@@ -392,7 +417,11 @@ export function PdfReading(props: ReadingProps) {
         aria-label={props.name}
         aria-haspopup="menu"
         aria-keyshortcuts="Shift+F10 ContextMenu"
-        onScroll={recordScroll}
+        onScroll={(event) => {
+          windowed.trackScroll(event.currentTarget.scrollTop);
+          updateWindow();
+          recordScroll();
+        }}
         onPointerDown={pick.begin}
         onPointerMove={pick.extend}
         onPointerUp={pick.end}
@@ -404,53 +433,33 @@ export function PdfReading(props: ReadingProps) {
           ref={(node) => {
             pages = node;
           }}
-          style={{ "--pdf-page-width": `${String(width() || 1)}px` }}
+          style={{
+            "--pdf-page-width": `${String(width() || 1)}px`,
+            "block-size": continuous() ? `${String(stripHeight())}px` : undefined,
+          }}
         >
-          <For each={numbers()}>
+          <For each={windowed.pages()}>
             {(page) => {
               const size = createMemo(() => sizeOf(page));
-              const active = createMemo(
-                () =>
-                  width() > 0 && (layout() === "continuous" ? visible().has(page) : shown(page)),
-              );
+              const inView = createMemo(() => windowed.inView(page));
               return (
-                <div
-                  class="pdf-sheet"
-                  hidden={!shown(page)}
-                  data-page={String(page)}
-                  style={{ "aspect-ratio": `${String(size().width)} / ${String(size().height)}` }}
-                  role="group"
-                  aria-label={fill(say(props.lang, "format_page"), {
-                    n: String(page),
-                    total: String(count()),
-                  })}
-                >
-                  <Show when={active()}>
-                    <PdfPage
-                      pdf={props.pdf}
-                      page={page}
-                      width={width()}
-                      lang={props.lang}
-                      measured={(size) => {
-                        measure(page, size);
-                      }}
-                    />
-                  </Show>
-                  <Show when={boxOn(page)}>
-                    {(region) => (
-                      <div class="pdf-region" style={regionStyle(region())} aria-hidden="true" />
-                    )}
-                  </Show>
-                  <Show when={highlight()?.page === page ? highlight()?.region : undefined}>
-                    {(region) => (
-                      <div
-                        class="pdf-region pdf-reference"
-                        style={regionStyle(region())}
-                        aria-hidden="true"
-                      />
-                    )}
-                  </Show>
-                </div>
+                <PdfSheet
+                  page={page}
+                  total={count}
+                  size={size()}
+                  top={continuous() ? pageTop(page) : undefined}
+                  box={boxOn(page)}
+                  reference={highlight()?.page === page ? highlight()?.region : undefined}
+                  pdf={props.pdf}
+                  detailDocument={props.detailDocument}
+                  width={width()}
+                  lang={props.lang}
+                  detail={inView() && !windowed.moving()}
+                  prepare={inView() || windowed.prefetch().has(page)}
+                  onReady={(pageWidth, painted) => windowed.noteReady(page, pageWidth, painted)}
+                  cache={rasters}
+                  measured={(size) => measure(page, size)}
+                />
               );
             }}
           </For>
@@ -475,6 +484,7 @@ export function PdfReading(props: ReadingProps) {
         {(entry) => (
           <PdfZoom
             pdf={props.pdf}
+            detailDocument={props.detailDocument}
             page={entry().page}
             anchor={entry().anchor}
             lang={props.lang}

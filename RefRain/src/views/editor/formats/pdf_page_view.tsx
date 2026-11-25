@@ -8,47 +8,52 @@ import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 
 import { fill, say } from "../../../core/lang";
 import type { Lang } from "../../../core/lang";
-import type { Size } from "./pdf";
+import { drawPdf, type PdfDetail, type Size } from "./pdf";
+import { regionStyle, type PdfRegion } from "./pdf_anchor";
+import { releaseRaster, type PdfRaster, type PdfRasterCache } from "./pdf_raster_cache";
+import type { RasterStage } from "./pdf_window";
 
 interface PageProps {
   readonly pdf: PDFDocumentProxy;
+  readonly detailDocument: PdfDetail;
   readonly page: number;
   readonly width: number;
   readonly lang: Lang;
   readonly measured?: (size: Size) => void;
   readonly selectable?: boolean;
+  readonly detail?: boolean;
+  readonly prepare?: boolean;
+  readonly onReady?: (width: number, stage: RasterStage) => void;
+  readonly cache?: PdfRasterCache;
 }
 
-function clear(surface: HTMLElement): void {
-  for (const canvas of surface.querySelectorAll("canvas")) {
-    canvas.width = 0;
-    canvas.height = 0;
-  }
-  surface.replaceChildren();
-}
-
-function display(surface: HTMLElement, picture: HTMLCanvasElement): void {
-  clear(surface);
-  picture.className = "pdf-original";
-  surface.append(picture);
-}
-
-function enhance(surface: HTMLElement, bitmap: ImageBitmap): void {
+function enhanced(bitmap: ImageBitmap): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
   canvas.width = bitmap.width;
   canvas.height = bitmap.height;
-  canvas.className = "pdf-clear";
   const context = canvas.getContext("bitmaprenderer");
   if (context === null) canvas.getContext("2d")?.drawImage(bitmap, 0, 0);
   else context.transferFromImageBitmap(bitmap);
   bitmap.close();
-  surface.append(canvas);
+  return canvas;
 }
 
 export function PdfPage(props: PageProps) {
   let pixels: HTMLDivElement | undefined;
   let words: HTMLDivElement | undefined;
+  let visible: { page: number; width: number; raster: PdfRaster } | undefined;
   const [failed, setFailed] = createSignal<string>();
+  const [painter, setPainter] = createSignal<ReturnType<typeof drawPdf>>();
+  const detailed = () => props.detail !== false;
+
+  function release(): void {
+    if (visible === undefined) return;
+    const { page, width, raster } = visible;
+    visible = undefined;
+    if (props.cache === undefined) releaseRaster(raster);
+    else props.cache.keep(page, width, raster);
+  }
+
   createEffect(
     () => ({
       pdf: props.pdf,
@@ -59,39 +64,60 @@ export function PdfPage(props: PageProps) {
     ({ pdf, number, width, selectable }) => {
       const surface = pixels;
       if (surface === undefined) return;
-      let stop: (() => void) | undefined;
-      let gone = false;
       setFailed(undefined);
-      const failure = (reason: unknown): void => {
-        if (!gone) setFailed(String(reason));
+      const display = (raster: PdfRaster): void => {
+        if (visible?.page === number && visible.width === width) {
+          releaseRaster(visible.raster);
+        } else release();
+        visible = { page: number, width, raster };
+        surface.replaceChildren(raster.original);
+        if (raster.clear !== null) surface.append(raster.clear);
+        props.onReady?.(width, raster.full ? "full" : "preview");
       };
-      void import("./pdf")
-        .then(({ drawPdf }) => {
-          if (gone) return;
-          stop = drawPdf({
-            pdf,
-            number,
-            width,
-            present: (picture, tones) => {
-              display(surface, picture);
-              if (tones !== null) enhance(surface, tones);
-            },
-            measure: (size) => {
-              props.measured?.(size);
-            },
-            failure,
-            ...(words === undefined || selectable === false ? {} : { textLayer: words }),
-          });
-        })
-        .catch(failure);
+      const cameBack = props.cache?.take(number, width);
+      if (cameBack !== undefined) display(cameBack);
+      const cached =
+        visible?.page === number && visible.width === width ? visible.raster : undefined;
+      const paint = drawPdf({
+        pdf,
+        detail: props.detailDocument,
+        number,
+        width,
+        present: (original, tones, full) => {
+          original.className = "pdf-original";
+          const clear =
+            tones instanceof HTMLCanvasElement || tones === null ? tones : enhanced(tones);
+          if (clear !== null) clear.className = "pdf-clear";
+          display({ original, full, clear });
+        },
+        measure: (size) => {
+          props.measured?.(size);
+        },
+        failure: (reason) => {
+          setFailed(String(reason));
+          props.onReady?.(width, "full");
+        },
+        ...(cached === undefined ? {} : { cached }),
+        ...(words === undefined || selectable === false ? {} : { textLayer: words }),
+      });
+      setPainter(paint);
       return () => {
-        gone = true;
-        stop?.();
+        paint.close();
+        props.onReady?.(width, "empty");
       };
     },
   );
+  createEffect(
+    () => ({ paint: painter(), detail: detailed(), prepare: props.prepare }),
+    ({ paint, detail, prepare }) => {
+      if (prepare === true) paint?.prepare();
+      if (detail) paint?.sharpen();
+      else paint?.pause();
+    },
+  );
   onCleanup(() => {
-    if (pixels !== undefined) clear(pixels);
+    pixels?.replaceChildren();
+    release();
   });
 
   return (
@@ -119,5 +145,43 @@ export function PdfPage(props: PageProps) {
         )}
       </Show>
     </>
+  );
+}
+
+interface SheetProps extends PageProps {
+  readonly size: Size;
+  readonly top: number | undefined;
+  readonly total: number;
+  readonly box: PdfRegion | undefined;
+  readonly reference: PdfRegion | undefined;
+}
+
+export function PdfSheet(props: SheetProps) {
+  return (
+    <div
+      class="pdf-sheet"
+      data-page={String(props.page)}
+      style={{
+        "aspect-ratio": String(props.size.width) + " / " + String(props.size.height),
+        "inset-block-start": props.top === undefined ? undefined : String(props.top) + "px",
+      }}
+      role="group"
+      aria-label={fill(say(props.lang, "format_page"), {
+        n: String(props.page),
+        total: String(props.total),
+      })}
+    >
+      <Show when={props.width > 0}>
+        <PdfPage {...props} />
+      </Show>
+      <Show when={props.box}>
+        {(region) => <div class="pdf-region" style={regionStyle(region())} aria-hidden="true" />}
+      </Show>
+      <Show when={props.reference}>
+        {(region) => (
+          <div class="pdf-region pdf-reference" style={regionStyle(region())} aria-hidden="true" />
+        )}
+      </Show>
+    </div>
   );
 }
