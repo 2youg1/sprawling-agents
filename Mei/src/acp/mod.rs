@@ -254,17 +254,20 @@ struct Input {
 impl Input {
     fn start(reader: impl Read + Send + 'static, meter: Option<Arc<AtomicU64>>) -> Self {
         let (tx, rx) = mpsc::channel();
-        let lines = tx.clone();
+        let eof = NotifyOnDrop {
+            sender: tx.clone(),
+            event: Some(InputEvent::Eof),
+        };
         thread::spawn(move || {
             for line in BufReader::new(reader).lines() {
-                if lines.send(InputEvent::Line(line)).is_err() {
+                if eof.sender.send(InputEvent::Line(line)).is_err() {
                     return;
                 }
                 if let Some(meter) = &meter {
                     meter.fetch_add(1, Ordering::SeqCst);
                 }
             }
-            drop(lines.send(InputEvent::Eof));
+            drop(eof);
         });
         Self { tx, rx, eof: false }
     }
@@ -291,11 +294,16 @@ impl Input {
     }
 }
 
-struct TurnDone(mpsc::Sender<InputEvent>);
+struct NotifyOnDrop {
+    sender: mpsc::Sender<InputEvent>,
+    event: Option<InputEvent>,
+}
 
-impl Drop for TurnDone {
+impl Drop for NotifyOnDrop {
     fn drop(&mut self) {
-        drop(self.0.send(InputEvent::TurnDone));
+        if let Some(event) = self.event.take() {
+            drop(self.sender.send(event));
+        }
     }
 }
 
@@ -370,7 +378,10 @@ fn run_turn_while_draining(
         pending: VecDeque::new(),
     };
     draining.read_ready()?;
-    let done = TurnDone(draining.input.tx.clone());
+    let done = NotifyOnDrop {
+        sender: draining.input.tx.clone(),
+        event: Some(InputEvent::TurnDone),
+    };
     let drain = thread::spawn(move || draining.read_until_done());
     let result = turn(turn_input);
     drop(done);
@@ -427,4 +438,25 @@ pub fn enter_cwd(cwd: &Path) -> Result<()> {
             .with_path(cwd.display().to_string()),
         )
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[allow(clippy::panic, reason = "simulate an abandoned input reader")]
+    fn an_unwinding_input_reader_notifies_the_receiver() {
+        struct AbandonedReader;
+
+        impl Read for AbandonedReader {
+            fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
+                panic!("input reader unwound");
+            }
+        }
+
+        let input = Input::start(AbandonedReader, None);
+        let event = input.rx.recv_timeout(std::time::Duration::from_secs(1));
+        assert!(matches!(event, Ok(InputEvent::Eof)));
+    }
 }
