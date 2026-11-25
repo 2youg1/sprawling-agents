@@ -3,11 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// City console face: QuietHost + Cli over termio/editor/screen/menu.
-// Host projects Entry bytes and owns wire Session.carry via carry_line.
-
 const std = @import("std");
-const builtin = @import("builtin");
 const leaf = @import("leaf");
 const write = leaf.write;
 const host_mod = @import("host.zig");
@@ -22,16 +18,12 @@ const face_look_ms: i32 = 100;
 
 pub const RunMode = enum { tty, dry };
 
-/// Blocking city UI. `dry` skips termio and returns after one host drain + key
-/// vector (for tests). Production Rust host calls with `.tty`.
 pub fn run(
     gpa: std.mem.Allocator,
     config: *const host_mod.CityConfig,
     host: *const host_mod.Host,
     mode: RunMode,
 ) i32 {
-    // Heap-allocate: a stack Ui is >4KiB and forces ___chkstk_ms, which MSVC
-    // Rust does not resolve when linking this archive.
     const ui = gpa.create(Ui) catch return 1;
     ui.init(gpa, config, host) catch {
         gpa.destroy(ui);
@@ -45,8 +37,6 @@ pub fn run(
 }
 
 export fn calyx_city_ui_run(config: *const host_mod.CityConfig, host: *const host_mod.Host) i32 {
-    // libc allocator: DebugAllocator's error paths pull Zig debug printers
-    // that MSVC cannot resolve when Rust links this archive.
     return run(std.heap.c_allocator, config, host, .tty);
 }
 
@@ -81,8 +71,6 @@ const Ui = struct {
     poll_buf: []u8 = &.{},
     stdin_scratch: [4096]u8 = undefined,
 
-    // Field-by-field into *Ui: returning Ui by value keeps a >4KiB temporary on
-    // the caller's stack and forces ___chkstk_ms under Windows-gnu.
     fn init(self: *Ui, gpa: std.mem.Allocator, config: *const host_mod.CityConfig, host: *const host_mod.Host) !void {
         self.gpa = gpa;
         self.host = host;
@@ -137,7 +125,7 @@ const Ui = struct {
     fn loop(self: *Ui, mode: RunMode) i32 {
         self.dry = mode == .dry;
         if (!self.dry) {
-            if (self.screen.take() == .lost) {
+            if (self.screen.take("sprawling · closing this window stops it", .steady_bar) == .lost) {
                 self.host.tell(self.host.ctx, @backingInt(host_mod.LifecycleEvent.terminal_lost), 0);
                 return 1;
             }
@@ -590,10 +578,7 @@ const Ui = struct {
             },
             else => null,
         };
-        self.drawn(self.screen.frameEntries(entries, live, if (builtin.os.tag == .windows)
-            .{ .columns = 80, .rows = 24 }
-        else
-            termio.size()));
+        self.drawn(self.screen.frameEntries(entries, live));
     }
 
     fn drawn(self: *Ui, written: screen_mod.Written) void {
@@ -689,8 +674,6 @@ fn editing(key: termio.Key) ?editor_mod.Edit {
 fn pollStdin(timeout_ms: i32) bool {
     return termio.waitReadable(timeout_ms);
 }
-
-// --- stub host + key handling tests ---
 
 const StubHost = struct {
     gpa: std.mem.Allocator,
@@ -835,7 +818,6 @@ test "dry city ui drains host face entries and handles quiet keys via host" {
     const code = run(gpa, &config, &host, .dry);
     try std.testing.expectEqual(@as(i32, 0), code);
 
-    // Simulate QuietHost Esc → Back and Enter → open_paired without TTY.
     var ui: Ui = undefined;
     try ui.init(gpa, &config, &host);
     defer ui.deinit();

@@ -45,21 +45,13 @@ pub const Screen = struct {
         self.frame.deinit(self.gpa);
     }
 
-    pub fn take(self: *Screen) Written {
-        return self.open(.steady_bar);
-    }
-
-    pub fn takeMei(self: *Screen) Written {
-        return self.open(null);
-    }
-
-    fn open(self: *Screen, style: ?termio.CursorStyle) Written {
+    pub fn take(self: *Screen, title: []const u8, style: ?termio.CursorStyle) Written {
         termio.enableRaw() catch |err| {
             std.debug.print("Calyx terminal initialization failed: {s}\n", .{@errorName(err)});
             self.lost = true;
             return .lost;
         };
-        self.writeAll("\x1b]2;sprawling · closing this window stops it\x07") catch return self.fail();
+        termio.setTitle(title) catch return self.fail();
         if (style) |value| self.setStyle(value) catch return self.fail();
         termio.enhanceKeyboard() catch return self.fail();
         return .shown;
@@ -67,7 +59,7 @@ pub const Screen = struct {
 
     pub fn giveBack(self: *Screen) Written {
         const left = self.leaveQuiet();
-        const erased = self.frameEntries(&.{}, null, termio.size());
+        const erased = self.frameEntries(&.{}, null);
         termio.plainKeyboard() catch {};
         self.setStyle(.default) catch {};
         _ = self.writeSlice("\x1b[?25h");
@@ -88,10 +80,9 @@ pub const Screen = struct {
         self: *Screen,
         entries: []const write.Entry,
         live: ?write.Live,
-        size: termio.Size,
     ) Written {
         if (self.lost or self.isQuiet()) return .shown;
-        self.render(entries, live, size) catch |reason| {
+        self.render(entries, live, termio.size()) catch |reason| {
             if (self.refused) |prior| if (prior == reason) return .shown;
             self.refused = reason;
             const erase = self.erase;
@@ -101,7 +92,7 @@ pub const Screen = struct {
         return self.flushFrame();
     }
 
-    pub fn render(
+    fn render(
         self: *Screen,
         entries: []const write.Entry,
         live: ?write.Live,
@@ -126,7 +117,7 @@ pub const Screen = struct {
         const entered: Written = if (termio.isAlternate())
             .shown
         else blk: {
-            const erased = self.frameEntries(&.{}, null, termio.size());
+            const erased = self.frameEntries(&.{}, null);
             termio.enterAlternate() catch break :blk self.fail();
             self.erase = 0;
             break :blk erased;
@@ -232,6 +223,32 @@ test "render updates erase and previous from a drawn inline scene" {
     try std.testing.expect(screen.frame.items.len > 0);
     try std.testing.expectEqual(part.Part.Reply, screen.previous.?);
     try std.testing.expect(screen.refused == null);
+}
+
+test "city draws a long workspace banner and anchors the composer in the visible window" {
+    var screen: Screen = .{ .gpa = std.testing.allocator };
+    defer screen.deinit();
+    const banner = [_]write.Entry{.{ .banner = .{
+        .city = "Z:\\Profiles\\terminal-operator\\.sprawling\\w\\0123456789abcdef0123456789abcdef",
+        .address = "127.0.0.1:2501",
+        .url = "http://127.0.0.1:2501",
+    } }};
+    const live: write.Live = .{ .composer = .{
+        .typed = "",
+        .cursor = 0,
+        .placeholder = "to the city…",
+        .room = "city",
+        .offer = "",
+    } };
+    try screen.render(&banner, live, .{ .columns = 140, .rows = 49 });
+    try std.testing.expect(std.mem.indexOf(u8, screen.frame.items, "/web") != null);
+    try std.testing.expect(std.mem.indexOf(u8, screen.frame.items, "\x1b[46;1H") != null);
+
+    screen.erase = 0;
+    screen.previous = null;
+    try screen.render(&banner, live, .{ .columns = 80, .rows = 24 });
+    try std.testing.expect(std.mem.indexOf(u8, screen.frame.items, "/web") == null);
+    try std.testing.expect(std.mem.indexOf(u8, screen.frame.items, "\x1b[21;1H") != null);
 }
 
 test "a refused oversized scene does not set previous" {

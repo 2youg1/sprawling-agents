@@ -5,9 +5,10 @@
 
 const std = @import("std");
 
-const app = "sprawling";
 const switch_name = "SPRAWLING_PROGRAM_STATUS";
 const never = "never";
+
+pub const Application = enum { sprawling, mei };
 
 pub const Reporting = enum {
     on,
@@ -124,7 +125,7 @@ pub const Report = union(enum) {
         };
     }
 
-    pub fn writeAnsi(self: Report, allocator: std.mem.Allocator) ![]u8 {
+    pub fn writeAnsi(self: Report, allocator: std.mem.Allocator, application: Application) ![]u8 {
         const pair = self.pairs();
         var out: std.ArrayList(u8) = .empty;
         errdefer out.deinit(allocator);
@@ -132,7 +133,7 @@ pub const Report = union(enum) {
         try out.appendSlice(allocator, pair[0]);
         if (self == .of) {
             try out.appendSlice(allocator, ":app=");
-            try out.appendSlice(allocator, app);
+            try out.appendSlice(allocator, @tagName(application));
         }
         if (pair[1]) |kind| {
             try out.appendSlice(allocator, ":kind=");
@@ -427,9 +428,20 @@ test "every row is the models" {
     try std.testing.expectEqual(@as(usize, 0), differing);
 }
 
+test "status identifies the calling application to the terminal" {
+    const report: Report = .{ .of = .{ .resting = .idle } };
+    const allocator = std.testing.allocator;
+    const mei = try report.writeAnsi(allocator, .mei);
+    defer allocator.free(mei);
+    try std.testing.expectEqualStrings("\x1b]7501;state=idle:app=mei\x1b\\", mei);
+    const sprawling = try report.writeAnsi(allocator, .sprawling);
+    defer allocator.free(sprawling);
+    try std.testing.expectEqualStrings("\x1b]7501;state=idle:app=sprawling\x1b\\", sprawling);
+}
+
 test "cleared report is the OSC clear sequence" {
     const report: Report = .cleared;
-    const rendered = try report.writeAnsi(std.testing.allocator);
+    const rendered = try report.writeAnsi(std.testing.allocator, .mei);
     defer std.testing.allocator.free(rendered);
     try std.testing.expectEqualStrings("\x1b]7501;state=clear\x1b\\", rendered);
 }
