@@ -6,10 +6,10 @@
 > is verified.
 >
 > It does not teach the vocabulary ([`docs/glossary.md`](glossary.md)),
-> install anything ([`docs/getting-started.md`](getting-started.md)),
+> install anything ([`docs/start/getting-started.md`](start/getting-started.md)),
 > list the rules a change must satisfy
 > ([`docs/CONTRIBUTING.md`](CONTRIBUTING.md)), or explain how to swap a
-> provider ([`docs/operating.md`](operating.md)).
+> provider ([`docs/operate/operating.md`](operate/operating.md)).
 >
 > **What is written here is what is true across modules today.** A rule that
 > governs one module lives in that module's SPEC and its rustdoc, and the
@@ -113,7 +113,7 @@ that something cannot be expressed), `kani` (bounded proof, Linux CI),
 `cargo-mutants` (do the tests bite), `cargo-fuzz` (parsers against hostile
 bytes). Miri is not among them: the legacy `unsafe` is FFI into Zig or
 Win32, which Miri cannot see; the reason and the alternative live in
-[verification.md](verification.md#why-miri-is-not-a-gate).
+[verification.md](maintain/verification.md#why-miri-is-not-a-gate).
 
 **A second compiled language is admitted by rule, not by taste.** This is
 a ruling of the person. Safe Rust comes first; Zig comes next, and only for
@@ -725,14 +725,14 @@ the part worth knowing before starting, not after.
 | a new module, or a deleted one | `architecture.toml` | `modmap` refuses a production file with no entry, and an entry whose file is gone; a test module needs no entry |
 | a platform the release ships | `xtask::platform`'s `PLATFORMS` | one row per platform; the npm scope and the bare root name are asserted there |
 | the page | `RefRain/` + `RefRain/Spec.lean` | its own lint, typecheck and tests; the bundle is measured against a byte budget |
-| the page's colours, motion or words | `RefRain/src/theme.css` and the parts it imports from `RefRain/src/theme/`, `RefRain/src/lang.json` + `docs/frontend-method.md` | `xtask color`, `xtask motion` and `xtask wording` refuse a colour, curve, duration or word spelled anywhere else |
+| the page's colours, motion or words | `RefRain/src/theme.css` and the parts it imports from `RefRain/src/theme/`, `RefRain/src/lang.json` + `docs/maintain/frontend-method.md` | `xtask color`, `xtask motion` and `xtask wording` refuse a colour, curve, duration or word spelled anywhere else |
 | what a module must hold on every input | the part under the crate's `spec/` that names the module (§11, *Specifications in Lean*) | `just models` proves it with no `sorry`, `admit` or `axiom`; the module's rustdoc names the part |
 | a gate itself | `Tools/xtask/` + `Tools/xtask/Spec.lean` | a red gate is resolved by fixing the code, narrowing its precise scope, or deleting it; never by adding an exception |
 | how a door handles a filesystem alias or pins content and evidence | [§10, Names, aliases and pins](#names-aliases-and-pins) | review against each door's stated scope and owning SPEC |
 
 Two documents sit beside this one rather than inside it: operating a
 city — swapping a provider, pointing at another MCP server, running a
-local model — is [`docs/operating.md`](operating.md), and what a
+local model — is [`docs/operate/operating.md`](operate/operating.md), and what a
 change must satisfy before it merges is
 [`docs/CONTRIBUTING.md`](CONTRIBUTING.md).
 
@@ -1109,7 +1109,7 @@ TypeScript modules below `RefRain/src/` the way a crate's are named after
 its Rust modules: `views/parts/segmented.ts` is specified by
 `RefRain/spec/Views/Parts/Segmented.lean`. The client's specification holds
 interfaces, decisions and interaction contracts; how a screen looks is
-described in English in `docs/frontend-method.md`, under the labels the
+described in English in `docs/maintain/frontend-method.md`, under the labels the
 code cites.
 
 **Where a specification lives.** A crate's entry is `<root>/<dir>/Spec.lean`

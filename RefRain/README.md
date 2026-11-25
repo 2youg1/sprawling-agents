@@ -4,12 +4,31 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
 Copyright (c) 2026 2youg1 and the sprawling contributors
 -->
 
-# The browser client
+# RefRain
+
+[简体中文](README.zh-CN.md)
 
 The Rust binary serves this client and its offline assets. The file and Session views
 share a workspace and conversation target. The registered directory, file identities,
 revisions and accepted changes belong to the host. The browser remembers layout,
 reading anchors, appearance and drafts.
+
+<p align="center">
+  <a href="../docs/images/refrain-workspace.webp"><img alt="The Atlas conversation and tool calls on the left, with the generated README.md open on the right" src="../docs/images/refrain-workspace.webp" width="100%"></a>
+</p>
+
+In the demo workspace, the conversation shows a run and its tool calls beside the file the run wrote.
+
+## Run against a city
+
+From the repository root, build the bundle and start the Rust host. A browser opened directly at the server address pairs with the code from the local console.
+
+```sh
+just build-web
+cargo run --locked -p sprawling -- up ./cities/first
+```
+
+The host owns dispatch, authentication and persistent city state. RefRain uses the [city wire](../docs/wire.md) through its generated decoders. For pairing and first use, see [Getting started](../docs/start/getting-started.md).
 
 ## Toolchain
 
@@ -25,7 +44,7 @@ reading anchors, appearance and drafts.
 ## Commands
 
 ```bash
-bun install        # once
+bun install --frozen-lockfile
 bun run lint       # type-aware Oxlint with zero warnings allowed
 bun run typecheck  # TypeScript and Solid JSX
 bun run test [file...]          # the logic next to what it judges
@@ -36,7 +55,7 @@ bun run build      # production client for Rust to embed
 outside: `npm` (lockfile and licences), `wording` (every word from
 `lang.json`), `color` (colour only in the theme), `budget` (bundle
 size), `render` (what was drawn), `wiring` (every wire verb reachable).
-See `docs/frontend-method.md` for how a screen is built and accepted.
+See the [frontend method](../docs/maintain/frontend-method.md) for how a screen is built and accepted.
 
 ## Where code goes
 

@@ -8,7 +8,7 @@
 
 Calyx 是城控制台与 Mei 进程 Face 的交互面。它拥有原始终端模式、按键与粘贴、行编辑器、斜杠菜单、面生命周期、屏面编排（含 OSC 7501 程序状态），以及无头 `mei` 的启动。帧渲染器是纯 Zig 叶：一份 scene 进，一帧终端字节出。
 
-WebUI（未来 `RefRain/`）是另一消费者。Calyx 不实现模型环、不声明工具、不注入 AGENTS。
+WebUI（[RefRain](../RefRain/README.zh-CN.md)）是另一消费者。Calyx 不实现模型环、不声明工具、不注入 AGENTS。
 
 ## 布局
 
@@ -53,5 +53,9 @@ cd Calyx && zig build test
 | Mei 交互 | `calyx`（或 TTY 上的 Mei npm shim） |
 | 城控制台 | `sprawling` 服务路径，经 Rust 宿主进入同一套 Zig 壳 |
 | Mei 无头 | `mei -p`、`mei --resume` 或非 TTY stdin — 不涉及 Calyx |
+
+在 Sprawling 控制台输入 `/w` 并按 Tab 打开补全菜单。
+
+[![输入 `/w` 再按 Tab 之后的斜杠菜单：光标在 `/web` 上，下面是 `/wire`，以及在其中移动的按键](../docs/images/console-slash-menu.webp)](../docs/images/console-slash-menu.webp)
 
 见 [`Spec.lean`](Spec.lean) 与 [`ffi/Spec.lean`](ffi/Spec.lean)。

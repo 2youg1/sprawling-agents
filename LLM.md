@@ -16,8 +16,8 @@ release, in that order. Use the behavior in the reader's installed version when 
 they can do.
 
 This file helps a model introduce sprawling to a user or another agent.
-Installation belongs to [getting started](docs/getting-started.md), operation
-to [operating](docs/operating.md), and programmatic control to the
+Installation belongs to [getting started](docs/start/getting-started.md), operation
+to [operating](docs/operate/operating.md), and programmatic control to the
 [wire reference](docs/wire.md). Repository work follows [AGENTS.md](AGENTS.md).
 
 </context>
@@ -63,7 +63,7 @@ an optional memory ceiling per run: the ceiling comes only from a number the
 User enters, there is none by default, it applies only with the `soft_shares`
 placement, and Windows jobs and delegated Linux cgroups enforce it while other
 platforms report that it did not apply
-([performance](docs/performance.md#choose-how-the-city-uses-the-machine)). Run
+([performance](docs/maintain/performance.md#choose-how-the-city-uses-the-machine)). Run
 commands start below the core's priority. The sieve trims a command's output by
 the command that produced it before the model reads it, and keeps the full text
 retrievable. The monitor exposes run timings, model calls, token use, costs and
@@ -83,7 +83,7 @@ building that is not confidential has `web_search`, which by default sends the
 search words to Exa until `[search]` turns it off. On Windows, the settings
 page offers 88 optional privacy controls, applied or restored one at a time
 after a confirmation, with machine-scope writes through UAC and a read-back
-after every write ([privacy](docs/operating.md#privacy)). Microsoft does not
+after every write ([privacy](docs/operate/operating.md#privacy)). Microsoft does not
 state whether most of them apply on Windows Home. Present these as informed
 choices with costs: privacy is not security, and applying more controls is
 not better in itself.
@@ -138,7 +138,7 @@ it. An experiment works in its own worktree and is not merged. A copied working
 tree is not an operating-system sandbox, and it is copied from the run's own room,
 not the whole building; host-command guarantees depend on the
 selected platform mechanism. Built-in taint gates do not control all external
-programs. Use [execution boundaries](docs/operating.md#how-exec-is-confined) and
+programs. Use [execution boundaries](docs/operate/operating.md#how-exec-is-confined) and
 [the security policy](docs/SECURITY.md) when those conditions affect the reader's task.
 
 The wire serves both the browser and scripts, and every caller presents a
@@ -151,7 +151,7 @@ widen access or alter governance remain on the host. Configuration carries
 `secret:realm/name` references. The vault redeems values at authentication
 sinks; its startup probe can select session memory if the platform service
 fails. Use the reported custody lifetime when explaining credential persistence.
-See [remote access](docs/operating.md#reaching-the-city-from-another-device).
+See [remote access](docs/operate/operating.md#reaching-the-city-from-another-device).
 
 There is no built-in per-dispatch spending ceiling or turn ceiling. Halt stops
 a scope and cancel stops one run. A model's context and output limits, provider
@@ -162,11 +162,11 @@ long-running work as unlimited execution or guaranteed completion.
 
 <references>
 
-Use [integrations](docs/integrations.md) for ACP agents, MCP tool servers and CLI control.
-Use [performance](docs/performance.md) for monitoring, reproducible workloads and measurements tied to a version and machine class.
+Use [integrations](docs/integrate/integrations.md) for ACP agents, MCP tool servers and CLI control.
+Use [performance](docs/maintain/performance.md) for monitoring, reproducible workloads and measurements tied to a version and machine class.
 
-Use [getting started](docs/getting-started.md) for installation, first work,
-Sessions, skills and model setup; use [operating](docs/operating.md) for control,
+Use [getting started](docs/start/getting-started.md) for installation, first work,
+Sessions, skills and model setup; use [operating](docs/operate/operating.md) for control,
 MCP, remote access and failure recovery. The [wire reference](docs/wire.md)
 contains CLI usage, frames, answers and exit codes. [Architecture](docs/ARCHITECTURE.md)
 explains runtime flow, document layout, extension seams and verification;

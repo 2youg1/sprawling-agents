@@ -7,7 +7,7 @@ You have unpacked a folder. Nothing was installed and no service was registered.
 - **Windows** — double-click `sprawling.exe`.
 - **macOS and Linux** — run `./sprawling` from a terminal.
 
-An operating-system warning is not proof of a safe or unsafe download. Verify the selected release's checksum and build provenance, and inspect its code-signing status before deciding whether to run it. The [installation guide](https://github.com/2youg1/sprawling-agents/blob/main/docs/getting-started.md#select-and-verify-a-version) explains these separate checks.
+An operating-system warning is not proof of a safe or unsafe download. Verify the selected release's checksum and build provenance, and inspect its code-signing status before deciding whether to run it. The [installation guide](https://github.com/2youg1/sprawling-agents/blob/main/docs/start/getting-started.md#select-and-verify-a-version) explains these separate checks.
 
 Started with no command, it asks one question before it creates anything, and shows you the folder it is about to create. Answer it and the window becomes the city's CLI, where you can already talk to the Mayor. Type `/web` to open the page at <http://127.0.0.1:2501> in your browser; the window then shows only the address and a pairing code. **That window keeps the city running**: closing the browser stops nothing, and the address opens the page again. Type `/quit` to close the city; closing the window closes it too, after its runs stop at their next safe point or four seconds have passed. Ctrl+C copies selected text and never closes the city.
 
@@ -35,11 +35,11 @@ Then **city** shows the buildings working, a count on the mailbox key says how m
 
 In `sprawling/city` under your home directory (`~/sprawling/city`), unless you typed another folder on the first screen. The first screen shows the folder before it creates anything, and the folder you choose is written as the `city` line of your personal configuration, `~/.sprawling/config.toml`, so the next start opens it again. A city that an earlier release kept beside its binary is moved to `~/sprawling/city` the first time this release starts from that same folder, because that folder is the only place a start looks for it. If you unpacked this release somewhere else, start it once from the old folder, or type the old city's folder on the first screen. When your home directory is on another volume, the city stays where it is and its path goes into the `city` line instead.
 
-One folder holds the whole history, and it can be copied or deleted as a unit. To move it, stop the city, move the folder whole, then change the `city` line to its new absolute path. Each session keeps its own folder inside the building it works in.
+The city keeps its Ledger and recorded work in private storage associated with the selected workspace. Follow [moving a city](https://github.com/2youg1/sprawling-agents/blob/main/docs/operate/operating.md#moving-a-city) to export, restore and verify a backup.
 
 ## Is there a newer one?
 
-Nothing here updates itself, and update checks run only when you ask. `sprawling version` says which release this is and the day it was cut; `sprawling status --check` asks whether a newer one is published, and **settings** → **which release this is** has the same check behind a button. Verify that the reported channel matches your installation, then follow the [update and rollback guide](https://github.com/2youg1/sprawling-agents/blob/main/docs/getting-started.md#updating). Stop the city and verify a restorable backup before replacing anything.
+Nothing here updates itself, and update checks run only when you ask. `sprawling version` says which release this is and the day it was cut; `sprawling status --check` asks whether a newer one is published, and **settings** → **which release this is** has the same check behind a button. Verify that the reported channel matches your installation, then follow the [update and rollback guide](https://github.com/2youg1/sprawling-agents/blob/main/docs/start/getting-started.md#updating). Stop the city and verify a restorable backup before replacing anything.
 
 ## Everything else
 

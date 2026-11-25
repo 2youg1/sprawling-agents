@@ -4,7 +4,7 @@
 
 Archetype:Mei is a minimal Agent Harness: a model receives a task, acts through one persistent **python** tool, sees each small result, and repeats until it has a final answer. A large or non-UTF-8 result stays complete on disk and returns only a notice with its full path, or a Python expression that losslessly reconstructs a non-Unicode native path. This package is the **headless** core. Mei does not contain a terminal shell.
 
-The interactive face is [Calyx](../Calyx/). `@sprawling/mei` ships both the headless `mei` binary and the `calyx` face; a TTY without `-p` becomes Calyx, while `-p` or a pipe stays headless. Scripts use the headless path alone. `mei --acp` speaks [Agent Client Protocol](https://agentclientprotocol.com/) version 1 as an agent over stdio so an ACP client (including the sprawling city harness) can call Mei like any other ACP agent; see [integrations](../docs/integrations.md).
+The interactive face is [Calyx](../Calyx/). `@sprawling/mei` ships both the headless `mei` binary and the `calyx` face; a TTY without `-p` becomes Calyx, while `-p` or a pipe stays headless. Scripts use the headless path alone. `mei --acp` speaks [Agent Client Protocol](https://agentclientprotocol.com/) version 1 as an agent over stdio so an ACP client (including the sprawling city harness) can call Mei like any other ACP agent; see [integrations](../docs/integrate/integrations.md).
 
 > **Safety first:** Mei has no sandbox, permission prompts, or undo. Generated Python can read and write files, use the network, and run commands with the current account's authority. Use only disposable project copies and a separate, revocable API key with a spending limit. Never supply private data, important credentials, or the only copy of a project.
 
@@ -200,48 +200,7 @@ The core and its python guest exist only while a task runs; Calyx alone is the i
 
 ## Prompt and tool contract
 
-`Mei/src/MEI.md` is compiled into `system`; the sole python definition occupies `tools[0]`. The table below uses a fixed documentation fixture with Python `3.12.13` and uv `0.12.3`; actual version attributes come from doctor. Byte counts exclude message envelopes and anything a provider adds itself.
-
-| Part | UTF-8 bytes | Tokens (`o200k_base`) |
-|---|---:|---:|
-| `system` | 297 | 57 |
-| Complete compact `tools[0]` JSON | 1489 | 332 |
-| Total | 1786 | 389 |
-
-Tokens use OpenAI's `o200k_base` tokenizer (the GPT-4o/4.1/5 family) on the same text, with no chat envelope or provider additions; another tokenizer gives another count. The JSON below is pretty-printed for reading, while the byte and token counts use its compact wire form.
-
-### `system`
-
-```text
-<agent-harness>
-You are operating inside Mei.
-No additional documents or environment capabilities are injected or exposed; fetch what you need.
-Workflow: Sense → Act → Verify → Adapt…
-Aligned with context, fulfill user intent thoroughly and resourcefully and stay scoped.
-</agent-harness>
-```
-
-### `tools[0]`
-
-```json
-{
-  "description": "<python version=\"3.12.13\" uv_version=\"0.12.3\">\nA persistent python interpreter. Variables, imports, and the working directory (cwd) persist across calls. An exception prints its traceback without ending the session, so you can recover and continue without rebuilding state. Expressions do not auto-echo, so explicitly print any values you need to inspect. If combined UTF-8 stdout/stderr is up to 16 KiB, the tool returns it inline. Larger or non-UTF-8 output returns a notice and the full path, or a Python expression that losslessly reconstructs a non-Unicode native path; filter that file, or re-run with narrower output, in the next python call. Run shell commands and CLIs through subprocess, capture their output, and check return codes. Start child interpreters with sys.executable, so they inherit the active environment. Call show_image(path) to attach a PNG, JPEG, GIF, or WebP picture as visual tool-result content; a picture is not text output. Attach at most 2 pictures per call and at most 5 MiB per picture, on the call's own thread; a picture from another thread or a later call is refused with how to read it. Because capabilities like web_search, web_fetch or sub-agent delegation are not exposed as built-in tools, python serves as your interface to invoke external APIs, CLIs, headless tools, and more directly via subprocess.\n</python>",
-  "input_schema": {
-    "properties": {
-      "code": {
-        "type": "string"
-      }
-    },
-    "required": [
-      "code"
-    ],
-    "type": "object"
-  },
-  "name": "python"
-}
-```
-
-Mei keeps one provider-neutral schema and validates every tool wave in the agent loop; it does not declare provider-specific `strict` modes.
+The system prompt lives in [`src/MEI.md`](src/MEI.md). The single `python` tool occupies `tools[0]`. The [Agent SPEC](spec/Agent.lean) defines its schema and call validation. Doctor supplies the detected Python and uv version attributes.
 
 ## Boundaries
 

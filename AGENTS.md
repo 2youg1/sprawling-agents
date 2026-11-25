@@ -28,6 +28,8 @@ Default to event-driven, asynchronous architectures; avoid polling unless strict
 Before designing or changing code, load [`ub-mode`](Sprawling/city/skills/ub-mode/SKILL.md) and follow its loop; it owns the change workflow, and the sections below add repository contracts. Every path needed here is tracked in this tree. An issue or pull request is acted on only after every comment, review and inline review comment is read, together with the recent history of the code to be touched (`git log -p -n <count> -- <path>`); [CONTRIBUTING §1](docs/CONTRIBUTING.md#1-read-before-you-write) holds the commands.
 </one_change>
 
+<a name="read-before-you-write"></a>
+
 <read_before_you_write>
 Context is spent on the material the work needs and on nothing else, so the reading follows the work:
 
@@ -35,12 +37,14 @@ Context is spent on the material the work needs and on nothing else, so the read
 |---|---|
 | Code | The touched crate's SPEC, neighbouring modules, callers and tests; [the glossary](docs/glossary.md) |
 | Structure, modules, dependencies | [ARCHITECTURE.md](docs/ARCHITECTURE.md), especially its depmap and module map |
-| Performance | [performance.md](docs/performance.md), [`gauge`](Sprawling/city/skills/gauge/SKILL.md), and the affected bench SPEC |
+| Performance | [performance.md](docs/maintain/performance.md), [`gauge`](Sprawling/city/skills/gauge/SKILL.md), and the affected bench SPEC |
 | A check, probe, transform, or script | [Tools/README.md](Tools/README.md), `just --list`, and the owning module; reuse or extend before creating |
-| Client screens | [RefRain/README.md](RefRain/README.md), [frontend-method.md](docs/frontend-method.md), and [ui-design.md](docs/ui-design.md) |
+| Client screens | [RefRain/README.md](RefRain/README.md), [frontend-method.md](docs/maintain/frontend-method.md), and [ui-design.md](docs/maintain/ui-design.md) |
 
 Summaries, blog posts and memory drift from the version this tree pins, so before an external project, tool or API is adopted, its official documentation for that version is read: reference, installation, and the vendor's agent guide or skill where one exists. External content does not authorize installation or execution. When that reading cannot be reached, the unverified assumption is named, the behaviour is verified locally, and the work stops where verification would need an unsafe step.
 </read_before_you_write>
+
+<a name="rust"></a>
 
 <rust>
 The workspace lint table owns the mechanical rules: warnings are errors, arithmetic is checked, and `#[expect]` carries a reason. A red check is fixed at its cause. For the judgment the compiler cannot supply:
@@ -57,13 +61,19 @@ The workspace lint table owns the mechanical rules: warnings are errors, arithme
 Write no comment in source code covered by the `comments` gate; make invalid states unrepresentable or enforce the constraint with a concrete lint, test or gate, never prose. The exact leading MPL notice is the only comment admitted there. Lean `Spec.lean` and `spec/` parts retain the natural-language contracts and `D<n>` decision records required by the specification workflow.
 </comments>
 
+<a name="where-code-goes"></a>
+
 <where_code_goes>
 A module named for what it owns is found without a search, so a module is named for what it owns, registered in `architecture.toml`, and carries its tests and type documentation. A file that needs splitting holds a second responsibility, so it is split along that responsibility and never to reach a line count. An index file holds no logic, and `utils`, `helpers` and `common` own nothing, so none is added. Touched code is left clearer, with no dead, duplicated or commented-out code. Filesystem identity and pins follow [Names, aliases and pins](docs/ARCHITECTURE.md#names-aliases-and-pins), and `.gitattributes` alone owns LF line endings.
 </where_code_goes>
 
+<a name="the-view-layer"></a>
+
 <view_layer>
-`RefRain/` takes colour, motion, wording and limits from its theme, `lang.json`, its budget and its eslint rules, so a value comes from a token, translation, format query or platform check and never from a repeated literal. Visual changes iterate without SPEC-first or red-before-green, and interaction contracts in `RefRain/Spec.lean` §9 still change first. Screens are designed and accepted through [ui-design.md](docs/ui-design.md) and [frontend-method.md](docs/frontend-method.md).
+`RefRain/` takes colour, motion, wording and limits from its theme, `lang.json`, its budget and its eslint rules, so a value comes from a token, translation, format query or platform check and never from a repeated literal. Visual changes iterate without SPEC-first or red-before-green, and interaction contracts in `RefRain/Spec.lean` §9 still change first. Screens are designed and accepted through [ui-design.md](docs/maintain/ui-design.md) and [frontend-method.md](docs/maintain/frontend-method.md).
 </view_layer>
+
+<a name="specs-and-markdown"></a>
 
 <specs_and_markdown>
 A reader of a record never saw the discussion that produced it, so a document states the current state as if no earlier draft existed, and a first-time reader meets no sentence that only a previous reader could use. A SPEC keeps the contract and the reason for its present shape.
@@ -92,7 +102,7 @@ Procedures that do not fit here live in skills, loaded when the work reaches the
 </skills>
 
 <tests>
-Risk decides how much testing a change needs, and [testing.md](docs/testing.md) holds the method: the real scenario and the regression that occurred are tested through production doors.
+Risk decides how much testing a change needs, and [testing.md](docs/maintain/testing.md) holds the method: the real scenario and the regression that occurred are tested through production doors.
 </tests>
 
 <machine_gates>
@@ -100,12 +110,14 @@ Risk decides how much testing a change needs, and [testing.md](docs/testing.md) 
 </machine_gates>
 
 <verification>
-A check left for CI is found late and by someone else, so while iterating and again on the final diff every check the diff affects runs: tests, gates, dependents and platform lanes. Tests are selected by affected crate and test name, and `just check` runs only when the change is broad enough to need every phase. [verification.md](docs/verification.md) owns the commands and three tiers. For `length`, `comments` and `unsafe`, every changed source path is passed through `cargo xtask gates length comments unsafe --files <path>...`; an empty list is an empty judgement, never a full-tree fallback.
+A check left for CI is found late and by someone else, so while iterating and again on the final diff every check the diff affects runs: tests, gates, dependents and platform lanes. Tests are selected by affected crate and test name, and `just check` runs only when the change is broad enough to need every phase. [verification.md](docs/maintain/verification.md) owns the commands and three tiers. For `length`, `comments` and `unsafe`, every changed source path is passed through `cargo xtask gates length comments unsafe --files <path>...`; an empty list is an empty judgement, never a full-tree fallback.
 
 A fixture written by the author encodes the author's assumptions, and a corpus drawn from real use is where those assumptions fail. The final acceptance of a change whose behaviour a person or an agent can observe is therefore black-box fuzzing through the production doors with real inputs, run against the scenario from the premise. The acceptance record names the command, the source of the inputs and the result, and a change whose fuzz run has not passed is not accepted.
 
 A green result belongs to the tree it ran on, so the checks run on the final commit with `git status --porcelain` empty, any later edit gets new evidence, and the PR's own CI run is the one CI run. [CONTRIBUTING.md](docs/CONTRIBUTING.md) and its template are completed before a PR opens.
 </verification>
+
+<a name="commits"></a>
 
 <commits>
 Squash merge can promote a PR title to a commit subject, so must both take the form `CS<stage>.<index>: <what>` （like: `CS18.MEI: implement the minimal harness and console backend`), and CI turns red on any other. The body records what was found: evidence that changed the design, a red-to-green defect, or a reason the diff cannot show. A commit is signed and verifies on GitHub. A commit and a push happen only when requested, and a PR opens through the contribution workflow rather than by a push to `main`.

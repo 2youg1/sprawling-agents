@@ -54,4 +54,8 @@ cd Calyx && zig build test
 | City console | `sprawling` serve path, through the Rust host into the same Zig shell |
 | Mei headless | `mei -p`, `mei --resume`, or non-TTY stdin — Calyx not involved |
 
+In the Sprawling console, type `/w` and press Tab to open command completion.
+
+[![The slash menu after `/w` and Tab: `/web` under the cursor, `/wire` below it, and the keys that move through them](../docs/images/console-slash-menu.webp)](../docs/images/console-slash-menu.webp)
+
 See [`Spec.lean`](Spec.lean) and [`ffi/Spec.lean`](ffi/Spec.lean).
