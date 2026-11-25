@@ -61,6 +61,16 @@ export function pdfPicking(door: PickingDoor) {
     return box() ?? selection ?? selectedText();
   }
 
+  function keepVisible(shown: (page: number) => boolean): void {
+    const region = box();
+    if (region !== undefined && !shown(region.page)) setBox(undefined);
+    const lastText = selectedText();
+    if (lastText !== undefined && !shown(lastText.page)) setSelectedText(undefined);
+    const native = textPicked();
+    if (native !== undefined && !shown(native.page)) document.getSelection()?.removeAllRanges();
+    if (drag !== null && !shown(drag.page)) drag = null;
+  }
+
   function anchor(pick: Picked): Point | undefined {
     const pages = door.pages();
     const node = pages === undefined ? null : numbered(pages, pick.page);
@@ -165,6 +175,8 @@ export function pdfPicking(door: PickingDoor) {
       setProblem("pdf_crop_failed");
       return;
     }
+    const page = numbered(pages, picked.page);
+    if (page === null || page.hidden) return;
     const anchor = { page: picked.page, region: picked.region, version: source };
     if (picked.text !== undefined) {
       committing = true;
@@ -174,7 +186,7 @@ export function pdfPicking(door: PickingDoor) {
       committing = false;
       return;
     }
-    const canvas = numbered(pages, picked.page)?.querySelector<HTMLCanvasElement>(".pdf-original");
+    const canvas = page.querySelector<HTMLCanvasElement>(".pdf-original");
     if (canvas == null) {
       setProblem("pdf_crop_failed");
       return;
@@ -225,6 +237,7 @@ export function pdfPicking(door: PickingDoor) {
     attach,
     chosen: choose,
     capture,
+    keepVisible,
     anchor,
     canHold,
     cancelDrag: () => {

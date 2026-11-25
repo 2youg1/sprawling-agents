@@ -3,10 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import { Option } from "effect";
+import { Option, Schema } from "effect";
 
 import { DEFAULT_VIEW, fromFragment, toFragment, type View, type WorkspaceView } from "./route";
 import { browserRows, type Rows } from "./rows";
+import type { WorkspaceProgress } from "./workspace";
 
 export type Subject = "files" | "session";
 export type NavigationLayer = "list" | "history" | "tools" | "library";
@@ -27,7 +28,17 @@ const KEYS = {
   splitTop: "refrain.workspace.split-top.v1",
   workspace: "refrain.workspace.active.v1",
   file: "refrain.workspace.file.v1.",
+  pdfProgress: "refrain.workspace.pdf-progress.v1.",
 };
+
+const readProgress = Schema.decodeUnknownOption(
+  Schema.fromJsonString(
+    Schema.Struct({
+      page: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)),
+      offset: Schema.Number.check(Schema.isBetween({ minimum: 0, maximum: 1 })),
+    }),
+  ),
+);
 
 export function shellVisit(rows: Rows = browserRows()) {
   return {
@@ -78,6 +89,15 @@ export function shellVisit(rows: Rows = browserRows()) {
     },
     file(workspace: string): string | null {
       return rows.getItem(KEYS.file + workspace);
+    },
+    pdfProgress(key: string): WorkspaceProgress | undefined {
+      return Option.getOrUndefined(readProgress(rows.getItem(KEYS.pdfProgress + key)));
+    },
+    setPdfProgress(key: string, point: WorkspaceProgress): void {
+      rows.setItem(KEYS.pdfProgress + key, JSON.stringify(point));
+    },
+    clearPdfProgress(key: string): void {
+      rows.removeItem(KEYS.pdfProgress + key);
     },
     closeFile(workspace: string): void {
       rows.removeItem(KEYS.file + workspace);

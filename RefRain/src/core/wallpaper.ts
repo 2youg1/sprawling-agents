@@ -39,6 +39,8 @@ interface WallpaperSettings {
   readonly subscribe: (show: (state: WallpaperState) => void) => () => void;
   readonly select: (kind: "solid" | "marble") => void;
   readonly brightness: (value: number) => void;
+  readonly fileWallpaper: (enabled: boolean) => void;
+  readonly filePalette: (value: string) => void;
   readonly choose: (input: HTMLInputElement) => Promise<void>;
   readonly importFile: (file: File) => Promise<void>;
   readonly restoreSource: () => Promise<void>;
@@ -59,9 +61,14 @@ const Brightness = Schema.Int.check(
   Schema.isBetween({ minimum: BRIGHTNESS.min, maximum: BRIGHTNESS.max }),
 );
 const validBrightness = Schema.is(Brightness);
+export const FILE_PALETTES = ["inherit", "paper", "mist", "slate", "moss"] as const;
+const FilePalette = Schema.Literals(FILE_PALETTES);
+const validPalette = Schema.is(FilePalette);
 const CurrentChoice = Schema.Struct({
   version: Schema.Literal(1),
   brightness: Brightness,
+  fileWallpaper: Schema.optional(Schema.Boolean),
+  filePalette: Schema.optional(FilePalette),
   wallpaper: Schema.Union([
     Schema.Struct({ kind: Schema.Literal("solid") }),
     Schema.Struct({ kind: Schema.Literal("marble") }),
@@ -158,7 +165,7 @@ async function readableFile(handle: LocalHandle): Promise<Blob | null> {
 async function openLook(choice: Choice): Promise<Look> {
   const { wallpaper } = choice;
   if (wallpaper.kind === "solid" || wallpaper.kind === "marble") {
-    return simple(choice.brightness, wallpaper.kind);
+    return simple(choice, wallpaper.kind);
   }
   const selected = await attempt(() =>
     wallpaper.kind === "copy" ? Promise.resolve(wallpaper.blob) : readableFile(wallpaper.handle),
@@ -171,9 +178,9 @@ async function openLook(choice: Choice): Promise<Look> {
   };
 }
 
-function simple(brightness: number, kind: "solid" | "marble"): Look {
+function simple(choice: Choice, kind: "solid" | "marble"): Look {
   return {
-    choice: { version: 1, wallpaper: { kind }, brightness },
+    choice: { ...choice, wallpaper: { kind } },
     image: kind === "marble" ? MARBLE : null,
     unavailable: false,
   };
@@ -184,6 +191,8 @@ function sameAppearance(left: Look, right: Look): boolean {
   const other = right.choice.wallpaper;
   return (
     left.choice.brightness === right.choice.brightness &&
+    (left.choice.fileWallpaper ?? false) === (right.choice.fileWallpaper ?? false) &&
+    (left.choice.filePalette ?? "inherit") === (right.choice.filePalette ?? "inherit") &&
     (one === other || (one.kind === other.kind && (one.kind === "solid" || one.kind === "marble")))
   );
 }
@@ -196,6 +205,8 @@ function draw(root: HTMLElement, earlier: Look | undefined, look: Look): void {
   if (earlier?.choice.brightness !== look.choice.brightness) {
     root.style.setProperty("--reading-level", String(look.choice.brightness / BRIGHTNESS.max));
   }
+  root.toggleAttribute("data-file-wallpaper", look.choice.fileWallpaper === true);
+  root.dataset.filePalette = look.choice.filePalette ?? "inherit";
   if (earlier?.image === look.image) return;
   if (look.image === null) root.style.removeProperty("--refrain-wallpaper-image");
   else root.style.setProperty("--refrain-wallpaper-image", `url(${JSON.stringify(look.image)})`);
@@ -311,11 +322,18 @@ function openSettings(root: HTMLElement): WallpaperSettings {
       };
     },
     select(kind) {
-      if (!busy) preview(simple(look.choice.brightness, kind));
+      if (!busy) preview(simple(look.choice, kind));
     },
     brightness(value) {
       if (!busy && validBrightness(value))
         preview({ ...look, choice: { ...look.choice, brightness: value } });
+    },
+    fileWallpaper(enabled) {
+      if (!busy) preview({ ...look, choice: { ...look.choice, fileWallpaper: enabled } });
+    },
+    filePalette(value) {
+      if (!busy && validPalette(value))
+        preview({ ...look, choice: { ...look.choice, filePalette: value } });
     },
     async choose(input) {
       const open = window.showOpenFilePicker?.bind(window);

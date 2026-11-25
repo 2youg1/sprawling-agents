@@ -51,6 +51,24 @@ function encode(text: string, encoding: Encoding): Uint8Array<ArrayBuffer> {
   return encoded;
 }
 
+export function workspaceLineBytes(line: string, encoding: Encoding): number {
+  return encoding === "utf16_le" || encoding === "utf16_be"
+    ? line.length * 2
+    : new TextEncoder().encode(line).byteLength;
+}
+
+export function workspaceDraftBytes(
+  savedBytes: number,
+  baseline: Positions<string>,
+  changes: readonly EditorChange[],
+): number {
+  return textEdits(baseline, changes).reduce(
+    (total, { span, text }) =>
+      total + workspaceLineBytes(text, baseline.encoding) - (span.end - span.start),
+    savedBytes,
+  );
+}
+
 export function encodeWorkspaceChanges(
   original: Uint8Array,
   baseline: Positions<string>,

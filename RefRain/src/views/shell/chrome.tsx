@@ -158,6 +158,38 @@ export function Chrome(props: ChromeProps) {
           </span>
         </button>
         <button
+          id={id(SUBJECT_KEY)}
+          type="button"
+          class="refrain-rail-key refrain-rail-action glass"
+          data-control=""
+          aria-label={say(props.lang, "shell_switch_subject")}
+          aria-pressed={props.subject === "files" ? "true" : "false"}
+          hidden={compact()}
+          onClick={() =>
+            activate("subject", () => {
+              props.onSubject();
+              collapse(true);
+            })
+          }
+        >
+          <Glyph name="switch-subject" size="key" />
+          <span class="refrain-rail-caption" aria-hidden="true">
+            {say(props.lang, "shell_switch_subject_short")}
+          </span>
+        </button>
+        <div
+          class="refrain-rail-mailbox"
+          onClick={(event) => {
+            if (
+              event.target instanceof Element &&
+              event.target.closest(`#${id(MAILBOX_KEY)}, [data-refrain-mailbox-key]`) !== null
+            )
+              collapse(false);
+          }}
+        >
+          {props.mailbox}
+        </div>
+        <button
           id={id(NAVIGATION_KEY)}
           type="button"
           class="refrain-rail-key refrain-rail-action glass"
@@ -176,38 +208,6 @@ export function Chrome(props: ChromeProps) {
           <Glyph name={props.subject === "files" ? "folder-tree" : "session-list"} size="key" />
           <span class="refrain-rail-caption" aria-hidden="true">
             {listName()}
-          </span>
-        </button>
-        <div
-          class="refrain-rail-mailbox"
-          onClick={(event) => {
-            if (
-              event.target instanceof Element &&
-              event.target.closest(`#${id(MAILBOX_KEY)}, [data-refrain-mailbox-key]`) !== null
-            )
-              collapse(false);
-          }}
-        >
-          {props.mailbox}
-        </div>
-        <button
-          id={id(SUBJECT_KEY)}
-          type="button"
-          class="refrain-rail-key refrain-rail-action glass"
-          data-control=""
-          aria-label={say(props.lang, "shell_switch_subject")}
-          aria-pressed={props.subject === "files" ? "true" : "false"}
-          hidden={compact()}
-          onClick={() =>
-            activate("subject", () => {
-              props.onSubject();
-              collapse(true);
-            })
-          }
-        >
-          <Glyph name="switch-subject" size="key" />
-          <span class="refrain-rail-caption" aria-hidden="true">
-            {say(props.lang, "shell_switch_subject_short")}
           </span>
         </button>
       </div>

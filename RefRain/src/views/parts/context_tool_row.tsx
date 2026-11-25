@@ -4,6 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { Show } from "solid-js";
+import { face, marks, platformOf } from "../../core/keys";
 import type { ContextTool, ContextToolsController } from "./context_tools";
 import Glyph from "./glyph.solid";
 
@@ -21,6 +22,17 @@ export function ContextRow(props: {
   readonly controller: ContextToolsController;
 }) {
   const held = () => props.tool.hold !== undefined;
+  const platform = platformOf(navigator.userAgent);
+  const shortcut = () => props.tool.shortcut;
+  const spokenShortcut = () => {
+    const chord = shortcut();
+    if (chord === undefined) return undefined;
+    return [
+      ...(chord.accel ? [platform === "mac" ? "Meta" : "Control"] : []),
+      ...(chord.shift ? ["Shift"] : []),
+      face(chord.key),
+    ].join("+");
+  };
   let pointer: number | undefined;
   const down = (event: PointerEvent & { currentTarget: HTMLButtonElement }): void => {
     if (!held() || props.disabled || event.button !== 0 || !event.isPrimary) return;
@@ -65,6 +77,7 @@ export function ContextRow(props: {
         props.tool.panel === undefined ? (opens(props.tool) ? "menu" : undefined) : "dialog"
       }
       aria-disabled={props.disabled ? "true" : undefined}
+      aria-keyshortcuts={spokenShortcut()}
       onClick={() => {
         props.controller.enter(props.tool);
       }}
@@ -85,6 +98,9 @@ export function ContextRow(props: {
         <Show when={props.tool.glyph}>{(name) => <Glyph name={name()} size="sm" />}</Show>
         <span>{props.tool.label}</span>
       </span>
+      <Show when={shortcut()}>
+        {(chord) => <kbd aria-hidden="true">{marks(chord(), platform).join("+")}</kbd>}
+      </Show>
       <Show when={wanted(props.tool.checked)}>
         <span aria-hidden="true">✓</span>
       </Show>

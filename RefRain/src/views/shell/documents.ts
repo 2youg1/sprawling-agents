@@ -3,6 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
+import { Effect, Result } from "effect";
 import { createEffect, createMemo, createSignal, onSettled } from "solid-js";
 
 import { toFragment, type ItemLink } from "../../core/route";
@@ -112,25 +113,64 @@ export function workspaceDocuments(target: DocumentTarget) {
     );
   }
 
-  function progress(file: OpenedFile, point: WorkspaceProgress): void {
-    void api.remember(file.workspace, file.record.id, { progress: point }).then(
-      (record) => {
-        if (visible) touch(file.workspace, record);
-      },
-      (error: unknown) => {
-        if (visible && opened()?.record.id === file.record.id) setFailed(error);
-      },
-    );
+  const recording = new Set<string>();
+
+  async function rememberProgress(file: OpenedFile, key: string): Promise<void> {
+    if (recording.has(key)) return;
+    const visit = target.shell.visit;
+    recording.add(key);
+    let point = visit.pdfProgress(key);
+    while (point !== undefined) {
+      const requested = point;
+      const result = await Effect.runPromise(
+        Effect.result(
+          Effect.tryPromise({
+            try: () => api.remember(file.workspace, file.record.id, { progress: requested }),
+            catch: (error) => error,
+          }),
+        ),
+      );
+      point = visit.pdfProgress(key);
+      const samePoint = point?.page === requested.page && point.offset === requested.offset;
+      if (Result.isFailure(result)) {
+        if (!samePoint) continue;
+        const current = opened();
+        if (
+          visible &&
+          current?.workspace === file.workspace &&
+          current.record.id === file.record.id
+        )
+          setFailed(result.failure);
+        break;
+      }
+      const record = result.success;
+      if (visible) touch(file.workspace, record);
+      if (samePoint) {
+        visit.clearPdfProgress(key);
+        break;
+      }
+    }
+    recording.delete(key);
   }
 
-  function display(file: OpenedFile): void {
-    target.shell.visit.setFile(file.workspace, file.record.id);
+  function progress(file: OpenedFile, point: WorkspaceProgress): void {
+    const key = cacheKey(file.workspace, file.record.id);
+    target.shell.visit.setPdfProgress(key, point);
+    void rememberProgress(file, key);
+  }
+
+  function display(file: OpenedFile, queued?: WorkspaceProgress): void {
+    const { workspace, record } = file;
+    target.shell.visit.setFile(workspace, record.id);
     const previous = opened();
-    if (previous?.workspace !== file.workspace || previous.record.id !== file.record.id) {
-      setRemembered(file.record.progress ?? undefined);
+    if (previous?.workspace !== workspace || previous.record.id !== record.id) {
+      const key = cacheKey(workspace, record.id);
+      const pending = target.shell.visit.pdfProgress(key);
+      setRemembered(pending ?? queued ?? record.progress ?? undefined);
+      if (pending !== undefined) void rememberProgress(file, key);
     }
     setOpened(file);
-    touch(file.workspace, file.record);
+    touch(workspace, record);
   }
 
   function open(id: string, file: LibraryTarget, from?: DocumentCitation): void {
@@ -141,7 +181,12 @@ export function workspaceDocuments(target: DocumentTarget) {
     setRecovery("id" in file ? { workspace: id, id: file.id } : null);
     setRepair("");
     const cached = "id" in file ? cache.get(id, file.id) : undefined;
-    if (cached !== undefined && (from === undefined || cached.record.version === from.version))
+    const queued = "id" in file ? target.shell.visit.pdfProgress(cacheKey(id, file.id)) : undefined;
+    if (
+      cached !== undefined &&
+      !cached.record.path.toLowerCase().endsWith(".pdf") &&
+      (from === undefined || cached.record.version === from.version)
+    )
       display(cached);
     void api
       .open(id, file)
@@ -159,7 +204,7 @@ export function workspaceDocuments(target: DocumentTarget) {
         if (request !== load) return;
         cache.keep(next);
         setPending(false);
-        display(next);
+        display(next, queued);
         setRecovery(null);
       })
       .catch((error: unknown) => {

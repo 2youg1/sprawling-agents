@@ -4,14 +4,25 @@
  * Copyright (c) 2026 2youg1 and the sprawling contributors */
 
 .workspace-document {
+  --workspace-editor-available: calc(100% - 2 * var(--workspace-editor-margin, 0px));
+  --workspace-editor-width: min(var(--workspace-editor-available), var(--container-measure));
   position: relative;
   display: flex;
   flex-direction: column;
   min-block-size: 0;
   block-size: 100%;
   inline-size: 100%;
-  background: var(--color-reading-canvas, var(--color-page));
-  color: var(--color-text);
+  background-color: var(--file-canvas, var(--color-reading-canvas, var(--color-page)));
+  color: var(--file-ink, var(--color-text));
+}
+
+@container shell (inline-size >= 768px) {
+  .refrain-workspace .workspace-document {
+    --workspace-editor-width: min(
+      var(--workspace-editor-available),
+      calc(var(--silver-side) * var(--silver) - var(--spacing-gutter))
+    );
+  }
 }
 
 .workspace-document-tools {
@@ -20,33 +31,38 @@
   gap: var(--spacing-tight) var(--spacing-snug);
   align-items: center;
   padding: var(--spacing-tight) var(--spacing-pane);
-  border-block-end: 1px solid var(--color-edge);
+  border-block-end: 1px solid var(--file-edge, var(--color-edge));
+  background: var(--file-canvas, var(--color-reading-canvas, var(--color-page)));
   font-size: var(--text-note);
 }
 
-:where(
-  .workspace-document-tools button,
-  .workspace-selection-menu button,
-  .workspace-document-error button
-) {
+:where(.workspace-document-tools button, .workspace-document-error button) {
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-tight);
   min-height: var(--spacing-control);
   padding-inline: var(--spacing-snug);
-  border: 1px solid var(--color-edge);
+  border: 1px solid var(--file-edge, var(--color-edge));
   border-radius: var(--radius-control);
-  background: var(--color-raised);
-  color: var(--color-text);
+  background: var(--file-raised, var(--color-raised));
+  color: var(--file-ink, var(--color-text));
+}
+
+:where(
+    .workspace-document-tools button,
+    .workspace-document-error button,
+    .workspace-proposal-actions button
+  ):is(:hover, :active, [data-control-keydown]):not(:disabled, [aria-busy="true"]) {
+  background: var(--file-selection, var(--color-raised-hover));
 }
 
 .workspace-document-tools button[aria-pressed="true"] {
-  border-color: var(--color-accent);
-  background: var(--color-raised-hover);
+  border-color: var(--file-accent, var(--color-accent));
+  background: var(--file-selection, var(--color-raised-hover));
 }
 
 .workspace-document-tools button:disabled {
-  color: var(--color-text-faint);
+  color: var(--file-faint-ink, var(--color-text-faint));
 }
 
 .workspace-document-tools label {
@@ -58,7 +74,7 @@
 
 .workspace-document-version {
   font-family: var(--font-mono);
-  color: var(--color-text-quiet);
+  color: var(--file-ink, var(--color-text-quiet));
 }
 
 .workspace-editor-host,
@@ -66,40 +82,104 @@
   flex: 1;
   min-height: 0;
   min-width: 0;
-  background: var(--color-reading-canvas, var(--color-page));
+  background: var(--file-canvas, var(--color-reading-canvas, var(--color-page)));
+}
+
+.workspace-document-tools,
+.workspace-editor-host,
+.workspace-document-status {
+  inline-size: var(--workspace-editor-width);
+  margin-inline: auto;
+}
+
+.workspace-document-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-tight) var(--spacing-base);
+  padding: var(--spacing-tight) var(--spacing-snug);
+  background: var(--file-canvas, var(--color-reading-canvas, var(--color-page)));
+  color: var(--file-ink, var(--color-text-quiet));
+  font-size: var(--text-note);
+  border-block-start: 1px solid var(--file-edge, var(--color-edge));
+}
+
+@container shell (inline-size < 768px) {
+  .workspace-document-status {
+    padding-inline-start: calc(var(--refrain-rail-size) + var(--spacing-snug));
+  }
 }
 
 .workspace-editor-host .cm-editor {
   block-size: 100%;
-  color: var(--color-text);
-  background: var(--color-reading-canvas, var(--color-page));
+  color: var(--file-ink, var(--color-text));
+  background: var(--file-canvas, var(--color-reading-canvas, var(--color-page)));
 }
 
 .workspace-editor-host .cm-scroller {
   font: var(--text-body) / var(--leading-read) var(--font-mono);
+  scrollbar-gutter: stable;
 }
 
 .workspace-editor-host .cm-gutters {
-  background: var(--color-reading-canvas, var(--color-page));
-  color: var(--color-text-faint);
-  border-color: var(--color-edge);
+  background: var(--file-canvas, var(--color-reading-canvas, var(--color-page)));
+  color: var(--file-ink, var(--color-text-faint));
+  border-color: var(--file-edge, var(--color-edge));
 }
 
 .workspace-editor-host .cm-activeLine {
-  background: var(--color-raised);
+  background: var(--file-raised, var(--color-raised));
+}
+
+.workspace-editor-host .cm-editor:has(.cm-selectionBackground) .cm-activeLine {
+  background: transparent;
 }
 
 .workspace-editor-host .cm-content {
-  caret-color: var(--color-accent);
+  min-inline-size: 0;
+  caret-color: var(--file-accent, var(--color-accent));
+}
+
+.workspace-editor-host .cm-line {
+  overflow-wrap: anywhere;
+  line-break: strict;
+}
+
+.workspace-editor-host .cm-content :is(strong, em) {
+  font-synthesis: weight style;
+}
+
+.workspace-editor-host .cm-content strong {
+  font-weight: var(--font-weight-heading);
+}
+
+.workspace-editor-host .cm-content em {
+  font-style: italic;
+}
+
+.workspace-editor-host .cm-content s {
+  text-decoration: line-through;
+}
+
+.workspace-editor-host .cm-editor .cm-dropCursor {
+  border-inline-start: var(--spacing-hair) solid var(--file-accent, var(--color-accent));
+  pointer-events: none;
 }
 
 .workspace-editor-host .cm-cursor {
-  border-inline-start-color: var(--color-accent);
+  border-inline-start-color: var(--file-accent, var(--color-accent));
 }
 
-.workspace-editor-host .cm-content ::selection,
-.workspace-editor-host .cm-editor .cm-selectionBackground {
-  background: var(--color-raised-hover);
+.workspace-editor-host .cm-editor > .cm-scroller > .cm-selectionLayer .cm-selectionBackground {
+  background: var(--file-selection, var(--color-raised-hover));
+  box-shadow: inset 0 calc(-1 * var(--spacing-hair)) var(--file-accent, transparent);
+}
+
+@media (forced-colors: active) {
+  .workspace-editor-host .cm-editor > .cm-scroller > .cm-selectionLayer .cm-selectionBackground {
+    forced-color-adjust: none;
+    box-shadow: inset 0 calc(-1 * var(--spacing-hair)) Highlight;
+  }
 }
 
 .workspace-format-preview {
@@ -135,26 +215,8 @@
   padding: var(--spacing-tight) var(--spacing-pane);
 }
 
-.workspace-selection-backdrop,
-.workspace-selection-menu {
-  position: fixed;
-  z-index: var(--layer-popover);
-}
-
-.workspace-selection-backdrop {
-  inset: 0;
-}
-
-.workspace-selection-menu {
-  max-width: calc(100vw - 2 * var(--spacing-pane));
-  padding: var(--spacing-tight);
-  border: 1px solid var(--color-edge-input);
-  border-radius: var(--radius-control);
-  background: var(--color-raised);
-}
-
 .cm-markdown-marker {
-  color: var(--color-markdown-marker, var(--color-text-quiet));
+  color: var(--file-link, var(--color-markdown-marker, var(--color-text-quiet)));
 }
 
 .cm-markdown-heading {
@@ -168,12 +230,12 @@
 }
 
 .cm-markdown-link {
-  color: var(--color-accent);
+  color: var(--file-link, var(--color-accent));
   text-decoration: underline;
 }
 
 .cm-markdown-code {
-  background: var(--color-raised);
+  background: var(--file-raised, var(--color-raised));
 }
 
 .cm-markdown-display,
@@ -186,7 +248,7 @@
 
 .cm-markdown-table :is(th, td) {
   padding: var(--spacing-tight) var(--spacing-snug);
-  border: 1px solid var(--color-edge);
+  border: 1px solid var(--file-edge, var(--color-edge));
 }
 
 .cm-markdown-table th {
@@ -199,8 +261,8 @@
   max-block-size: 45%;
   overflow: auto;
   padding: var(--spacing-snug) var(--spacing-pane);
-  border-block-end: 1px solid var(--color-edge);
-  background: var(--color-raised);
+  border-block-end: 1px solid var(--file-edge, var(--color-edge));
+  background: var(--file-raised, var(--color-raised));
 }
 
 .workspace-proposal h3 {
@@ -224,9 +286,9 @@
 }
 
 .workspace-proposal-text textarea {
-  background: var(--color-page);
-  color: var(--color-text);
-  border: 1px solid var(--color-edge-input);
+  background: var(--file-paper, var(--color-page));
+  color: var(--file-ink, var(--color-text));
+  border: 1px solid var(--file-edge-input, var(--color-edge-input));
 }
 
 .workspace-proposal-actions {
@@ -242,10 +304,10 @@
   gap: var(--spacing-tight);
   min-height: var(--spacing-control);
   padding-inline: var(--spacing-snug);
-  border: 1px solid var(--color-edge-input);
+  border: 1px solid var(--file-edge-input, var(--color-edge-input));
   border-radius: var(--radius-control);
-  background: var(--color-raised);
-  color: var(--color-text);
+  background: var(--file-raised, var(--color-raised));
+  color: var(--file-ink, var(--color-text));
 }
 
 .workspace-proposal-actions button:disabled {

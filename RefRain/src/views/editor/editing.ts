@@ -19,6 +19,7 @@ import {
   EditorView,
   type ViewUpdate,
   drawSelection,
+  dropCursor,
   highlightActiveLine,
   highlightSpecialChars,
   keymap,
@@ -27,8 +28,8 @@ import {
 } from "@codemirror/view";
 
 import type { EditorChange } from "../../core/document_pos";
-import { markdownEditing, markdownMode } from "./markdown_editing";
-import type { MarkdownMode, MarkdownOptions } from "./markdown_editing";
+import { formatMarkdown, markdownEditing, markdownMode } from "./markdown_editing";
+import type { MarkdownFormat, MarkdownMode, MarkdownOptions } from "./markdown_editing";
 
 export interface TextRange {
   readonly from: number;
@@ -39,6 +40,7 @@ export interface ContextSelection {
   readonly range: TextRange;
   readonly x: number;
   readonly y: number;
+  readonly event: MouseEvent | KeyboardEvent;
 }
 
 export interface EditorSetup {
@@ -51,6 +53,8 @@ export interface EditorSetup {
 
   readonly phrases: Readonly<Record<string, string>>;
   readonly onEdit: () => void;
+  readonly onLine?: (line: string) => void;
+  readonly onCompositionEnd?: () => void;
   readonly onSave: () => void;
   readonly markdown?: MarkdownOptions | undefined;
   readonly onMarkdownMode?: (mode: MarkdownMode) => void;
@@ -64,6 +68,8 @@ export interface Editing {
 
   readonly editedSinceSent: () => boolean | null;
   readonly text: () => string;
+  readonly line: () => string;
+  readonly format: (format: MarkdownFormat) => boolean;
   readonly slice: (range: TextRange) => string;
 
   readonly sent: () => void;
@@ -205,6 +211,10 @@ export function openEditor(setup: EditorSetup): Editing {
     }
     const composedAt = measured ? performance.now() : 0;
     if (edited) setup.onEdit();
+    if (selectedOrChanged && setup.onLine !== undefined) {
+      const { doc, selection } = update.state;
+      setup.onLine(doc.lineAt(selection.main.head).text);
+    }
     if (measured) {
       const ended = performance.now();
       performance.measure("sprawling:editor_input_handler", {
@@ -236,6 +246,7 @@ export function openEditor(setup: EditorSetup): Editing {
         history(),
         EditorState.allowMultipleSelections.of(true),
         drawSelection(),
+        dropCursor(),
         rectangularSelection(),
         highlightActiveLine(),
         search({ top: true }),
@@ -263,10 +274,13 @@ export function openEditor(setup: EditorSetup): Editing {
           compositionend() {
             composing = false;
             requestAnimationFrame(() => {
-              if (!alive || awaiting === null) return;
-              const mode = awaiting;
-              awaiting = null;
-              setMarkdown(mode);
+              if (!alive) return;
+              if (awaiting !== null) {
+                const mode = awaiting;
+                awaiting = null;
+                setMarkdown(mode);
+              }
+              setup.onCompositionEnd?.();
             });
             return false;
           },
@@ -277,6 +291,7 @@ export function openEditor(setup: EditorSetup): Editing {
             const fromKeyboard = event.clientX === 0 && event.clientY === 0;
             setup.onContextSelection({
               range,
+              event,
               x: fromKeyboard ? (at?.left ?? 0) : event.clientX,
               y: fromKeyboard ? (at?.bottom ?? 0) : event.clientY,
             });
@@ -288,7 +303,7 @@ export function openEditor(setup: EditorSetup): Editing {
             const range = selected(editor);
             if (range === null || setup.onContextSelection === undefined) return false;
             const at = editor.coordsAtPos(range.to);
-            setup.onContextSelection({ range, x: at?.left ?? 0, y: at?.bottom ?? 0 });
+            setup.onContextSelection({ range, event, x: at?.left ?? 0, y: at?.bottom ?? 0 });
             return true;
           },
         }),
@@ -323,6 +338,8 @@ export function openEditor(setup: EditorSetup): Editing {
     hasChanges: () => !composed.empty,
     editedSinceSent: () => (sinceSent === null ? null : !sinceSent.empty),
     text: () => view.state.doc.toString(),
+    line: () => view.state.doc.lineAt(view.state.selection.main.head).text,
+    format: (format) => formatMarkdown(view, format),
     slice: ({ from, to }) => view.state.doc.sliceString(from, to),
     sent: () => {
       sentText = view.state.doc.toString();

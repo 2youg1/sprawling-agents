@@ -11,105 +11,31 @@ import {
   createUniqueId,
   flush,
   For,
-  Match,
   onSettled,
   Show,
-  Switch,
+  untrack,
 } from "solid-js";
 
 import { fill, say } from "../../../core/lang";
-import type { Lang } from "../../../core/lang";
 import { scopedUi } from "../../../ui";
 import { attachContextTools, ContextTools, createContextTools } from "../../parts/context_tools";
 import Glyph from "../../parts/glyph.solid";
-import { NAME } from "./format";
-import type { Opened, Size } from "./pdf";
+import type { Size } from "./pdf";
 import { pointAt, readableRegion, regionStyle } from "./pdf_anchor";
-import type { PdfProgress, PdfReference, PdfRegion, PdfSelection, Point } from "./pdf_anchor";
+import type { PdfProgress, PdfRegion, Point } from "./pdf_anchor";
 import { PdfPage } from "./pdf_page_view";
+import type { Graphics, PdfProps } from "./pdf_loading";
 import { PdfToneFilter } from "./pdf_palette";
 import { pdfPicking, type Picked } from "./pdf_pick";
-import { positionAt, scrollToPosition } from "./pdf_position";
-import { pdfActions, PdfZoom } from "./pdf_tools";
+import {
+  firstPdfPage,
+  pagesPerTurn,
+  positionAt,
+  scrollToPosition,
+  type PdfLayout,
+} from "./pdf_position";
+import { pdfActions, PdfReaderControls, PdfZoom } from "./pdf_tools";
 import "./pdf.css";
-
-export interface PdfProps {
-  readonly bytes: Uint8Array;
-  readonly version: string | null;
-  readonly name: string;
-  readonly lang: Lang;
-  readonly progress?: PdfProgress | null | undefined;
-  readonly onProgress?: ((progress: PdfProgress) => void) | undefined;
-  readonly reference?: PdfReference | null | undefined;
-  readonly onSelection?: ((attachment: PdfSelection) => void) | undefined;
-}
-
-interface Graphics {
-  readonly webgpu: boolean;
-  readonly webgl2: boolean;
-}
-
-export function PdfView(props: PdfProps) {
-  const [opened, setOpened] = createSignal<Opened | null>(null);
-  const [graphics, setGraphics] = createSignal<Graphics>();
-  const bytes = createMemo(() => props.bytes);
-  const pdf = createMemo(() => {
-    const value = opened();
-    return value?.kind === "open" ? value.pdf : null;
-  });
-  const broken = createMemo(() => {
-    const value = opened();
-    return value?.kind === "broken" ? value.reason : undefined;
-  });
-
-  createEffect(bytes, (from) => {
-    setOpened(null);
-    let gone = false;
-    let close: (() => void) | undefined;
-    void import("./pdf")
-      .then(({ openPdf, gpuAvailability }) => {
-        if (gone) return;
-        const opening = openPdf(from);
-        close = opening.close;
-        void opening.opened.then((result) => {
-          if (!gone) setOpened(result);
-        });
-        void gpuAvailability().then((available) => {
-          if (!gone) setGraphics(available);
-        });
-      })
-      .catch((reason: unknown) => {
-        if (!gone) setOpened({ kind: "broken", reason: String(reason) });
-      });
-    return () => {
-      gone = true;
-      close?.();
-    };
-  });
-
-  return (
-    <Switch>
-      <Match when={pdf()} keyed>
-        {(document) => <PdfReading {...props} pdf={document} graphics={graphics()} />}
-      </Match>
-      <Match when={opened()?.kind === "locked"}>
-        <p class="px-wide py-snug text-note text-text-quiet">{say(props.lang, "format_locked")}</p>
-      </Match>
-      <Match when={broken()}>
-        {(reason) => (
-          <p class="px-wide py-snug text-note text-text-quiet">
-            {fill(say(props.lang, "format_broken"), { format: NAME.pdf, reason: reason() })}
-          </p>
-        )}
-      </Match>
-      <Match when={opened() === null}>
-        <p class="px-wide py-snug text-note text-text-faint">
-          {fill(say(props.lang, "format_reading"), { format: NAME.pdf })}
-        </p>
-      </Match>
-    </Switch>
-  );
-}
 
 interface ReadingProps extends PdfProps {
   readonly pdf: PDFDocumentProxy;
@@ -124,11 +50,19 @@ interface Zoomed {
 const FALLBACK = { width: 595, height: 842 };
 const MAX_NEARBY = 5;
 
-function PdfReading(props: ReadingProps) {
+export function PdfReading(props: ReadingProps) {
   const tone = createUniqueId();
+  const onProgress = untrack(() => props.onProgress);
   const [sizes, setSizes] = createSignal<ReadonlyMap<number, Size>>(new Map());
   const [visible, setVisible] = createSignal<ReadonlySet<number>>(new Set());
   const [width, setWidth] = createSignal(0);
+  const [layout, setLayout] = createSignal<PdfLayout>("continuous");
+  const [scale, setScale] = createSignal(100);
+  const [pageAt, setPageAt] = createSignal(1);
+  const first = () => firstPdfPage(layout(), pageAt());
+  const turns = () => pagesPerTurn(layout());
+  const shown = (page: number) =>
+    layout() === "continuous" || (page >= first() && page < first() + turns());
   const [original, setOriginal] = createSignal(false);
   const [zoom, setZoom] = createSignal<Zoomed>();
   let scroller: HTMLDivElement | undefined;
@@ -136,7 +70,8 @@ function PdfReading(props: ReadingProps) {
   let surface: HTMLDivElement | undefined;
   const menus = createContextTools();
   const canChangeBrightness = scopedUi() === undefined;
-  let frame = 0;
+  let availableWidth = 0;
+  let placed: { readonly point: PdfProgress; readonly top: number } | undefined;
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
   let nextProgress: PdfProgress | undefined;
 
@@ -155,10 +90,54 @@ function PdfReading(props: ReadingProps) {
       : null;
   });
 
+  function position(height = 0): PdfProgress | null {
+    if (scroller === undefined || pages === undefined || availableWidth === 0) return null;
+    const page = layout() === "continuous" ? undefined : pageAt();
+    return positionAt(scroller, pages, height, page);
+  }
+
   function center(): PdfProgress | null {
-    return scroller === undefined || pages === undefined
-      ? null
-      : positionAt(scroller, pages, scroller.clientHeight / 2);
+    return position((scroller?.clientHeight ?? 0) / 2);
+  }
+
+  function readingPoint(): PdfProgress | null {
+    return placed !== undefined && scroller?.scrollTop === placed.top ? placed.point : position();
+  }
+
+  function scroll(point: PdfProgress): void {
+    if (scroller === undefined || pages === undefined) return;
+    scrollToPosition(scroller, pages, point);
+    placed = { point, top: scroller.scrollTop };
+  }
+
+  function place(point: PdfProgress, nextLayout = layout(), nextScale = scale()): void {
+    const view = scroller;
+    const list = pages;
+    if (view === undefined || list === undefined || availableWidth === 0) return;
+    const page = Math.min(count(), Math.max(1, point.page));
+    const columns = pagesPerTurn(nextLayout);
+    if (nextLayout !== "continuous") {
+      const start = firstPdfPage(nextLayout, page);
+      pick.keepVisible((selected) => selected >= start && selected < start + columns);
+    }
+    setPageAt(page);
+    setLayout(nextLayout);
+    setScale(nextScale);
+    const gap = Number.parseFloat(getComputedStyle(list).columnGap) || 0;
+    setWidth((Math.max(1, (availableWidth - (columns - 1) * gap) / columns) * nextScale) / 100);
+    flush();
+    scroll({ page, offset: point.offset });
+  }
+
+  function moveReading(nextLayout: PdfLayout, nextScale: number): void {
+    place(readingPoint() ?? { page: pageAt(), offset: 0 }, nextLayout, nextScale);
+    recordScroll();
+  }
+
+  function turn(direction: number): void {
+    if (scroller !== undefined) scroller.scrollLeft = 0;
+    place({ page: first() + direction * turns(), offset: 0 });
+    recordScroll();
   }
 
   const pick = pdfPicking({
@@ -182,20 +161,16 @@ function PdfReading(props: ReadingProps) {
     clearTimeout(saveTimer);
     const recorded = nextProgress;
     nextProgress = undefined;
-    if (recorded !== undefined) props.onProgress?.(recorded);
+    if (recorded !== undefined) onProgress?.(recorded);
   }
 
   function recordScroll(): void {
-    if (frame || props.onProgress === undefined) return;
-    frame = window.requestAnimationFrame(() => {
-      frame = 0;
-      if (scroller === undefined || pages === undefined) return;
-      const position = positionAt(scroller, pages);
-      if (position === null) return;
-      nextProgress = position;
-      clearTimeout(saveTimer);
-      saveTimer = setTimeout(saveProgress, 250);
-    });
+    if (onProgress === undefined) return;
+    const recorded = readingPoint();
+    if (recorded === null) return;
+    nextProgress = recorded;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveProgress, 250);
   }
 
   onSettled(() => {
@@ -203,22 +178,26 @@ function PdfReading(props: ReadingProps) {
     const list = pages;
     const host = surface;
     if (view === undefined || list === undefined || host === undefined) return;
-    let restored = false;
+
     let resizeFrame: number | undefined;
     const nearby = new Set<number>();
     function readWidth(): void {
       if (view === undefined || list === undefined) return;
-      const available = list.clientWidth;
-      if (available === 0 || (restored && width() === available)) return;
-      const before = restored ? positionAt(view, list) : (props.progress ?? null);
+      const style = getComputedStyle(view);
+      const available =
+        view.clientWidth -
+        Number.parseFloat(style.paddingLeft) -
+        Number.parseFloat(style.paddingRight);
+      if (available <= 0 || available === availableWidth) return;
       const source = highlight();
-      const initial = !restored;
-      restored = true;
-      setWidth(available);
-      flush();
       const desired =
-        initial && source !== null ? { page: source.page, offset: source.region.y } : before;
-      if (desired !== null) scrollToPosition(view, list, desired);
+        availableWidth > 0
+          ? readingPoint()
+          : source === null
+            ? props.progress
+            : { page: source.page, offset: source.region.y };
+      availableWidth = available;
+      place(desired ?? { page: 1, offset: 0 });
     }
     const observer = new ResizeObserver(() => {
       if (resizeFrame !== undefined) return;
@@ -248,7 +227,6 @@ function PdfReading(props: ReadingProps) {
       { root: view, rootMargin: "33% 0px" },
     );
     observer.observe(view);
-    readWidth();
     for (const page of list.children) intersection.observe(page);
     view.addEventListener("keydown", pick.keyDown);
     const closeTools = attachContextTools(
@@ -279,7 +257,6 @@ function PdfReading(props: ReadingProps) {
     return () => {
       saveProgress();
       if (resizeFrame !== undefined) window.cancelAnimationFrame(resizeFrame);
-      window.cancelAnimationFrame(frame);
       observer.disconnect();
       intersection.disconnect();
       view.removeEventListener("keydown", pick.keyDown);
@@ -298,9 +275,8 @@ function PdfReading(props: ReadingProps) {
       }
       pick.setProblem(undefined);
       const deferred = window.requestAnimationFrame(() => {
-        if (scroller !== undefined && pages !== undefined) {
-          scrollToPosition(scroller, pages, { page: source.page, offset: source.region.y });
-        }
+        place({ page: source.page, offset: source.region.y });
+        recordScroll();
       });
       return () => {
         window.cancelAnimationFrame(deferred);
@@ -314,7 +290,7 @@ function PdfReading(props: ReadingProps) {
     if (prior?.width === size.width && prior.height === size.height) return;
     const view = scroller;
     const list = pages;
-    const before = view === undefined || list === undefined ? null : positionAt(view, list);
+    const before = readingPoint();
     setSizes(new Map(known).set(page, size));
     if (
       view !== undefined &&
@@ -323,7 +299,7 @@ function PdfReading(props: ReadingProps) {
       (page === 1 || before.page >= page)
     ) {
       flush();
-      scrollToPosition(view, list, before);
+      scroll(before);
     }
   }
 
@@ -363,8 +339,8 @@ function PdfReading(props: ReadingProps) {
         source === null
           ? undefined
           : () => {
-              if (scroller !== undefined && pages !== undefined)
-                scrollToPosition(scroller, pages, { page: source.page, offset: source.region.y });
+              place({ page: source.page, offset: source.region.y });
+              recordScroll();
             },
       details: () => ({ lang: props.lang, version: props.version, width: width(), pages: count() }),
     });
@@ -395,6 +371,17 @@ function PdfReading(props: ReadingProps) {
       aria-label={props.name}
     >
       <PdfToneFilter id={tone} />
+      <PdfReaderControls
+        lang={props.lang}
+        layout={layout()}
+        scale={scale()}
+        first={first()}
+        last={Math.min(first() + turns() - 1, count())}
+        total={count()}
+        onLayout={(next) => moveReading(next, scale())}
+        onScale={(next) => moveReading(layout(), next)}
+        onTurn={turn}
+      />
       <div
         class={["pdf-scroll", { "pdf-selecting": pick.selecting() }]}
         ref={(node) => {
@@ -413,6 +400,7 @@ function PdfReading(props: ReadingProps) {
       >
         <div
           class="pdf-pages"
+          data-layout={layout()}
           ref={(node) => {
             pages = node;
           }}
@@ -421,10 +409,14 @@ function PdfReading(props: ReadingProps) {
           <For each={numbers()}>
             {(page) => {
               const size = createMemo(() => sizeOf(page));
-              const active = createMemo(() => width() > 0 && visible().has(page));
+              const active = createMemo(
+                () =>
+                  width() > 0 && (layout() === "continuous" ? visible().has(page) : shown(page)),
+              );
               return (
                 <div
                   class="pdf-sheet"
+                  hidden={!shown(page)}
                   data-page={String(page)}
                   style={{ "aspect-ratio": `${String(size().width)} / ${String(size().height)}` }}
                   role="group"
