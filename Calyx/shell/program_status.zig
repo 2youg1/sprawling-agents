@@ -427,6 +427,13 @@ test "every row is the models" {
     try std.testing.expectEqual(@as(usize, 0), differing);
 }
 
+test "Mei status identifies Mei to the terminal" {
+    const report: Report = .{ .of = .{ .resting = .idle } };
+    const rendered = try report.writeAnsi(std.testing.allocator);
+    defer std.testing.allocator.free(rendered);
+    try std.testing.expectEqualStrings("\x1b]7501;state=idle:app=mei\x1b\\", rendered);
+}
+
 test "cleared report is the OSC clear sequence" {
     const report: Report = .cleared;
     const rendered = try report.writeAnsi(std.testing.allocator);
