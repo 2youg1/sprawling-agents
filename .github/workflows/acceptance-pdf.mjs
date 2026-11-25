@@ -866,6 +866,29 @@ try {
   assert.equal(evidence.restored.page, evidence.anchor.page);
   assert.equal(evidence.restored.width, evidence.anchor.width);
   assert.ok(Math.abs(evidence.restored.offset - evidence.anchor.offset) < 0.002);
+  const layout = restored.getByRole("combobox", { name: english("pdf_layout") });
+  const shownPages = () =>
+    restored
+      .locator(".pdf-sheet[data-page]:visible")
+      .evaluateAll((pages) => pages.map((page) => Number(page.dataset.page)));
+  await layout.selectOption("spread");
+  assert.deepEqual(await shownPages(), [3, 4]);
+  const fitted = await sheet(restored, 3).boundingBox();
+  assert.ok(fitted);
+  const scale = restored.getByRole("slider", { name: english("pdf_reader_scale") });
+  await scale.press("ArrowRight");
+  await scale.press("ArrowRight");
+  await scale.press("ArrowRight");
+  assert.equal(await scale.getAttribute("aria-valuetext"), "130%");
+  const enlarged = await sheet(restored, 3).boundingBox();
+  assert.ok(enlarged && Math.abs(enlarged.width / fitted.width - 1.3) < 0.01);
+  await button(restored, "pdf_next_page").click();
+  assert.deepEqual(await shownPages(), [5, 6]);
+  await layout.selectOption("single");
+  assert.deepEqual(await shownPages(), [5]);
+  await layout.selectOption("continuous");
+  assert.equal((await shownPages()).length, 8);
+  assert.equal((await position(restored)).page, 5);
   evidence.frames = await page.evaluate(() =>
     window.refrainPdfPaints.map((frame) => ({
       ...frame,
