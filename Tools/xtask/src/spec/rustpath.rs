@@ -28,10 +28,11 @@ pub(crate) struct Modules {
 struct Module {
     text: String,
     declared: BTreeSet<String>,
+    on_disk: bool,
 }
 
 impl Modules {
-    pub(crate) fn new(files: BTreeMap<String, String>) -> Self {
+    pub(crate) fn new(files: BTreeMap<String, Option<String>>) -> Self {
         let tops = files
             .keys()
             .filter_map(|module| module.split("::").next())
@@ -40,27 +41,36 @@ impl Modules {
         let files = files
             .into_iter()
             .map(|(path, text)| {
+                let on_disk = text.is_some();
+                let text = text.unwrap_or_default();
                 let declared = declared(&text);
-                (path, Module { text, declared })
+                (
+                    path,
+                    Module {
+                        text,
+                        declared,
+                        on_disk,
+                    },
+                )
             })
             .collect();
         Self { files, tops }
     }
 
     pub(crate) fn paths_in<'l>(&self, line: &'l str) -> Vec<&'l str> {
-        line.split('`')
-            .skip(1)
-            .step_by(2)
+        inline_code(line)
             .map(|span| span.trim_end_matches("()").trim_end_matches('!'))
             .filter(|span| {
-                let segments: Vec<&str> = span.split("::").collect();
-                segments.len() >= 2
-                    && segments.iter().all(|s| {
-                        !s.is_empty() && s.chars().all(|c| c.is_alphanumeric() || c == '_')
-                    })
-                    && segments.first().is_some_and(|top| self.tops.contains(*top))
+                rust_path(span)
+                    && span
+                        .split_once("::")
+                        .is_some_and(|(top, _)| self.tops.contains(top))
             })
             .collect()
+    }
+
+    pub(super) fn contains_module(&self, path: &str) -> bool {
+        self.files.get(path).is_some_and(|module| module.on_disk)
     }
 
     pub(crate) fn resolves(&self, path: &str) -> bool {
@@ -107,6 +117,17 @@ impl Modules {
             })
             .map(|(_, module)| module)
     }
+}
+
+pub(super) fn inline_code(line: &str) -> impl Iterator<Item = &str> {
+    line.split('`').skip(1).step_by(2)
+}
+
+pub(super) fn rust_path(path: &str) -> bool {
+    path.contains("::")
+        && path
+            .split("::")
+            .all(|part| !part.is_empty() && part.chars().all(|c| c.is_alphanumeric() || c == '_'))
 }
 
 fn declared(text: &str) -> BTreeSet<String> {

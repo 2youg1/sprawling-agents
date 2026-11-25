@@ -389,12 +389,46 @@ minimum_percent = 90
 measured_by = "just mutants, or on-demand.yml -f job=mutants-modules (just mutants-modules, then just mutants-score)"
 status = "gated by just mutants-score, not by just check; on-demand run 37120210843 (mutants-modules on wave/W11, eight shards on windows-latest; no job scores macOS or Linux) read 6 caught, 0 missed, 0 timed out, 3 unviable: 100.0%"
 
+[remote_hybrid_agreement]
+what = "X25519 and ML-KEM-768 per remote pairing or session handshake, by peer"
+status = "not measured"
+
+[remote_hybrid_signature]
+what = "Ed25519 and ML-DSA-44 signing and verification per remote handshake proof, by peer"
+status = "not measured"
+
+[remote_sha256]
+what = "SHA-256 per remote transcript or pairing fingerprint, by peer"
+status = "not measured"
+
+[remote_hkdf]
+what = "HKDF-SHA256 per remote session key derivation or identity seed expansion, by peer"
+status = "not measured"
+
+[remote_frame_seal]
+what = "AES-256-GCM per outbound seal or inbound open, by peer and frame size"
+status = "not measured"
+
+[vault_file_kdf]
+what = "Argon2id per file Vault open or creation"
+status = "not measured"
+
+[vault_file_aead]
+what = "ChaCha20-Poly1305 per file Vault entry seal or open, by entry size"
+status = "not measured"
+
+[cas_blake3]
+what = "BLAKE3 per CAS write or verified full read, by object size"
+status = "not measured"
+
 [ledger_append]
 what = "append plus fsync, p50 and p99"
 budget_p50_us = 5000 # was 5 ms
 budget_p99_us = 20000 # was 20 ms
+recorded_p50_us = 555
+recorded_p99_us = 688
 measured_by = "just bench (citysim bench bin, release)"
-status = "measured, not gated: p50 0.555 ms / p99 0.688 ms, nearest rank (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-10-01); batched append_all moves 140,934 records/s. The two readings the register used to carry (about 335k records/s batched, run_history 3.3 ms) were re-read on the two trees either side of 2ff1859b: its parent gives 206,501 records/s and 4.177 ms, 2ff1859b itself 135,831 records/s and 6.429 ms, so most of the later drop is the bench load changing shape in 2ff1859b, not the product; the parent itself sits below the old figures, a gap that is either in 2feeb2d6..2ff1859b^ or the machine and has not been bisected. A wall-clock figure is the machine's, so it is recorded, never gated. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just bench retakes it"
+status = "measured, not gated: recorded latency fields report append plus fsync by nearest rank (fixture 1dc560ad5766de65, features sprawling/sandbox, windows-x86_64, 16 cores, NVMe, release, 2026-10-01); batched append_all moves 140,934 records/s. The two readings the register used to carry (about 335k records/s batched, run_history 3.3 ms) were re-read on the two trees either side of 2ff1859b: its parent gives 206,501 records/s and 4.177 ms, 2ff1859b itself 135,831 records/s and 6.429 ms, so most of the later drop is the bench load changing shape in 2ff1859b, not the product; the parent itself sits below the old figures, a gap that is either in 2feeb2d6..2ff1859b^ or the machine and has not been bisected. A wall-clock figure is the machine's, so it is recorded, never gated. This version's reading is owed, because the User ruled to skip measurement in this version: the figures above were taken on an earlier tree, and just bench retakes it"
 
 # What one durability barrier costs per record as the batch under
 # it grows. The absolute figures belong to the disk class they were
