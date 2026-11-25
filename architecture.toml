@@ -26,6 +26,7 @@ module = [
   { name = "mei::doctor::support", file = "Mei/src/doctor/support.rs", owns = "the official Python end-of-life instants and the support decision the repair plan reads", shape = "decision", since = "CS24", status = "built", spec = "Mei.spec.Environment" },
   { name = "mei::doctor::install", file = "Mei/src/doctor/install.rs", owns = "the private uv and managed-Python installers, with no global PATH or shell-profile change", shape = "adapter", since = "CS24", status = "built", spec = "Mei.Spec" },
   { name = "mei::capture", file = "Mei/src/capture.rs", owns = "the run-owned inline and session/caller-owned spilled capture files", shape = "adapter", since = "CS24", status = "built", spec = "Mei.spec.Capture" },
+  { name = "mei::child_exit", file = "Mei/src/child_exit.rs", owns = "bounded waits for the Mei child process to exit", shape = "adapter", since = "CS27", status = "built", spec = "Mei.Spec" },
   { name = "mei::catalog", file = "Mei/src/catalog.rs", owns = "Magpie model selection and completed route JSON", shape = "value", since = "CS25", status = "built", spec = "Mei.spec.Gateway" },
   { name = "mei::observation", file = "Mei/src/observation.rs", owns = "the one mei.obs JSONL writer", shape = "adapter", since = "CS25", status = "built", spec = "Mei.Spec" },
   { name = "mei::transport", file = "Mei/src/transport.rs", owns = "the minimal Anthropic Messages HTTP/1.0 adapter and mei.obs pulse lines during blocked reads", shape = "adapter", since = "CS18", status = "built", spec = "Mei.Spec" },
@@ -1603,6 +1604,9 @@ module = [
   { name = "benchstat::analysis::support", file = "Tools/benchstat/src/analysis/support.rs", owns = "shared JSON number helpers and observation segment grouping for analysis", shape = "projection", since = "CS20", status = "built", spec = "Tools.benchstat.Spec" },
   { name = "benchstat::report", file = "Tools/benchstat/src/report.rs", owns = "canonical exports and the generated Markdown section", shape = "projection", since = "S16", status = "built", spec = "Tools.benchstat.Spec" },
   { name = "benchstat::report::sections", file = "Tools/benchstat/src/report/sections.rs", owns = "Markdown section builders and cell display helpers for the generated report", shape = "projection", since = "CS20", status = "built", spec = "Tools.benchstat.Spec" },
+  { name = "refrain::pdf_raster_cache", file = "RefRain/src/views/editor/formats/pdf_raster_cache.ts", owns = "the byte-bounded cache of detached PDF page rasters", shape = "adapter", since = "CS27", status = "built", spec = "RefRain.Spec" },
+  { name = "refrain::pdf_document", file = "RefRain/src/views/editor/formats/pdf_document.ts", owns = "opening PDF documents, decoder resources and preview and full-detail worker lifetimes", shape = "adapter", since = "CS27", status = "built", spec = "RefRain.Spec" },
+  { name = "refrain::pdf_window", file = "RefRain/src/views/editor/formats/pdf_window.ts", owns = "the PDF viewport window and directional preview admission", shape = "decision", since = "CS27", status = "built", spec = "RefRain.Spec" },
 ]
 
 # What each family of modules is for. Keyed by the prefix its module

@@ -346,8 +346,8 @@ fn installResize() void {
     if (is_windows or resize_armed) return;
     var fds: [2]posix.fd_t = undefined;
     if (std.c.pipe(&fds) != 0) return;
-    setNonblock(fds[0]);
-    setNonblock(fds[1]);
+    _ = setNonblock(fds[0]);
+    _ = setNonblock(fds[1]);
     winch_read = fds[0];
     winch_write = fds[1];
     const mask = posix.sigemptyset();
@@ -360,14 +360,14 @@ fn installResize() void {
     resize_armed = true;
 }
 
-fn setNonblock(fd: posix.fd_t) void {
-    if (builtin.os.tag == .windows) return;
+fn setNonblock(fd: posix.fd_t) bool {
+    if (builtin.os.tag == .windows) return false;
     const get: c_int = 3;
     const set: c_int = 4;
     const nonblock: c_uint = if (builtin.os.tag == .macos) 0x0004 else 0o4000;
     const cur = std.c.fcntl(fd, get, @as(c_uint, 0));
-    if (cur < 0) return;
-    _ = std.c.fcntl(fd, set, @as(c_uint, @intCast(cur)) | nonblock);
+    if (cur < 0) return false;
+    return std.c.fcntl(fd, set, @as(c_uint, @intCast(cur)) | nonblock) >= 0;
 }
 
 fn wakeWinch(_: posix.SIG) callconv(.c) void {
@@ -483,6 +483,76 @@ fn wake(timeout_ms: i32) Wake {
 pub fn waitReadable(timeout_ms: i32) bool {
     if (is_windows) return waitReadableWindows(timeout_ms);
     return wake(timeout_ms) != .none;
+}
+
+pub const Notification = struct {
+    handle: if (is_windows) WinApi.HANDLE else [2]posix.fd_t,
+
+    pub fn init() Error!Notification {
+        if (comptime is_windows) {
+            return .{ .handle = WinApi.CreateEventW(null, .TRUE, .FALSE, null) orelse return error.Unexpected };
+        }
+        var fds: [2]posix.fd_t = undefined;
+        if (std.c.pipe(&fds) != 0) return error.Unexpected;
+        for (fds) |fd| {
+            if (!setNonblock(fd) or std.c.fcntl(fd, 2, @as(c_int, 1)) < 0) {
+                for (fds) |opened| _ = std.c.close(opened);
+                return error.Unexpected;
+            }
+        }
+        return .{ .handle = fds };
+    }
+
+    pub fn deinit(self: Notification) void {
+        if (comptime is_windows) {
+            _ = WinApi.CloseHandle(self.handle);
+        } else {
+            for (self.handle) |fd| _ = std.c.close(fd);
+        }
+    }
+
+    pub fn set(self: Notification) void {
+        if (comptime is_windows) {
+            _ = WinApi.SetEvent(self.handle);
+        } else {
+            const byte = [_]u8{1};
+            while (std.c.write(self.handle[1], &byte, 1) < 0) {
+                if (posix.errno(-1) != .INTR) break;
+            }
+        }
+    }
+
+    pub fn clear(self: Notification) void {
+        if (comptime is_windows) {
+            _ = WinApi.ResetEvent(self.handle);
+        } else {
+            var byte: [1]u8 = undefined;
+            _ = posix.read(self.handle[0], &byte) catch {};
+        }
+    }
+
+    pub fn wait(self: Notification, timeout_ms: i32) bool {
+        if (comptime is_windows) {
+            return WinApi.WaitForSingleObject(self.handle, windowsTimeout(timeout_ms)) == WinApi.WAIT_OBJECT_0;
+        }
+        var fds = [_]posix.pollfd{.{ .fd = self.handle[0], .events = posix.POLL.IN, .revents = 0 }};
+        return (posix.poll(&fds, timeout_ms) catch 0) > 0;
+    }
+};
+
+pub fn waitReadableOr(timeout_ms: i32, notice: Notification) bool {
+    if (comptime is_windows) {
+        const stdin = WinApi.stdHandle(WinApi.STD_INPUT_HANDLE) catch return false;
+        const handles = [_]WinApi.HANDLE{ stdin, notice.handle };
+        return WinApi.WaitForMultipleObjects(handles.len, &handles, .FALSE, windowsTimeout(timeout_ms)) == WinApi.WAIT_OBJECT_0;
+    }
+    var fds = [_]posix.pollfd{
+        .{ .fd = posix.STDIN_FILENO, .events = posix.POLL.IN, .revents = 0 },
+        .{ .fd = winch_read, .events = posix.POLL.IN, .revents = 0 },
+        .{ .fd = notice.handle[0], .events = posix.POLL.IN, .revents = 0 },
+    };
+    if ((posix.poll(&fds, timeout_ms) catch 0) <= 0) return false;
+    return fds[0].revents != 0 or fds[1].revents != 0;
 }
 
 fn windowsKey(unit: u16, mods: Modifiers) ?Event {
@@ -789,6 +859,11 @@ const WinApi = if (is_windows) struct {
         lpOverlapped: ?*anyopaque,
     ) callconv(.winapi) BOOL;
     extern "kernel32" fn WaitForSingleObject(hHandle: HANDLE, dwMilliseconds: DWORD) callconv(.winapi) DWORD;
+    extern "kernel32" fn WaitForMultipleObjects(count: DWORD, handles: [*]const HANDLE, all: BOOL, milliseconds: DWORD) callconv(.winapi) DWORD;
+    extern "kernel32" fn CreateEventW(attributes: ?*anyopaque, manual: BOOL, initial: BOOL, name: ?[*:0]const u16) callconv(.winapi) ?HANDLE;
+    extern "kernel32" fn SetEvent(handle: HANDLE) callconv(.winapi) BOOL;
+    extern "kernel32" fn ResetEvent(handle: HANDLE) callconv(.winapi) BOOL;
+    extern "kernel32" fn CloseHandle(handle: HANDLE) callconv(.winapi) BOOL;
     extern "kernel32" fn GetConsoleScreenBufferInfo(
         hConsoleOutput: HANDLE,
         lpConsoleScreenBufferInfo: *CONSOLE_SCREEN_BUFFER_INFO,
@@ -867,10 +942,13 @@ fn readStdinWindows(buf: []u8) Error!usize {
 fn waitReadableWindows(timeout_ms: i32) bool {
     if (comptime is_windows) {
         const in_h = WinApi.stdHandle(WinApi.STD_INPUT_HANDLE) catch return false;
-        const ms: u32 = if (timeout_ms < 0) WinApi.INFINITE else @intCast(timeout_ms);
-        return WinApi.WaitForSingleObject(in_h, ms) == WinApi.WAIT_OBJECT_0;
+        return WinApi.WaitForSingleObject(in_h, windowsTimeout(timeout_ms)) == WinApi.WAIT_OBJECT_0;
     }
     return false;
+}
+
+fn windowsTimeout(timeout_ms: i32) u32 {
+    return if (timeout_ms < 0) WinApi.INFINITE else @intCast(timeout_ms);
 }
 
 fn sizeWindows() Size {

@@ -14,6 +14,8 @@
 use std::cell::Cell;
 use std::collections::VecDeque;
 
+use crate::error::Error;
+
 use super::*;
 
 fn request() -> Value {

@@ -20,7 +20,6 @@ pub(super) const BUDGET: Duration = Duration::from_secs(900);
 
 const BUDGET_SECONDS: u64 = 900;
 const CONNECT_TIMEOUT_SECONDS: u64 = 10;
-const POLL: Duration = Duration::from_millis(50);
 
 pub(super) struct Deadline {
     at: Instant,
@@ -230,22 +229,9 @@ pub(super) fn run(
     })?;
     let stdout = child.stdout.take().map(read_pipe);
     let stderr = child.stderr.take().map(read_pipe);
-    let status = loop {
-        match child.try_wait() {
-            Ok(Some(status)) => break status,
-            Ok(None) => {}
-            Err(err) => {
-                stop(&mut child, action, subject)?;
-                return Err(failure(
-                    action,
-                    err.to_string(),
-                    "inspect the installer process and retry",
-                )
-                .at(subject));
-            }
-        }
-        let remaining = deadline.remaining();
-        if remaining.is_zero() {
+    let status = match crate::child_exit::wait(&mut child, deadline.remaining()) {
+        Ok(Some(status)) => status,
+        Ok(None) => {
             stop(&mut child, action, subject)?;
             return Err(failure(
                 action,
@@ -254,7 +240,15 @@ pub(super) fn run(
             )
             .at(subject));
         }
-        std::thread::sleep(POLL.min(remaining));
+        Err(err) => {
+            stop(&mut child, action, subject)?;
+            return Err(failure(
+                action,
+                err.to_string(),
+                "inspect the installer process and retry",
+            )
+            .at(subject));
+        }
     };
     let stdout = match stdout {
         Some(reader) => receive_pipe(reader, deadline, action, subject)?,
@@ -325,23 +319,20 @@ fn receive_pipe(
 }
 
 fn stop(child: &mut std::process::Child, action: &str, subject: &Path) -> Result<()> {
-    let killed = child.kill();
-    let waited = child.wait();
-    match (killed, waited) {
-        (Ok(()), Ok(_)) => Ok(()),
-        (Err(err), _) => Err(failure(
+    use crate::child_exit::TerminateError;
+
+    crate::child_exit::terminate(child).map_err(|error| {
+        let (stage, err) = match error {
+            TerminateError::Kill(err) => ("kill the installer", err),
+            TerminateError::Wait(err) => ("wait for the killed installer", err),
+        };
+        failure(
             action,
-            err.to_string(),
+            format!("{stage}: {err}"),
             "reap the installer before retrying",
         )
-        .at(subject)),
-        (Ok(()), Err(err)) => Err(failure(
-            action,
-            err.to_string(),
-            "reap the installer before retrying",
-        )
-        .at(subject)),
-    }
+        .at(subject)
+    })
 }
 
 fn check_status(output: Output, action: &str, subject: &Path) -> Result<Output> {

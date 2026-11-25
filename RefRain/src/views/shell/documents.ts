@@ -17,6 +17,8 @@ import {
 } from "../../core/workspace";
 import { ui } from "../../ui";
 import type { Address, Seq } from "../../wire";
+import { drawnAs } from "../editor/formats/format";
+import { preloadPdfReader } from "../editor/formats/pdf_loading";
 import {
   keepAttachment,
   requestedCitation,
@@ -192,6 +194,7 @@ export function workspaceDocuments(target: DocumentTarget) {
       .open(id, file)
       .then(async (record) => {
         if (request !== load) return;
+        if (drawnAs(record.path) === "pdf") preloadPdfReader();
         const previous = cache.get(id, record.id);
         const next = {
           workspace: id,
