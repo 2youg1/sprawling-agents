@@ -130,7 +130,10 @@ export function workspaceDocuments(target: DocumentTarget) {
           }),
         ),
       );
+      point = visit.pdfProgress(key);
+      const samePoint = point?.page === requested.page && point.offset === requested.offset;
       if (Result.isFailure(result)) {
+        if (!samePoint) continue;
         const current = opened();
         if (
           visible &&
@@ -142,8 +145,7 @@ export function workspaceDocuments(target: DocumentTarget) {
       }
       const record = result.success;
       if (visible) touch(file.workspace, record);
-      point = visit.pdfProgress(key);
-      if (point?.page === requested.page && point.offset === requested.offset) {
+      if (samePoint) {
         visit.clearPdfProgress(key);
         break;
       }

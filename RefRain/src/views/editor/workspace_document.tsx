@@ -22,14 +22,13 @@ import type { PreviewResource } from "./markdown_widgets";
 import { phrasesIn } from "./reading";
 import { WorkspacePreview, workspaceFormat } from "./workspace_preview";
 import { WorkspaceProposal } from "./workspace_proposal";
-import { writeRefusal } from "./workspace_receipt";
+import { writeRefusal, type WriteReceipt } from "./workspace_receipt";
 import {
   WorkspaceDocumentFeedback,
   WorkspaceDocumentStatus,
   WorkspaceDocumentTools,
   workspaceSelectionTools,
 } from "./workspace_document_tools";
-import type { WriteReceipt } from "./workspace_receipt";
 import {
   decodeWorkspaceText,
   encodeWorkspaceChanges,
@@ -223,6 +222,7 @@ export default function WorkspaceDocument(props: WorkspaceDocumentProps) {
     );
     busy = false;
     if (Result.isFailure(result)) {
+      saveDue = undefined;
       if (!alive) return;
       if (change === undefined) current.unsent();
       else current.readOnly(original.length > EDITABLE_BYTES_MAX);

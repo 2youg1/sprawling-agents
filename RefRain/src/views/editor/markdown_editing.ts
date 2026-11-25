@@ -6,7 +6,7 @@
 import { markdown } from "@codemirror/lang-markdown";
 import { syntaxTree } from "@codemirror/language";
 import { EditorSelection, StateEffect, StateField, Transaction } from "@codemirror/state";
-import type { EditorState, Extension, Range } from "@codemirror/state";
+import type { ChangeSpec, EditorState, Extension, Range } from "@codemirror/state";
 import { Decoration, EditorView, keymap, ViewPlugin } from "@codemirror/view";
 import type { DecorationSet, ViewUpdate } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
@@ -68,46 +68,77 @@ export const markdownShortcut = (format: MarkdownFormat): Chord => ({
   shift: format.shift,
 });
 
+function formatSpan(
+  state: EditorState,
+  format: MarkdownFormat,
+  from: number,
+  content: string,
+): ChangeSpec[] {
+  const to = from + content.length;
+  let node: SyntaxNode | null = syntaxTree(state).resolveInner(from, 1);
+  while (node !== null && node.name !== format.node) node = node.parent;
+  const first = node?.firstChild;
+  const last = node?.lastChild;
+  if (node !== null && first != null && last != null) {
+    const inner = state.sliceDoc(first.to, last.from);
+    const padded =
+      format.id === "code" && inner.startsWith(" ") && inner.endsWith(" ") && inner.trim() !== "";
+    const start = first.to + Number(padded);
+    const end = last.from - Number(padded);
+    if ((from === start && to === end) || (from === node.from && to === node.to)) {
+      return [
+        { from: first.from, to: start },
+        { from: end, to: last.to },
+      ];
+    }
+  }
+  let marker: string = format.marker;
+  let padding = "";
+  if (format.id === "code") {
+    for (const run of content.matchAll(/`+/gu)) {
+      if (run[0].length >= marker.length) marker = "`".repeat(run[0].length + 1);
+    }
+    if (content.startsWith("`") || content.endsWith("`")) padding = " ";
+  }
+  return [
+    { from, insert: marker + padding },
+    { from: to, insert: padding + marker },
+  ];
+}
+
 export function formatMarkdown(view: EditorView, format: MarkdownFormat): boolean {
   if (view.state.readOnly || view.compositionStarted) return false;
   const { state } = view;
-  const { marker } = format;
   const formatted = state.changeByRange((range) => {
-    const picked = state.doc.sliceString(range.from, range.to);
-    const trimmed = picked.trim();
-    if (!range.empty && trimmed === "") return { range };
-    const from = range.from + picked.length - picked.trimStart().length;
-    const to = from + trimmed.length;
-    let node: SyntaxNode | null = syntaxTree(state).resolveInner(from, 1);
-    while (node !== null && node.name !== format.node) node = node.parent;
-    const first = node?.firstChild;
-    const last = node?.lastChild;
-    const around = first != null && last != null && from === first.to && to === last.from;
-    const whole = node !== null && from === node.from && to === node.to;
-    const remove = !range.empty && first != null && last != null && (around || whole);
-    const selected = (left: number, right: number) =>
-      range.anchor <= range.head
-        ? EditorSelection.range(left, right)
-        : EditorSelection.range(right, left);
-    if (remove) {
+    if (range.empty) {
       return {
-        changes: [
-          { from: first.from, to: first.to },
-          { from: last.from, to: last.to },
-        ],
-        range: selected(first.from, last.from - (first.to - first.from)),
+        changes: { from: range.from, insert: format.marker + format.marker },
+        range: EditorSelection.cursor(range.from + format.marker.length),
       };
     }
+    const spans = state.sliceDoc(range.from, range.to).split(/(\n(?:[ \t]*\n)+)/u);
+    const edits: ChangeSpec[] = [];
+    let offset = range.from;
+    for (const span of spans) {
+      const start = span.trimStart();
+      const content = start.trimEnd();
+      if (content !== "")
+        edits.push(...formatSpan(state, format, offset + span.length - start.length, content));
+      offset += span.length;
+    }
+    const changes = state.changes(edits);
+    const wholeParagraphs = spans.length > 1;
+    const from = changes.mapPos(range.from, wholeParagraphs ? -1 : 1);
+    const to = changes.mapPos(range.to, wholeParagraphs ? 1 : -1);
     return {
-      changes: range.empty
-        ? { from, insert: marker + marker }
-        : [
-            { from, insert: marker },
-            { from: to, insert: marker },
-          ],
-      range: selected(from + marker.length, to + marker.length),
+      changes,
+      range:
+        range.anchor < range.head
+          ? EditorSelection.range(from, to)
+          : EditorSelection.range(to, from),
     };
   });
+  if (formatted.changes.empty) return false;
   view.dispatch({ ...formatted, scrollIntoView: true, userEvent: "input.format" });
   return true;
 }

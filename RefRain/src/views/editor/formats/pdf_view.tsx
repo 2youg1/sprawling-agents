@@ -115,10 +115,14 @@ export function PdfReading(props: ReadingProps) {
     const list = pages;
     if (view === undefined || list === undefined || availableWidth === 0) return;
     const page = Math.min(count(), Math.max(1, point.page));
+    const columns = pagesPerTurn(nextLayout);
+    if (nextLayout !== "continuous") {
+      const start = firstPdfPage(nextLayout, page);
+      pick.keepVisible((selected) => selected >= start && selected < start + columns);
+    }
     setPageAt(page);
     setLayout(nextLayout);
     setScale(nextScale);
-    const columns = pagesPerTurn(nextLayout);
     const gap = Number.parseFloat(getComputedStyle(list).columnGap) || 0;
     setWidth((Math.max(1, (availableWidth - (columns - 1) * gap) / columns) * nextScale) / 100);
     flush();

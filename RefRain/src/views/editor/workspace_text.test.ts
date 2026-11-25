@@ -31,9 +31,15 @@ describe("registered workspace text", () => {
     const baseline = decodeWorkspaceText("base", original);
     expect(baseline?.editor).toBe("😀\n乙");
     if (baseline === null) return;
-    const changes = [{ from: 0, to: 2, insert: "甲" }];
+    const changes = [
+      { from: 0, to: 2, insert: "甲\n丙" },
+      { from: 3, to: 4, insert: "" },
+    ];
     const edited = encodeWorkspaceChanges(original, baseline, changes);
-    expect(edited).toEqual(Uint8Array.of(0xfe, 0xff, 0x75, 0x32, 0x00, 0x0d, 0x4e, 0x59));
+    expect(edited).toEqual(
+      Uint8Array.of(0xfe, 0xff, 0x75, 0x32, 0x00, 0x0d, 0x4e, 0x19, 0x00, 0x0d),
+    );
+    expect(workspaceDraftBytes(original.length, baseline, [])).toBe(original.length);
     expect(workspaceDraftBytes(original.length, baseline, changes)).toBe(edited.length);
     expect(workspaceLineBytes("甲😀", baseline.encoding)).toBe(6);
   });
