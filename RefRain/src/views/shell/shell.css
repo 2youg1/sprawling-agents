@@ -8,7 +8,9 @@
   --refrain-rail-size: max(44px, var(--spacing-key));
   --refrain-rail-gap: var(--spacing-snug);
   --refrain-rail-height: calc(4 * var(--refrain-rail-size) + 3 * var(--refrain-rail-gap));
-  --refrain-rail-left: max(var(--refrain-rail-inset), env(safe-area-inset-left));
+  --refrain-rail-left: calc(
+    max(var(--refrain-rail-inset), env(safe-area-inset-left)) + var(--spacing-hair)
+  );
   --refrain-rail-bottom: max(var(--refrain-rail-inset), env(safe-area-inset-bottom));
   --refrain-menu-bottom: calc(
     var(--refrain-rail-bottom) + var(--refrain-rail-height) + var(--refrain-rail-gap)
@@ -129,6 +131,11 @@
 .refrain-navigation[aria-hidden="true"] {
   visibility: hidden;
   pointer-events: none;
+}
+
+.refrain-workspace[data-subject="files"]:not([data-split])
+  > .refrain-canvas:has([data-refrain-file-editor]) {
+  grid-column-start: 1;
 }
 
 .refrain-workspace[data-split] > .refrain-canvas {

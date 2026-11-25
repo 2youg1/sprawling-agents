@@ -3,20 +3,18 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import { lazy, Loading, Match, Show, Switch } from "solid-js";
+import { lazy, Loading, Match, Show, Switch, untrack } from "solid-js";
 
 import { say, type Lang } from "../../core/lang";
 import type { Stretch } from "../../core/stretches";
 import type { Seq } from "../../wire";
+import { PdfLoading } from "../editor/formats/pdf_loading";
 import { AttachmentTarget } from "./attachment_target";
 import { scopedId } from "./chrome";
 import type { WorkspaceDocuments } from "./documents";
 import { cacheKey, type OpenedFile } from "./file_cache";
 import { WorkspaceFailure } from "./workspace_failure";
 
-const Pdf = lazy(() =>
-  import("../editor/formats/pdf_view").then(({ PdfView }) => ({ default: PdfView })),
-);
 const TextDocument = lazy(() => import("../editor/workspace_document"));
 
 interface FileProps {
@@ -61,6 +59,7 @@ function FileHeader(props: FileProps) {
 }
 
 function FormatFile(props: FileProps) {
+  const registered = untrack(() => props.file);
   const textRange = () => {
     const selection = props.docs.revealed();
     return selection?.kind === "markdown" ? selection : undefined;
@@ -83,14 +82,14 @@ function FormatFile(props: FileProps) {
       >
         <Switch>
           <Match when={props.file.record.path.toLowerCase().endsWith(".pdf")}>
-            <Pdf
+            <PdfLoading
               bytes={props.file.bytes}
               name={props.file.record.path}
               version={props.file.record.version}
               lang={props.lang}
               progress={props.docs.remembered() ?? null}
               reference={pdfRange()}
-              onProgress={(point) => props.docs.progress(props.file, point)}
+              onProgress={(point) => props.docs.progress(registered, point)}
               onSelection={(range) => props.docs.attach(props.file, range, range.version)}
             />
           </Match>

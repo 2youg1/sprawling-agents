@@ -87,6 +87,38 @@
     "en": "Preview a Session background and adjust reading brightness. Apply keeps both on this device.",
     "zh": "预览会话背景并调整阅读亮度。应用后，两项设置保存在此设备。"
   },
+  "file_appearance": {
+    "en": "File editor appearance",
+    "zh": "文件编辑器外观"
+  },
+  "file_share_wallpaper": {
+    "en": "Use Session wallpaper in the file editor",
+    "zh": "将会话壁纸用于文件编辑器"
+  },
+  "file_palette": {
+    "en": "File editor palette",
+    "zh": "文件编辑配色"
+  },
+  "file_palette_inherit": {
+    "en": "Match workspace theme",
+    "zh": "跟随工作区主题"
+  },
+  "file_palette_paper": {
+    "en": "Warm Paper",
+    "zh": "暖纸"
+  },
+  "file_palette_mist": {
+    "en": "Blue Mist",
+    "zh": "蓝雾"
+  },
+  "file_palette_slate": {
+    "en": "Soft Slate",
+    "zh": "柔灰"
+  },
+  "file_palette_moss": {
+    "en": "Moss",
+    "zh": "苔绿"
+  },
   "wallpaper_solid": {
     "en": "Solid",
     "zh": "纯色"
@@ -1267,6 +1299,30 @@
     "en": "Live rendering",
     "zh": "实时渲染"
   },
+  "refrain_bold": {
+    "en": "Bold",
+    "zh": "加粗"
+  },
+  "refrain_italic": {
+    "en": "Italic",
+    "zh": "斜体"
+  },
+  "refrain_strike": {
+    "en": "Strikethrough",
+    "zh": "删除线"
+  },
+  "refrain_inline_code": {
+    "en": "Inline code",
+    "zh": "行内代码"
+  },
+  "refrain_blake3": {
+    "en": "BLAKE3 {hash}",
+    "zh": "BLAKE3 校验值 {hash}"
+  },
+  "refrain_byte_count": {
+    "en": "File {total} bytes · Line {line} bytes",
+    "zh": "全文 {total} 字节 · 本行 {line} 字节"
+  },
   "refrain_diagram": {
     "en": "Mermaid diagram",
     "zh": "Mermaid 图表"
@@ -1626,6 +1682,34 @@
   "pdf_one_page": {
     "en": "1 page",
     "zh": "1 页"
+  },
+  "pdf_layout": {
+    "en": "View",
+    "zh": "视图"
+  },
+  "pdf_layout_strip": {
+    "en": "Continuous strip",
+    "zh": "条形阅读"
+  },
+  "pdf_layout_book": {
+    "en": "Book spread",
+    "zh": "书籍视图"
+  },
+  "pdf_layout_single": {
+    "en": "Single page",
+    "zh": "单页视图"
+  },
+  "pdf_reader_scale": {
+    "en": "Zoom",
+    "zh": "缩放"
+  },
+  "pdf_previous_page": {
+    "en": "Previous page",
+    "zh": "上一页"
+  },
+  "pdf_next_page": {
+    "en": "Next page",
+    "zh": "下一页"
   },
   "pdf_zoom": {
     "en": "Magnify page",

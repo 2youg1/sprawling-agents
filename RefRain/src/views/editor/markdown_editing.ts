@@ -5,9 +5,9 @@
 
 import { markdown } from "@codemirror/lang-markdown";
 import { syntaxTree } from "@codemirror/language";
-import { StateEffect, StateField, Transaction } from "@codemirror/state";
+import { EditorSelection, StateEffect, StateField, Transaction } from "@codemirror/state";
 import type { EditorState, Extension, Range } from "@codemirror/state";
-import { Decoration, EditorView, ViewPlugin } from "@codemirror/view";
+import { Decoration, EditorView, keymap, ViewPlugin } from "@codemirror/view";
 import type { DecorationSet, ViewUpdate } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
 import { GFM } from "@lezer/markdown";
@@ -21,11 +21,100 @@ import {
   webLink,
 } from "./markdown_widgets";
 import type { PreviewResource } from "./markdown_widgets";
+import type { Chord } from "../../core/keys";
+import type { Key } from "../../core/lang";
 
 export type MarkdownMode = "source" | "live";
 
+export const MARKDOWN_FORMATS = [
+  {
+    id: "bold",
+    label: "refrain_bold",
+    key: "b",
+    shift: false,
+    marker: "**",
+    node: "StrongEmphasis",
+  },
+  { id: "italic", label: "refrain_italic", key: "i", shift: false, marker: "*", node: "Emphasis" },
+  {
+    id: "strike",
+    label: "refrain_strike",
+    key: "x",
+    shift: true,
+    marker: "~~",
+    node: "Strikethrough",
+  },
+  {
+    id: "code",
+    label: "refrain_inline_code",
+    key: "c",
+    shift: true,
+    marker: "`",
+    node: "InlineCode",
+  },
+] as const satisfies readonly {
+  readonly id: string;
+  readonly label: Key;
+  readonly key: string;
+  readonly shift: boolean;
+  readonly marker: string;
+  readonly node: string;
+}[];
+
+export type MarkdownFormat = (typeof MARKDOWN_FORMATS)[number];
+export const markdownShortcut = (format: MarkdownFormat): Chord => ({
+  accel: true,
+  key: format.key,
+  shift: format.shift,
+});
+
+export function formatMarkdown(view: EditorView, format: MarkdownFormat): boolean {
+  if (view.state.readOnly || view.compositionStarted) return false;
+  const { state } = view;
+  const { marker } = format;
+  const formatted = state.changeByRange((range) => {
+    const picked = state.doc.sliceString(range.from, range.to);
+    const trimmed = picked.trim();
+    if (!range.empty && trimmed === "") return { range };
+    const from = range.from + picked.length - picked.trimStart().length;
+    const to = from + trimmed.length;
+    let node: SyntaxNode | null = syntaxTree(state).resolveInner(from, 1);
+    while (node !== null && node.name !== format.node) node = node.parent;
+    const first = node?.firstChild;
+    const last = node?.lastChild;
+    const around = first != null && last != null && from === first.to && to === last.from;
+    const whole = node !== null && from === node.from && to === node.to;
+    const remove = !range.empty && first != null && last != null && (around || whole);
+    const selected = (left: number, right: number) =>
+      range.anchor <= range.head
+        ? EditorSelection.range(left, right)
+        : EditorSelection.range(right, left);
+    if (remove) {
+      return {
+        changes: [
+          { from: first.from, to: first.to },
+          { from: last.from, to: last.to },
+        ],
+        range: selected(first.from, last.from - (first.to - first.from)),
+      };
+    }
+    return {
+      changes: range.empty
+        ? { from, insert: marker + marker }
+        : [
+            { from, insert: marker },
+            { from: to, insert: marker },
+          ],
+      range: selected(from + marker.length, to + marker.length),
+    };
+  });
+  view.dispatch({ ...formatted, scrollIntoView: true, userEvent: "input.format" });
+  return true;
+}
+
 export interface MarkdownOptions {
   readonly diagramLabel: string;
+  readonly initialMode?: MarkdownMode;
   readonly readResource?: PreviewResource | undefined;
 }
 
@@ -93,8 +182,28 @@ const SOURCE_MARKERS = new Set([
   "TableDelimiter",
 ]);
 
-function selectionTouches(state: EditorState, node: SyntaxNode): boolean {
-  return state.selection.ranges.some((range) => range.from <= node.to && range.to >= node.from);
+interface Span {
+  readonly from: number;
+  readonly to: number;
+}
+
+function overlaps(left: Span, right: Span): boolean {
+  return left.from < right.to && right.from < left.to;
+}
+
+function markOutsideSource(
+  out: Range<Decoration>[],
+  node: SyntaxNode,
+  source: readonly Span[],
+  mark: Decoration,
+): void {
+  let from = node.from;
+  for (const raw of source) {
+    if (!overlaps(node, raw)) continue;
+    if (from < raw.from) out.push(mark.range(from, raw.from));
+    from = Math.max(from, raw.to);
+  }
+  if (from < node.to) out.push(mark.range(from, node.to));
 }
 
 function documentText(state: EditorState, node: SyntaxNode): string {
@@ -153,25 +262,33 @@ function drawNode(
   out: Range<Decoration>[],
   state: EditorState,
   node: SyntaxNode,
-  live: boolean,
+  mode: MarkdownMode,
+  source: readonly Span[],
+  viewport: Viewport,
   options: MarkdownOptions,
 ): void {
-  if (node.from === node.to) return;
+  if (node.from === node.to || !overlaps(node, viewport)) return;
   const name = node.name;
+  const live = mode === "live";
+  const renderHere = live && !source.some((range) => overlaps(range, node));
   if (SOURCE_MARKERS.has(name)) {
-    const hide = live && name !== "QuoteMark" && name !== "ListMark" && name !== "CodeMark";
+    const hide =
+      renderHere &&
+      name !== "QuoteMark" &&
+      name !== "ListMark" &&
+      (name !== "CodeMark" || node.parent?.name === "InlineCode");
     out.push((hide ? HIDDEN : MARKER).range(node.from, node.to));
     return;
   }
   if (live) {
-    const widget = terminal(state, node, options);
+    const widget = renderHere ? terminal(state, node, options) : null;
     if (widget !== null) {
       out.push(widget.range(node.from, node.to));
       return;
     }
     const heading = /^(?:ATX|Setext)Heading([1-6])$/u.exec(name)?.[1];
-    if (heading !== undefined) {
-      const line = state.doc.lineAt(node.from);
+    const line = heading === undefined ? null : state.doc.lineAt(node.from);
+    if (line !== null && heading !== undefined && !source.some((range) => overlaps(range, line))) {
       out.push(
         Decoration.line({
           class: `cm-markdown-heading cm-markdown-heading-${heading}`,
@@ -180,29 +297,31 @@ function drawNode(
       );
     }
     const mark = INLINE[name];
-    if (mark !== undefined) out.push(Decoration.mark(mark).range(node.from, node.to));
+    if (mark !== undefined) markOutsideSource(out, node, source, Decoration.mark(mark));
     if (name === "Link" || name === "Autolink") {
       const target = targetOf(state, node);
       const href = target === null ? null : webLink(target);
       if (href !== null)
-        out.push(
+        markOutsideSource(
+          out,
+          node,
+          source,
           Decoration.mark({
             tagName: "a",
             class: "cm-markdown-link",
             attributes: { href, rel: "noopener noreferrer", target: "_blank", tabindex: "-1" },
-          }).range(node.from, node.to),
+          }),
         );
       const title = node.getChild("LinkTitle");
-      if (title !== null) out.push(HIDDEN.range(title.from, title.to));
+      if (title !== null) markOutsideSource(out, title, source, HIDDEN);
       const url = node.getChild("URL");
-      if (url !== null && name === "Link") out.push(HIDDEN.range(url.from, url.to));
+      if (url !== null && name === "Link") markOutsideSource(out, url, source, HIDDEN);
     }
   }
-  for (const child of children(node)) {
-    const hideCodeMark = live && name === "InlineCode" && child.name === "CodeMark";
-    if (hideCodeMark) out.push(HIDDEN.range(child.from, child.to));
-    else drawNode(out, state, child, live, options);
-  }
+  const childMode =
+    live && !renderHere && (name === "Table" || name === "DisplayMath") ? "source" : mode;
+  for (const child of children(node))
+    drawNode(out, state, child, childMode, source, viewport, options);
 }
 
 function decorationSet(
@@ -212,13 +331,16 @@ function decorationSet(
   options: MarkdownOptions,
 ): DecorationSet {
   const out: Range<Decoration>[] = [];
+  const source = state.selection.ranges.map(({ from, to }) => ({
+    from: state.doc.lineAt(from).from,
+    to: state.doc.lineAt(to).to + 1,
+  }));
   syntaxTree(state).iterate({
     from: viewport.from,
     to: viewport.to,
     enter(ref) {
       if (ref.name === "Document") return true;
-      const node = ref.node;
-      drawNode(out, state, node, mode === "live" && !selectionTouches(state, node), options);
+      drawNode(out, state, ref.node, mode, source, viewport, options);
       return false;
     },
   });
@@ -229,11 +351,8 @@ export function markdownEditing(options: MarkdownOptions): Extension {
   const drawing = StateField.define<Drawing>({
     create(state) {
       const viewport = { from: 0, to: 0 };
-      return {
-        mode: "source",
-        viewport,
-        decorations: decorationSet(state, "source", viewport, options),
-      };
+      const mode = options.initialMode ?? "source";
+      return { mode, viewport, decorations: decorationSet(state, mode, viewport, options) };
     },
     update(old, tx) {
       if (tx.isUserEvent("input.type.compose")) {
@@ -282,7 +401,7 @@ export function markdownEditing(options: MarkdownOptions): Extension {
       update(update: ViewUpdate): void {
         if (update.viewportChanged) this.refresh();
       }
-      refresh(): void {
+      refresh(force = false): void {
         if (this.queued) return;
         this.queued = true;
         queueMicrotask(() => {
@@ -290,7 +409,7 @@ export function markdownEditing(options: MarkdownOptions): Extension {
           if (!this.current || this.view.compositionStarted) return;
           const want = this.view.viewport;
           const old = this.view.state.field(drawing).viewport;
-          if (old.from !== want.from || old.to !== want.to)
+          if (force || old.from !== want.from || old.to !== want.to)
             this.view.dispatch({
               effects: scrolled.of(want),
               annotations: Transaction.addToHistory.of(false),
@@ -306,9 +425,15 @@ export function markdownEditing(options: MarkdownOptions): Extension {
     markdown({ extensions: [GFM, MATH] }),
     drawing,
     viewport,
+    keymap.of(
+      MARKDOWN_FORMATS.map((format) => ({
+        key: `Mod-${format.shift ? "Shift-" : ""}${format.key}`,
+        run: (view) => formatMarkdown(view, format),
+      })),
+    ),
     EditorView.domEventHandlers({
       compositionend(_event, view) {
-        queueMicrotask(() => view.plugin(viewport)?.refresh());
+        requestAnimationFrame(() => view.plugin(viewport)?.refresh(true));
         return false;
       },
       click(event) {

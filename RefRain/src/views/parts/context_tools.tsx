@@ -5,7 +5,9 @@
 
 import { Portal, type JSX } from "@solidjs/web";
 import { For, Show, createEffect, createSignal, onCleanup, onSettled } from "solid-js";
+import { matches, type Chord } from "../../core/keys";
 import { say, type Lang } from "../../core/lang";
+import { pressedOf } from "../../core/press";
 import { ContextRow, opens, wanted } from "./context_tool_row";
 import type { GlyphName } from "./glyph";
 import Glyph from "./glyph.solid";
@@ -33,6 +35,7 @@ export interface ContextTool {
   readonly id: string;
   readonly label: string;
   readonly glyph?: GlyphName;
+  readonly shortcut?: Chord;
   readonly checked?: boolean | (() => boolean);
   readonly disabled?: boolean | (() => boolean);
   readonly children?: readonly ContextTool[];
@@ -271,6 +274,20 @@ function ContextSurface(props: Props) {
       return;
     }
     if (level()?.panel !== undefined) return;
+    const shortcut = event.isComposing
+      ? undefined
+      : level()?.tools.find(
+          (tool) =>
+            tool.shortcut !== undefined &&
+            !wanted(tool.disabled) &&
+            matches(tool.shortcut, pressedOf(event)),
+        );
+    if (shortcut !== undefined) {
+      event.preventDefault();
+      event.stopPropagation();
+      props.controller.enter(shortcut);
+      return;
+    }
     if (
       event.key === "ArrowRight" &&
       index >= 0 &&

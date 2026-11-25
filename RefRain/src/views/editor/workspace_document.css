@@ -4,14 +4,25 @@
  * Copyright (c) 2026 2youg1 and the sprawling contributors */
 
 .workspace-document {
+  --workspace-editor-available: calc(100% - 2 * var(--workspace-editor-margin, 0px));
+  --workspace-editor-width: min(var(--workspace-editor-available), var(--container-measure));
   position: relative;
   display: flex;
   flex-direction: column;
   min-block-size: 0;
   block-size: 100%;
   inline-size: 100%;
-  background: var(--color-reading-canvas, var(--color-page));
+  background-color: var(--color-reading-canvas, var(--color-page));
   color: var(--color-text);
+}
+
+@container shell (inline-size >= 768px) {
+  .refrain-workspace .workspace-document {
+    --workspace-editor-width: min(
+      var(--workspace-editor-available),
+      calc(var(--silver-side) * var(--silver) - var(--spacing-gutter))
+    );
+  }
 }
 
 .workspace-document-tools {
@@ -21,14 +32,11 @@
   align-items: center;
   padding: var(--spacing-tight) var(--spacing-pane);
   border-block-end: 1px solid var(--color-edge);
+  background: var(--color-reading-canvas, var(--color-page));
   font-size: var(--text-note);
 }
 
-:where(
-  .workspace-document-tools button,
-  .workspace-selection-menu button,
-  .workspace-document-error button
-) {
+:where(.workspace-document-tools button, .workspace-document-error button) {
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-tight);
@@ -58,7 +66,7 @@
 
 .workspace-document-version {
   font-family: var(--font-mono);
-  color: var(--color-text-quiet);
+  color: var(--color-file-metadata, var(--color-text-quiet));
 }
 
 .workspace-editor-host,
@@ -69,6 +77,31 @@
   background: var(--color-reading-canvas, var(--color-page));
 }
 
+.workspace-document-tools,
+.workspace-editor-host,
+.workspace-document-status {
+  inline-size: var(--workspace-editor-width);
+  margin-inline: auto;
+}
+
+.workspace-document-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-tight) var(--spacing-base);
+  padding: var(--spacing-tight) var(--spacing-snug);
+  background: var(--color-reading-canvas, var(--color-page));
+  color: var(--color-file-metadata, var(--color-text-quiet));
+  font-size: var(--text-note);
+  border-block-start: 1px solid var(--color-edge);
+}
+
+@container shell (inline-size < 768px) {
+  .workspace-document-status {
+    padding-inline-start: calc(var(--refrain-rail-size) + var(--spacing-snug));
+  }
+}
+
 .workspace-editor-host .cm-editor {
   block-size: 100%;
   color: var(--color-text);
@@ -77,11 +110,12 @@
 
 .workspace-editor-host .cm-scroller {
   font: var(--text-body) / var(--leading-read) var(--font-mono);
+  scrollbar-gutter: stable;
 }
 
 .workspace-editor-host .cm-gutters {
   background: var(--color-reading-canvas, var(--color-page));
-  color: var(--color-text-faint);
+  color: var(--color-file-metadata, var(--color-text-faint));
   border-color: var(--color-edge);
 }
 
@@ -89,17 +123,55 @@
   background: var(--color-raised);
 }
 
+.workspace-editor-host .cm-editor:has(.cm-selectionBackground) .cm-activeLine {
+  background: transparent;
+}
+
+@media (forced-colors: active) {
+  .workspace-editor-host .cm-editor > .cm-scroller > .cm-selectionLayer .cm-selectionBackground {
+    forced-color-adjust: none;
+    box-shadow: inset 0 calc(-1 * var(--spacing-hair)) Highlight;
+  }
+}
+
 .workspace-editor-host .cm-content {
+  min-inline-size: 0;
   caret-color: var(--color-accent);
+}
+
+.workspace-editor-host .cm-line {
+  overflow-wrap: anywhere;
+  line-break: strict;
+}
+
+.workspace-editor-host .cm-content :is(strong, em) {
+  font-synthesis: weight style;
+}
+
+.workspace-editor-host .cm-content strong {
+  font-weight: var(--font-weight-heading);
+}
+
+.workspace-editor-host .cm-content em {
+  font-style: italic;
+}
+
+.workspace-editor-host .cm-content s {
+  text-decoration: line-through;
+}
+
+.workspace-editor-host .cm-editor .cm-dropCursor {
+  border-inline-start: var(--spacing-hair) solid var(--color-accent);
+  pointer-events: none;
 }
 
 .workspace-editor-host .cm-cursor {
   border-inline-start-color: var(--color-accent);
 }
 
-.workspace-editor-host .cm-content ::selection,
-.workspace-editor-host .cm-editor .cm-selectionBackground {
+.workspace-editor-host .cm-editor > .cm-scroller > .cm-selectionLayer .cm-selectionBackground {
   background: var(--color-raised-hover);
+  box-shadow: inset 0 calc(-1 * var(--spacing-hair)) var(--color-file-selection-edge, transparent);
 }
 
 .workspace-format-preview {
@@ -135,24 +207,6 @@
   padding: var(--spacing-tight) var(--spacing-pane);
 }
 
-.workspace-selection-backdrop,
-.workspace-selection-menu {
-  position: fixed;
-  z-index: var(--layer-popover);
-}
-
-.workspace-selection-backdrop {
-  inset: 0;
-}
-
-.workspace-selection-menu {
-  max-width: calc(100vw - 2 * var(--spacing-pane));
-  padding: var(--spacing-tight);
-  border: 1px solid var(--color-edge-input);
-  border-radius: var(--radius-control);
-  background: var(--color-raised);
-}
-
 .cm-markdown-marker {
   color: var(--color-markdown-marker, var(--color-text-quiet));
 }
@@ -168,7 +222,7 @@
 }
 
 .cm-markdown-link {
-  color: var(--color-accent);
+  color: var(--color-markdown-link, var(--color-accent));
   text-decoration: underline;
 }
 

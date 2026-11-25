@@ -4,7 +4,13 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { describe, expect, test } from "bun:test";
-import { decodeWorkspaceText, encodeWorkspaceChanges, proposalBlock } from "./workspace_text";
+import {
+  decodeWorkspaceText,
+  encodeWorkspaceChanges,
+  proposalBlock,
+  workspaceDraftBytes,
+  workspaceLineBytes,
+} from "./workspace_text";
 
 describe("registered workspace text", () => {
   test("keeps a UTF-8 BOM and untouched mixed line endings", () => {
@@ -13,10 +19,11 @@ describe("registered workspace text", () => {
     const baseline = decodeWorkspaceText("base", original);
     expect(baseline?.editor).toBe("甲\n乙\n丙\n丁");
     if (baseline === null) return;
-    const edited = encodeWorkspaceChanges(original, baseline, [
-      { from: 2, to: 3, insert: "戊\n己" },
-    ]);
+    const changes = [{ from: 2, to: 3, insert: "戊\n己" }];
+    const edited = encodeWorkspaceChanges(original, baseline, changes);
     expect(edited).toEqual(encoder.encode("\uFEFF甲\r\n戊\r\n己\n丙\r丁"));
+    expect(workspaceDraftBytes(original.length, baseline, changes)).toBe(edited.length);
+    expect(workspaceLineBytes("甲😀", baseline.encoding)).toBe(7);
   });
 
   test("keeps UTF-16 byte order and puts replacements on encoded boundaries", () => {
@@ -24,8 +31,11 @@ describe("registered workspace text", () => {
     const baseline = decodeWorkspaceText("base", original);
     expect(baseline?.editor).toBe("😀\n乙");
     if (baseline === null) return;
-    const edited = encodeWorkspaceChanges(original, baseline, [{ from: 0, to: 2, insert: "甲" }]);
+    const changes = [{ from: 0, to: 2, insert: "甲" }];
+    const edited = encodeWorkspaceChanges(original, baseline, changes);
     expect(edited).toEqual(Uint8Array.of(0xfe, 0xff, 0x75, 0x32, 0x00, 0x0d, 0x4e, 0x59));
+    expect(workspaceDraftBytes(original.length, baseline, changes)).toBe(edited.length);
+    expect(workspaceLineBytes("甲😀", baseline.encoding)).toBe(6);
   });
 
   test("refuses opaque or invalid sequences", () => {

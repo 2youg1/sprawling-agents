@@ -59,6 +59,69 @@
   --wallpaper-preview-size: 96px;
 }
 
+:root[data-file-wallpaper] [data-refrain-file-editor] {
+  --workspace-editor-margin: var(--spacing-snug);
+  background-image: var(--refrain-wallpaper-image);
+  background-position: center;
+  background-size: cover;
+}
+
+:root[data-file-palette="paper"] [data-refrain-file-editor] {
+  --file-paper: oklch(0.939 calc(0.029 * var(--chroma)) 83);
+  --file-ink: oklch(0.145 calc(0.015 * var(--chroma)) 61);
+  --file-link: oklch(0.155 calc(0.026 * var(--chroma)) 54);
+  --file-selection: oklch(0.927 calc(0.053 * var(--chroma)) 88);
+  --file-accent: oklch(0.43 calc(0.10 * var(--chroma)) 52);
+  color-scheme: light;
+}
+
+:root[data-file-palette="mist"] [data-refrain-file-editor] {
+  --file-paper: oklch(0.935 calc(0.024 * var(--chroma)) 236);
+  --file-ink: oklch(0.145 calc(0.018 * var(--chroma)) 244);
+  --file-link: oklch(0.155 calc(0.037 * var(--chroma)) 251);
+  --file-selection: oklch(0.927 calc(0.05 * var(--chroma)) 232);
+  --file-accent: oklch(0.42 calc(0.12 * var(--chroma)) 247);
+  color-scheme: light;
+}
+
+:root[data-file-palette="slate"] [data-refrain-file-editor] {
+  --file-paper: oklch(0.265 calc(0.022 * var(--chroma)) 255);
+  --file-ink: oklch(0.955 calc(0.015 * var(--chroma)) 239);
+  --file-link: oklch(0.958 calc(0.025 * var(--chroma)) 230);
+  --file-selection: oklch(0.321 calc(0.065 * var(--chroma)) 254);
+  --file-accent: oklch(0.755 calc(0.105 * var(--chroma)) 239);
+  color-scheme: dark;
+}
+
+:root[data-file-palette="moss"] [data-refrain-file-editor] {
+  --file-paper: oklch(0.285 calc(0.031 * var(--chroma)) 146);
+  --file-ink: oklch(0.965 calc(0.018 * var(--chroma)) 115);
+  --file-link: oklch(0.965 calc(0.036 * var(--chroma)) 128);
+  --file-selection: oklch(0.337 calc(0.063 * var(--chroma)) 146);
+  --file-accent: oklch(0.79 calc(0.11 * var(--chroma)) 138);
+  color-scheme: dark;
+}
+
+:root[data-file-palette]:not([data-file-palette="inherit"]) [data-refrain-file-editor] {
+  --file-reading-spread: 0.02;
+  --color-reading-canvas: oklch(
+    from var(--file-paper) calc(l + (var(--reading-level) - 0.5) * var(--file-reading-spread)) c h
+  );
+  --color-page: var(--file-paper);
+  --color-text: var(--file-ink);
+  --color-text-quiet: color-mix(in oklch, var(--file-ink) 92%, var(--file-paper));
+  --color-text-faint: color-mix(in oklch, var(--file-ink) 84%, var(--file-paper));
+  --color-raised: color-mix(in oklch, var(--file-paper) 98.5%, var(--file-ink));
+  --color-raised-hover: var(--file-selection);
+  --color-edge: color-mix(in oklch, var(--file-paper) 75%, var(--file-ink));
+  --color-edge-input: color-mix(in oklch, var(--file-paper) 52%, var(--file-ink));
+  --color-accent: var(--file-accent);
+  --color-markdown-marker: var(--file-link);
+  --color-markdown-link: var(--file-link);
+  --color-file-metadata: var(--color-text);
+  --color-file-selection-edge: var(--file-accent);
+}
+
 @media (forced-colors: active) {
   :root,
   :root[data-theme="light"] {
@@ -68,7 +131,23 @@
   }
 
   [data-refrain-session-shell],
-  [data-refrain-wallpaper-preview] {
+  [data-refrain-wallpaper-preview],
+  :root[data-file-wallpaper] [data-refrain-file-editor] {
+    --workspace-editor-margin: 0px;
     background-image: none;
+  }
+
+  :root[data-file-palette]:not([data-file-palette="inherit"]) [data-refrain-file-editor] {
+    --file-paper: Canvas;
+    --file-ink: CanvasText;
+    --file-link: LinkText;
+    --file-accent: Highlight;
+    --color-reading-canvas: Canvas;
+    --color-raised: Canvas;
+    --color-raised-hover: Canvas;
+    --color-text-quiet: CanvasText;
+    --color-text-faint: GrayText;
+    --color-edge: CanvasText;
+    --color-edge-input: CanvasText;
   }
 }

@@ -9,6 +9,7 @@ import { fill, say, type Key, type Lang } from "../../core/lang";
 import { RenderSnippet, type Snippet } from "../../core/snippet";
 import {
   BRIGHTNESS,
+  FILE_PALETTES,
   WALLPAPER_ACCEPT,
   WALLPAPER_EDGE,
   WALLPAPER_MIB,
@@ -141,6 +142,14 @@ export default function Wallpaper(props: Props) {
     });
   }
 
+  const paletteWords = {
+    inherit: "file_palette_inherit",
+    paper: "file_palette_paper",
+    mist: "file_palette_mist",
+    slate: "file_palette_slate",
+    moss: "file_palette_moss",
+  } as const;
+
   const controls: Snippet = () => (
     <div class="grid gap-snug items-start">
       <fieldset class="flex flex-wrap items-center gap-tight" disabled={busy()}>
@@ -202,6 +211,33 @@ export default function Wallpaper(props: Props) {
           <span class="text-body text-text">{said("wallpaper_canvas")}</span>
         </div>
       </div>
+      <fieldset class="flex flex-wrap items-center gap-base" disabled={busy()}>
+        <legend class="sr-only">{said("file_appearance")}</legend>
+        <label class="inline-flex items-center gap-tight">
+          <input
+            type="checkbox"
+            checked={held()?.look.choice.fileWallpaper === true}
+            onChange={(event) => settings.fileWallpaper(event.currentTarget.checked)}
+          />
+          {said("file_share_wallpaper")}
+        </label>
+        <label class="inline-flex flex-wrap items-center gap-tight">
+          {said("file_palette")}
+          <select
+            data-control="surface"
+            onChange={(event) => settings.filePalette(event.currentTarget.value)}
+          >
+            {FILE_PALETTES.map((palette) => (
+              <option
+                value={palette}
+                selected={(held()?.look.choice.filePalette ?? "inherit") === palette}
+              >
+                {said(paletteWords[palette])}
+              </option>
+            ))}
+          </select>
+        </label>
+      </fieldset>
       <Show when={held()}>
         {(current) => (
           <fieldset disabled={current().busy}>

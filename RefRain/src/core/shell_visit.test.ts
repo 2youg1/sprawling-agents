@@ -45,3 +45,18 @@ test("a plain launch returns to the recorded subject, geometry, file and session
   };
   expect(launchView(toFragment(explicit), cold)).toEqual(explicit);
 });
+
+test("an unconfirmed PDF position survives reopen and stays with its registered file", () => {
+  const stored = memory();
+  const before = shellVisit(stored);
+  const paper = JSON.stringify(["root", "paper"]);
+  const copy = JSON.stringify(["root", "copy"]);
+  const point = { page: 7, offset: 0.34 };
+  before.setPdfProgress(paper, point);
+
+  const reopened = shellVisit(stored);
+  expect(reopened.pdfProgress(paper)).toEqual(point);
+  expect(reopened.pdfProgress(copy)).toBeUndefined();
+  reopened.clearPdfProgress(paper);
+  expect(before.pdfProgress(paper)).toBeUndefined();
+});

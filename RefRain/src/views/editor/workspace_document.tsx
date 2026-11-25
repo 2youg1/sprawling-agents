@@ -13,7 +13,7 @@ import type { Lang } from "../../core/lang";
 import { kib } from "../../core/time";
 import { preferences } from "../../core/prefs";
 import { B3Hash } from "../../wire";
-import Glyph from "../parts/glyph.solid";
+import { ContextTools, createContextTools } from "../parts/context_tools";
 import type { DocumentRewrite } from "../talk/attachments";
 import { openEditor } from "./editing";
 import type { ContextSelection, Editing, TextRange } from "./editing";
@@ -23,14 +23,21 @@ import { phrasesIn } from "./reading";
 import { WorkspacePreview, workspaceFormat } from "./workspace_preview";
 import { WorkspaceProposal } from "./workspace_proposal";
 import { writeRefusal } from "./workspace_receipt";
-import { selectionMenuStyle, WorkspaceDocumentTools } from "./workspace_document_tools";
+import {
+  WorkspaceDocumentFeedback,
+  WorkspaceDocumentStatus,
+  WorkspaceDocumentTools,
+  workspaceSelectionTools,
+} from "./workspace_document_tools";
 import type { WriteReceipt } from "./workspace_receipt";
 import {
   decodeWorkspaceText,
   encodeWorkspaceChanges,
   proposalBlock,
   validReplacement,
+  workspaceDraftBytes,
   workspaceExcerpt,
+  workspaceLineBytes,
 } from "./workspace_text";
 import "./workspace_document.css";
 
@@ -55,6 +62,7 @@ export interface WorkspaceDocumentProps {
 
 const WRITING_KEY = "refrain.editor.typewriter";
 const DRAFT_DELAY = 350;
+const AUTOSAVE_DELAY = 4_000;
 
 export default function WorkspaceDocument(props: WorkspaceDocumentProps) {
   const lang = () => props.lang ?? langOf(document.documentElement.lang);
@@ -69,17 +77,18 @@ export default function WorkspaceDocument(props: WorkspaceDocumentProps) {
   const [receipt, setReceipt] = createSignal<WriteReceipt>({ kind: "clean" });
   const [dirty, publishDirty] = createSignal(false);
   const [typewriter, setTypewriter] = createSignal(false);
-  const [mode, setMode] = createSignal<MarkdownMode>("source");
+  const [mode, setMode] = createSignal<MarkdownMode>("live");
   const [preview, setPreview] = createSignal<string | null>(null);
   const [canAttach, setCanAttach] = createSignal(false);
-  const [context, setContext] = createSignal<ContextSelection | null>(null);
+  const menus = createContextTools();
+  const [totalBytes, setTotalBytes] = createSignal(props.bytes.length);
+  const [lineBytes, setLineBytes] = createSignal(0);
   const [attachRefused, setAttachRefused] = createSignal(false);
   const [shownVersion, setShownVersion] = createSignal<string>();
   const [draftUnkept, setDraftUnkept] = createSignal(false);
   const [staleDraft, setStaleDraft] = createSignal<string>();
   const [editRevision, setEditRevision] = createSignal(0);
   let host: HTMLDivElement | undefined;
-  let menuButton: HTMLButtonElement | undefined;
   let editor: Editing | null = null;
   let original: Uint8Array = new Uint8Array();
   let baseline: ReturnType<typeof decodeWorkspaceText> = null;
@@ -88,6 +97,9 @@ export default function WorkspaceDocument(props: WorkspaceDocumentProps) {
   let draftKey: string | undefined;
   let draftTimer: ReturnType<typeof setTimeout> | undefined;
   let draftDue = 0;
+  let closedDraft: string | undefined;
+  let saveTimer: ReturnType<typeof setTimeout> | undefined;
+  let saveDue: number | undefined;
   let previousDirty = false;
   let reviewing = false;
   const prefs = preferences();
@@ -139,6 +151,27 @@ export default function WorkspaceDocument(props: WorkspaceDocumentProps) {
       prefs.setDraft(draftKey, writeDraft({ version, changes }));
   }
 
+  function refreshBytes(): void {
+    if (baseline === null || editor === null) return;
+    setTotalBytes(workspaceDraftBytes(original.length, baseline, editor.changes()));
+  }
+
+  function scheduleSave(): void {
+    clearTimeout(saveTimer);
+    if (
+      format().kind !== "markdown" ||
+      saveDue === undefined ||
+      busy ||
+      reviewing ||
+      editor?.composing() !== false
+    )
+      return;
+    saveTimer = setTimeout(
+      () => void save(undefined, true),
+      Math.max(0, saveDue - performance.now()),
+    );
+  }
+
   function followIncoming(version: string, bytes: Uint8Array): void {
     if (
       editor === null ||
@@ -154,11 +187,12 @@ export default function WorkspaceDocument(props: WorkspaceDocumentProps) {
     original = bytes;
     editor.follow(next.editor);
     editor.readOnly(original.length > EDITABLE_BYTES_MAX);
+    refreshBytes();
     setShownVersion(version);
     reveal(props.reveal);
   }
 
-  async function save(change?: EditorChange): Promise<void> {
+  async function save(change?: EditorChange, automatic = false): Promise<void> {
     const current = editor;
     const previous = baseline;
     if (
@@ -166,11 +200,14 @@ export default function WorkspaceDocument(props: WorkspaceDocumentProps) {
       previous === null ||
       busy ||
       current.composing() ||
+      (automatic && (reviewing || receipt().kind === "conflict")) ||
       previous.version !== props.version
     )
       return;
     const changes = change === undefined ? current.changes() : [change];
     if (changes.length === 0 || original.length > EDITABLE_BYTES_MAX) return;
+    clearTimeout(saveTimer);
+    saveDue = undefined;
     const bytes = encodeWorkspaceChanges(original, previous, changes);
     busy = true;
     if (change === undefined) current.sent();
@@ -185,8 +222,8 @@ export default function WorkspaceDocument(props: WorkspaceDocumentProps) {
       ),
     );
     busy = false;
-    if (!alive) return;
     if (Result.isFailure(result)) {
+      if (!alive) return;
       if (change === undefined) current.unsent();
       else current.readOnly(original.length > EDITABLE_BYTES_MAX);
       setReceipt(writeRefusal(result.failure, previous.version));
@@ -196,20 +233,23 @@ export default function WorkspaceDocument(props: WorkspaceDocumentProps) {
     original = bytes;
     baseline = decodeWorkspaceText(accepted.version, original);
     if (change === undefined) current.landed();
-    else {
+    else if (alive) {
       if (baseline !== null) current.rebaseChange(baseline.editor, change);
       current.readOnly(original.length > EDITABLE_BYTES_MAX);
     }
-    setShownVersion(accepted.version);
-    setDirty(current.hasChanges());
-    setReceipt({ kind: "saved" });
-    setStaleDraft(undefined);
-    if (draftKey !== undefined) {
+    if (draftKey !== undefined && (alive || prefs.draft(draftKey) === closedDraft)) {
       const landed = Option.getOrNull(validVersion(accepted.version));
       if (landed !== null)
         prefs.setDraft(draftKey, writeDraft({ version: landed, changes: current.changes() }));
     }
+    if (!alive) return;
+    setShownVersion(accepted.version);
+    setDirty(current.hasChanges());
+    refreshBytes();
+    setReceipt({ kind: "saved" });
+    setStaleDraft(undefined);
     if (change !== undefined) props.onProposalDecision?.("accepted");
+    scheduleSave();
   }
 
   function accept(proposal: DocumentRewrite, replacement: string): void {
@@ -234,14 +274,7 @@ export default function WorkspaceDocument(props: WorkspaceDocumentProps) {
       return;
     }
     setAttachRefused(false);
-    setContext(null);
     props.onSelection?.({ kind: "markdown", from, to, text });
-  }
-
-  function closeContext(): void {
-    if (context() === null) return;
-    setContext(null);
-    editor?.focus();
   }
 
   function pickPreview(): void {
@@ -278,6 +311,7 @@ export default function WorkspaceDocument(props: WorkspaceDocumentProps) {
       markdown: markdown
         ? {
             diagramLabel: say(lang(), "refrain_diagram"),
+            initialMode: "live",
             readResource: props.readResource,
           }
         : undefined,
@@ -285,10 +319,18 @@ export default function WorkspaceDocument(props: WorkspaceDocumentProps) {
         void save();
       },
       onEdit: () => {
-        setDirty(editor?.hasChanges() ?? false);
+        const edited = editor?.hasChanges() ?? false;
+        setDirty(edited);
+        refreshBytes();
         if (reviewing) setEditRevision((count) => count + 1);
         keepSoon();
+        saveDue = edited ? performance.now() + AUTOSAVE_DELAY : undefined;
+        scheduleSave();
       },
+      onLine: (line) => {
+        if (baseline !== null) setLineBytes(workspaceLineBytes(line, baseline.encoding));
+      },
+      onCompositionEnd: scheduleSave,
       onMarkdownMode: setMode,
       ...(markdown
         ? {
@@ -297,14 +339,33 @@ export default function WorkspaceDocument(props: WorkspaceDocumentProps) {
               setAttachRefused(false);
             },
             onContextSelection: (menu: ContextSelection) => {
-              if (props.onSelection === undefined) return;
-              setContext(menu);
-              onSettled(() => menuButton?.focus());
+              const tools = workspaceSelectionTools(
+                lang(),
+                original.length <= EDITABLE_BYTES_MAX
+                  ? (format) => editor?.format(format)
+                  : undefined,
+                props.onSelection === undefined ? undefined : () => attach(menu.range),
+              );
+              menus.open(
+                { tools, restore: () => editor?.focus() },
+                {
+                  kind: menu.event instanceof KeyboardEvent ? "keyboard" : "pointer",
+                  event: menu.event,
+                  x: menu.x,
+                  y: menu.y,
+                },
+              );
             },
           }
         : {}),
     });
-    setDirty((restored?.changes.length ?? 0) > 0);
+    setDirty(editor.hasChanges());
+    refreshBytes();
+    setLineBytes(workspaceLineBytes(editor.line(), baseline.encoding));
+    if (editor.hasChanges()) {
+      saveDue = performance.now() + AUTOSAVE_DELAY;
+      scheduleSave();
+    }
     const preference = Result.try(() => localStorage.getItem(WRITING_KEY) === "on");
     const wanted = Result.isSuccess(preference) && preference.success;
     setTypewriter(wanted);
@@ -314,6 +375,8 @@ export default function WorkspaceDocument(props: WorkspaceDocumentProps) {
     return () => {
       globalThis.removeEventListener("pagehide", keepDraft);
       keepDraft();
+      closedDraft = draftKey === undefined ? undefined : prefs.draft(draftKey);
+      clearTimeout(saveTimer);
       stopDraft?.();
       alive = false;
       editor?.destroy();
@@ -324,6 +387,7 @@ export default function WorkspaceDocument(props: WorkspaceDocumentProps) {
     () => props.proposal !== undefined,
     (shown) => {
       reviewing = shown;
+      scheduleSave();
     },
   );
   createEffect(() => props.reveal, reveal);
@@ -343,15 +407,9 @@ export default function WorkspaceDocument(props: WorkspaceDocumentProps) {
     <section
       class="workspace-document"
       aria-label={props.name}
-      onKeyDown={(event) => {
-        if (event.key !== "Escape" || context() === null) return;
-        event.preventDefault();
-        event.stopPropagation();
-        closeContext();
-      }}
+      data-refrain-file-editor={editable() ? "" : undefined}
     >
       <WorkspaceDocumentTools
-        version={shownVersion() ?? props.version}
         lang={lang()}
         editable={editable()}
         markdown={format().kind === "markdown"}
@@ -376,61 +434,15 @@ export default function WorkspaceDocument(props: WorkspaceDocumentProps) {
         receipt={receipt()}
         onSave={() => void save()}
       />
-      <Show when={changed()}>
-        <p role="status">{say(lang(), "refrain_external_changed")}</p>
-      </Show>
-      <Show when={staleDraft() !== undefined}>
-        <div class="workspace-document-error" role="status">
-          <p>{say(lang(), "refrain_previous_draft")}</p>
-          <button
-            type="button"
-            data-control="surface"
-            onClick={() => {
-              const stored = staleDraft();
-              if (stored !== undefined) void navigator.clipboard.writeText(stored);
-            }}
-          >
-            <Glyph name="copy" size="sm" />
-            {say(lang(), "refrain_copy_draft")}
-          </button>
-        </div>
-      </Show>
-      <Show when={draftUnkept() && dirty()}>
-        <p role="status">{say(lang(), "refrain_registered_draft_unkept")}</p>
-      </Show>
-      <Show when={receipt().detail !== undefined}>
-        <details class="workspace-document-error">
-          <summary>{receipt().detail}</summary>
-          <Show when={receipt().diagnostic !== undefined}>
-            <pre>{receipt().diagnostic}</pre>
-            <button
-              type="button"
-              data-control="surface"
-              onClick={() => {
-                const diagnostic = receipt().diagnostic;
-                if (diagnostic !== undefined) void navigator.clipboard.writeText(diagnostic);
-              }}
-            >
-              <Glyph name="copy" size="sm" />
-              {say(lang(), "refrain_copy_diagnostic")}
-            </button>
-          </Show>
-          <button
-            type="button"
-            data-control="surface"
-            onClick={() => {
-              const text = editor?.text();
-              if (text !== undefined) void navigator.clipboard.writeText(text);
-            }}
-          >
-            <Glyph name="copy" size="sm" />
-            {say(lang(), "refrain_copy_draft")}
-          </button>
-        </details>
-      </Show>
-      <Show when={attachRefused()}>
-        <p role="status">{say(lang(), "refrain_attach_unsaved")}</p>
-      </Show>
+      <WorkspaceDocumentFeedback
+        lang={lang()}
+        changed={changed()}
+        staleDraft={staleDraft()}
+        draftUnkept={draftUnkept() && dirty()}
+        receipt={receipt()}
+        attachRefused={attachRefused()}
+        draft={() => editor?.text()}
+      />
       <Show when={props.proposal} keyed>
         {(proposal) => (
           <WorkspaceProposal
@@ -477,22 +489,12 @@ export default function WorkspaceDocument(props: WorkspaceDocumentProps) {
       <Show when={!editable() && format().kind !== "docx" && format().kind !== "image"}>
         <p role="status">{say(lang(), "refrain_format_opaque")}</p>
       </Show>
-      <Show when={context() !== null}>
-        <div class="workspace-selection-backdrop" onPointerDown={closeContext} />
-        <div class="workspace-selection-menu" style={selectionMenuStyle(context())}>
-          <button
-            type="button"
-            data-control="surface"
-            ref={(node) => {
-              menuButton = node;
-            }}
-            onClick={() => attach(context()?.range)}
-          >
-            <Glyph name="pin" size="sm" />
-            {say(lang(), "refrain_attach_selection")}
-          </button>
-        </div>
-      </Show>
+      <WorkspaceDocumentStatus
+        lang={lang()}
+        version={shownVersion() ?? props.version}
+        bytes={editable() ? { total: totalBytes(), line: lineBytes() } : undefined}
+      />
+      <ContextTools controller={menus} lang={lang()} />
     </section>
   );
 }

@@ -6,7 +6,7 @@
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { onCleanup, onSettled, Show } from "solid-js";
 
-import { fill, say } from "../../../core/lang";
+import { fill, say, type Key } from "../../../core/lang";
 import type { Lang } from "../../../core/lang";
 import { storeValue } from "../../../core/solid_store";
 import { BRIGHTNESS, wallpaperSettings } from "../../../core/wallpaper";
@@ -18,6 +18,7 @@ import type { Size } from "./pdf";
 import { readableRegion, type Point } from "./pdf_anchor";
 import type { pdfPicking, Picked } from "./pdf_pick";
 import { PdfPage } from "./pdf_page_view";
+import { PDF_LAYOUTS, PDF_SCALE, type PdfLayout } from "./pdf_position";
 
 interface DetailsProps {
   readonly lang: Lang;
@@ -279,5 +280,93 @@ export function PdfZoom(props: ZoomProps) {
         {say(props.lang, "pdf_close_zoom")}
       </button>
     </dialog>
+  );
+}
+
+const LAYOUT_WORDS: Readonly<Record<PdfLayout, Key>> = {
+  continuous: "pdf_layout_strip",
+  spread: "pdf_layout_book",
+  single: "pdf_layout_single",
+};
+
+export function PdfReaderControls(props: {
+  readonly lang: Lang;
+  readonly layout: PdfLayout;
+  readonly scale: number;
+  readonly first: number;
+  readonly last: number;
+  readonly total: number;
+  readonly onLayout: (layout: PdfLayout) => void;
+  readonly onScale: (scale: number) => void;
+  readonly onTurn: (direction: number) => void;
+}) {
+  return (
+    <div class="pdf-reader-controls">
+      <label>
+        {say(props.lang, "pdf_layout")}
+        <select
+          class="pdf-control"
+          data-control="surface"
+          onChange={(event) => {
+            const next = PDF_LAYOUTS.find((layout) => layout === event.currentTarget.value);
+            if (next !== undefined) props.onLayout(next);
+          }}
+        >
+          {PDF_LAYOUTS.map((layout) => (
+            <option value={layout} selected={layout === props.layout}>
+              {say(props.lang, LAYOUT_WORDS[layout])}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        <span>{say(props.lang, "pdf_reader_scale")}</span>
+        <input
+          type="range"
+          min={PDF_SCALE.min}
+          max={PDF_SCALE.max}
+          step={PDF_SCALE.step}
+          value={props.scale}
+          aria-valuetext={`${String(props.scale)}%`}
+          onInput={(event) => props.onScale(event.currentTarget.valueAsNumber)}
+        />
+        <span class="pdf-reader-scale" aria-hidden="true">
+          {props.scale}%
+        </span>
+      </label>
+      <Show when={props.layout !== "continuous"}>
+        <div class="pdf-reader-turn">
+          <button
+            type="button"
+            class="pdf-control"
+            data-control="surface"
+            aria-label={say(props.lang, "pdf_previous_page")}
+            disabled={props.first <= 1}
+            onClick={() => props.onTurn(-1)}
+          >
+            <Glyph name="go-back" size="sm" />
+          </button>
+          <span aria-live="polite">
+            {fill(say(props.lang, "format_page"), {
+              n:
+                props.first === props.last
+                  ? String(props.first)
+                  : `${String(props.first)}–${String(props.last)}`,
+              total: String(props.total),
+            })}
+          </span>
+          <button
+            type="button"
+            class="pdf-control pdf-next-page"
+            data-control="surface"
+            aria-label={say(props.lang, "pdf_next_page")}
+            disabled={props.last >= props.total}
+            onClick={() => props.onTurn(1)}
+          >
+            <Glyph name="go-back" size="sm" />
+          </button>
+        </div>
+      </Show>
+    </div>
   );
 }

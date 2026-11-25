@@ -24,8 +24,17 @@ rechecks it without silently prompting. Refocusing the browser rechecks a
 linked image. An unavailable file shows the solid
 Session surface and keeps its name for recovery. Browsers with only a file
 input keep a local image copy and show which source is saved. Files stay on the
-device, distinct from city-owned preferences (4-29). The reading and editing
-canvas is solid. PDF paper and ink reuse the rendered page, with the original
+device, distinct from city-owned preferences (4-29). File editing starts with
+a solid canvas. A device checkbox previews and persists the Session wallpaper
+behind the opaque writing column when enabled. A device palette selects the
+inherited theme, Warm Paper, Mist, Slate, or Moss for the text editor. The
+older wallpaper record defaults to a solid file canvas and inherited colors.
+The four palettes specify OKLCH colors and keep at least |Lc| 90 for body
+text, source markers, links, line numbers and the file footer on their
+rendered surfaces. The reading brightness control varies the file surface
+by two OKLCH lightness points across its range. A tinted selection uses
+its own opaque backing and replaces the active-line tint while a range
+is selected. PDF paper and ink reuse the rendered page, with the original
 PDF pixels available on hold.
 
 Brightness is a bounded integer percentage, with 50 used for a new browser
@@ -50,6 +59,19 @@ cannot be known is reported as unmeasured.
 -/
 
 namespace Client.Views.Appearance
+
+inductive FilePalette where
+  | inheritTheme
+  | warmPaper
+  | mist
+  | slate
+  | moss
+  deriving DecidableEq, Repr
+
+structure FileAppearance where
+  useSessionWallpaper : Bool := false
+  palette : FilePalette := .inheritTheme
+  deriving DecidableEq, Repr
 
 inductive Commit where
   | editing
