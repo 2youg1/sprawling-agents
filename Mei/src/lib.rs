@@ -7,6 +7,7 @@ pub mod acp;
 pub mod agent;
 pub mod capture;
 pub mod catalog;
+mod child_exit;
 pub mod doctor;
 pub mod error;
 pub mod launch;

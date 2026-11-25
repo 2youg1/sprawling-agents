@@ -231,14 +231,8 @@ fn run_acp() -> Result<()> {
     let stdin = std::io::stdin();
     let stdout = std::io::stdout();
     let result = acp::serve(stdin, stdout, |turn: Turn| {
-        launch::bind_python_to_cwd(&mut python, &mut opened_cwd, &turn.cwd, &environment)?;
-        if python.is_none() {
-            return Err(Error::Diagnostic(Diagnostic::new(
-                Code::Protocol,
-                "bind the ACP python interpreter",
-                "no interpreter is bound to the session cwd",
-                "restart `mei --acp` and open a new session",
-            )));
+        if !turn.cancelled.load(std::sync::atomic::Ordering::SeqCst) {
+            launch::bind_python_to_cwd(&mut python, &mut opened_cwd, &turn.cwd, &environment)?;
         }
         if turn.cancelled.load(std::sync::atomic::Ordering::SeqCst) {
             return Ok(Outcome {

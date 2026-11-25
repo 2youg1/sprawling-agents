@@ -79,6 +79,8 @@ pub const Ui = struct {
     steer_path: ?[]u8 = null,
     session_dir: []u8,
     git_head: ?[]u8 = null,
+    git_probe: ?std.Thread = null,
+    git_refresh_pending: bool = false,
     banner_caption: ?[]u8 = null,
     banner_agents: bool = false,
     pending: std.ArrayList([]u8) = .empty,
@@ -150,7 +152,7 @@ pub const Ui = struct {
             .editor = editor_mod.Editor.init(gpa),
             .screen = .{ .gpa = gpa },
             .seen = try observation.Seen.init(gpa, model),
-            .bus = .{ .gpa = gpa, .io = io },
+            .bus = mei_process.Bus.init(gpa, io),
             .session_dir = session_dir,
             .replay_path = replay,
             .replay_file = replay_file,
@@ -164,6 +166,7 @@ pub const Ui = struct {
 
     fn deinit(self: *Ui) void {
         if (self.process) |*process| process.deinit();
+        if (self.git_probe) |thread| thread.join();
         if (self.steer_path) |path| self.gpa.free(path);
         if (self.capture_dir) |path| {
             mei_session.discardCaptureDirectory(self.io, path) catch {};
@@ -208,7 +211,7 @@ pub const Ui = struct {
             runtime.drain(self);
             self.flushPresent(false);
             const timeout = self.pollTimeout();
-            if (stdin_filled == 0 and !pollStdin(timeout)) continue;
+            if (stdin_filled == 0 and !self.bus.waitForInput(timeout)) continue;
             const event = termio.readEvent(&stdin_buf, &stdin_filled) catch {
                 self.lost = true;
                 runtime.stop(self);
@@ -238,7 +241,7 @@ pub const Ui = struct {
         if (self.cadence.due(at, false)) return 0;
         if (self.cadence.dirty) return self.cadence.waitMs(at);
         if (self.seen.since != null or self.view.completion != null) return present.MOTION_INTERVAL_MS;
-        if (self.process != null or !self.replay_done or self.seen.calling) return 50;
+        if (!self.replay_done or (self.bus.notification == null and (self.process != null or self.git_probe != null))) return 50;
         if (!termio.resizeArmed()) return 1000;
         return -1;
     }
@@ -635,10 +638,29 @@ pub const Ui = struct {
     }
 
     pub fn refreshGit(self: *Ui) void {
-        const head = workspace.gitHead(self.gpa, self.io, self.session_dir, self.environ.get("PATH") orelse "");
+        if (self.quit or self.lost) return;
+        if (self.git_probe != null) {
+            self.git_refresh_pending = true;
+            return;
+        }
+        self.git_probe = std.Thread.spawn(.{}, struct {
+            fn run(bus: *mei_process.Bus, directory: []const u8, path: []const u8) void {
+                bus.push(.{ .git_head = workspace.gitHead(bus.gpa, bus.io, directory, path) });
+            }
+        }.run, .{ &self.bus, self.session_dir, self.environ.get("PATH") orelse "" }) catch return;
+    }
+
+    pub fn gitHeadArrived(self: *Ui, head: ?[]u8) void {
+        if (self.git_probe) |thread| thread.join();
+        self.git_probe = null;
         if (self.git_head) |old| self.gpa.free(old);
         self.git_head = head;
         self.updateBanner();
+        self.touch(false);
+        if (self.git_refresh_pending) {
+            self.git_refresh_pending = false;
+            self.refreshGit();
+        }
     }
 
     fn updateBanner(self: *Ui) void {
@@ -828,15 +850,16 @@ pub const Ui = struct {
     }
 
     fn giveBack(self: *Ui, code: u8) u8 {
+        self.quit = true;
         runtime.stop(self);
-        var spins: usize = 0;
-        while (self.process != null and spins < 50) : (spins += 1) {
+        const deadline: std.Io.Clock.Timestamp = .fromNow(self.io, .{ .raw = .fromMilliseconds(5000), .clock = .awake });
+        while (self.process != null) {
             runtime.drain(self);
             self.flushPresent(true);
-            if (self.process) |*process| {
-                if (process.isFinished()) break;
-            } else break;
-            self.io.sleep(std.Io.Duration.fromMilliseconds(100), .real) catch {};
+            if (self.process == null) break;
+            const remaining = deadline.durationFromNow(self.io).raw.toMilliseconds();
+            if (remaining <= 0) break;
+            self.bus.waitForEvents(@intCast(remaining));
         }
         if (self.process) |*process| {
             process.deinit();
@@ -878,10 +901,6 @@ fn editing(key: termio.Key) ?editor_mod.Edit {
         .end => .end,
         else => null,
     };
-}
-
-fn pollStdin(timeout_ms: i32) bool {
-    return termio.waitReadable(timeout_ms);
 }
 
 fn nowMs(io: std.Io) u64 {

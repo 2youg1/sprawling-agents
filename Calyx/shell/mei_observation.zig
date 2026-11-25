@@ -176,7 +176,10 @@ pub const Seen = struct {
             return try noteEntries(arena, raw);
         };
         defer parsed.deinit();
-        const value = parsed.value;
+        return self.projectLine(arena, raw, parsed.value, at);
+    }
+
+    pub fn projectLine(self: *Seen, arena: std.mem.Allocator, raw: []const u8, value: std.json.Value, at: u64) ![]write.Entry {
         if (value != .object) return try noteEntries(arena, raw);
         if (value.object.get("type")) |ty| {
             if (ty == .string and std.mem.eql(u8, ty.string, "mei.obs")) {

@@ -71,6 +71,7 @@ pub struct Intake {
     path: PathBuf,
     offset: u64,
     pending: Vec<u8>,
+    scanned: usize,
 }
 
 impl Intake {
@@ -79,6 +80,7 @@ impl Intake {
             path: path.as_ref().to_path_buf(),
             offset: 0,
             pending: Vec::new(),
+            scanned: 0,
         })
     }
 
@@ -90,10 +92,15 @@ impl Intake {
         };
         file.seek(SeekFrom::Start(self.offset))
             .map_err(|err| self.io("seek the Mei steer file", err))?;
-        let mut chunk = Vec::new();
-        file.read_to_end(&mut chunk)
-            .map_err(|err| self.io("read the Mei steer file", err))?;
-        let read = u64::try_from(chunk.len()).map_err(|_| {
+        let previous = self.pending.len();
+        let read = match file.read_to_end(&mut self.pending) {
+            Ok(read) => read,
+            Err(err) => {
+                self.pending.truncate(previous);
+                return Err(self.io("read the Mei steer file", err));
+            }
+        };
+        let read = u64::try_from(read).map_err(|_| {
             Error::Diagnostic(
                 Diagnostic::new(
                     Code::Config,
@@ -105,37 +112,49 @@ impl Intake {
             )
         })?;
         self.offset = self.offset.saturating_add(read);
-        self.pending.extend_from_slice(&chunk);
-        let mut steers = Vec::new();
-        while let Some(end) = self.pending.iter().position(|byte| *byte == b'\n') {
-            let mut line = self.pending.drain(..=end).collect::<Vec<u8>>();
-            if line.last() == Some(&b'\n') {
-                line.pop();
-            }
-            if line.last() == Some(&b'\r') {
-                line.pop();
-            }
-            if line.is_empty() {
-                continue;
-            }
-            let text = std::str::from_utf8(&line).map_err(|err| {
-                Error::Diagnostic(
-                    Diagnostic::new(
-                        Code::Config,
-                        "decode a Mei steer line",
-                        err.to_string(),
-                        "append one UTF-8 JSON object per line shaped as {\"text\":\"…\"}",
-                    )
-                    .with_path(self.path.display().to_string()),
-                )
-            })?;
-            steers.push(self.parse_line(text)?);
-        }
-        Ok(steers)
+        self.take_lines()
     }
 
-    fn parse_line(&self, line: &str) -> Result<String> {
-        let value: Value = serde_json::from_str(line).map_err(|err| {
+    #[expect(
+        clippy::indexing_slicing,
+        reason = "a line starts at zero or after the preceding delimiter and ends at the current delimiter index"
+    )]
+    fn take_lines(&mut self) -> Result<Vec<String>> {
+        let mut consumed = 0;
+        let lines = self.pending.iter().enumerate().skip(self.scanned);
+        let result = lines
+            .filter_map(|(index, byte)| (*byte == b'\n').then_some(index))
+            .try_fold(Vec::new(), |mut steers, end| {
+                let line = &self.pending[consumed..end];
+                consumed = end.saturating_add(1);
+                let line = line.strip_suffix(b"\r").unwrap_or(line);
+                if !line.is_empty() {
+                    steers.push(self.parse_line(line)?);
+                }
+                Ok(steers)
+            });
+        self.pending.drain(..consumed);
+        self.scanned = if result.is_ok() {
+            self.pending.len()
+        } else {
+            0
+        };
+        result
+    }
+
+    fn parse_line(&self, line: &[u8]) -> Result<String> {
+        let line = std::str::from_utf8(line).map_err(|err| {
+            Error::Diagnostic(
+                Diagnostic::new(
+                    Code::Config,
+                    "decode a Mei steer line",
+                    err.to_string(),
+                    "append one UTF-8 JSON object per line shaped as {\"text\":\"…\"}",
+                )
+                .with_path(self.path.display().to_string()),
+            )
+        })?;
+        let mut value: Value = serde_json::from_str(line).map_err(|err| {
             Error::Diagnostic(
                 Diagnostic::new(
                     Code::Config,
@@ -147,22 +166,19 @@ impl Intake {
                 .with_value(line.to_owned()),
             )
         })?;
-        value
-            .get("text")
-            .and_then(Value::as_str)
-            .map(str::to_owned)
-            .ok_or_else(|| {
-                Error::Diagnostic(
-                    Diagnostic::new(
-                        Code::Config,
-                        "read a Mei steer line",
-                        "text is missing or is not a string",
-                        "append one JSON object per line shaped as {\"text\":\"…\"}",
-                    )
-                    .with_path(self.path.display().to_string())
-                    .with_value(line.to_owned()),
+        match value.get_mut("text").map(Value::take) {
+            Some(Value::String(text)) => Ok(text),
+            _ => Err(Error::Diagnostic(
+                Diagnostic::new(
+                    Code::Config,
+                    "read a Mei steer line",
+                    "text is missing or is not a string",
+                    "append one JSON object per line shaped as {\"text\":\"…\"}",
                 )
-            })
+                .with_path(self.path.display().to_string())
+                .with_value(line.to_owned()),
+            )),
+        }
     }
 
     fn io(&self, action: &str, err: std::io::Error) -> Error {
@@ -265,5 +281,20 @@ mod tests {
         file.write_all(&bytes[split..]).unwrap();
         file.flush().unwrap();
         assert_eq!(intake.drain().unwrap(), ["窄搜索"]);
+    }
+
+    #[test]
+    fn intake_keeps_lines_after_a_malformed_entry() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("steer.jsonl");
+        std::fs::write(
+            &path,
+            b"{\"text\":\"one\"}\ninvalid\n\r\n{\"text\":\"two\"}\r\n",
+        )
+        .unwrap();
+        let mut intake = Intake::open(path).unwrap();
+        assert!(intake.drain().is_err());
+        assert_eq!(intake.drain().unwrap(), ["two"]);
+        assert!(intake.drain().unwrap().is_empty());
     }
 }

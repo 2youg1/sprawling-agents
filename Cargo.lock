@@ -2828,8 +2828,10 @@ version = "0.18.1"
 dependencies = [
  "base64 0.23.1",
  "image",
+ "rustix",
  "serde_json",
  "tempfile",
+ "wait-timeout",
 ]
 
 [[package]]
@@ -3498,6 +3500,15 @@ checksum = "a5924018406ce0063cd67f8e008104968b74b563ee1b85dde3ed1f7cb87d3dbd"
 dependencies = [
  "arrayvec",
  "memchr",
+]
+
+[[package]]
+name = "wait-timeout"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09ac3b126d3914f9849036f826e054cbabdc8519970b8998ddaf3b5bd3c65f11"
+dependencies = [
+ "libc",
 ]
 
 [[package]]

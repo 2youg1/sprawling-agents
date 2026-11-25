@@ -66,37 +66,38 @@ pub fn drain(ui: anytype) void {
         switch (event) {
             .line => |line| onLine(ui, line),
             .finished => |finished| onFinished(ui, finished),
+            .git_head => |head| ui.gitHeadArrived(head),
         }
     }
 }
 
 fn onLine(ui: anytype, line: []u8) void {
-    const is_message = blk: {
-        var parsed = std.json.parseFromSlice(std.json.Value, ui.gpa, line, .{}) catch break :blk false;
-        defer parsed.deinit();
-        if (parsed.value != .object) break :blk false;
-        if (parsed.value.object.get("type")) |kind| {
-            if (kind == .string and std.mem.eql(u8, kind.string, "mei.obs")) {
-                const name = parsed.value.object.get("kind") orelse break :blk false;
-                break :blk name == .string and std.mem.eql(u8, name.string, "image");
-            }
-        }
-        const role = parsed.value.object.get("role") orelse break :blk false;
-        if (role != .string) break :blk false;
-        if (!std.mem.eql(u8, role.string, "user") and !std.mem.eql(u8, role.string, "assistant")) break :blk false;
-        if (parsed.value.object.get("content") == null) break :blk false;
-        break :blk true;
-    };
-    if (is_message) {
-        ui.pending.append(ui.gpa, line) catch {
-            ui.gpa.free(line);
-            return;
-        };
+    var recorded = false;
+    defer if (!recorded) ui.gpa.free(line);
+    var parsed = std.json.parseFromSlice(std.json.Value, ui.gpa, line, .{}) catch null;
+    defer if (parsed) |*record| record.deinit();
+    const value: std.json.Value = if (parsed) |record| record.value else .null;
+    if (journalLine(value)) {
+        ui.pending.append(ui.gpa, line) catch return;
+        recorded = true;
     }
-    defer if (!is_message) ui.gpa.free(line);
     const arena = ui.frame_arena.allocator();
-    const entries = ui.seen.line(arena, line, ui.now()) catch return;
+    const entries = ui.seen.projectLine(arena, line, value, ui.now()) catch return;
     ui.print(entries);
+}
+
+fn journalLine(value: std.json.Value) bool {
+    if (value != .object) return false;
+    if (value.object.get("type")) |kind| {
+        if (kind == .string and std.mem.eql(u8, kind.string, "mei.obs")) {
+            const name = value.object.get("kind") orelse return false;
+            return name == .string and std.mem.eql(u8, name.string, "image");
+        }
+    }
+    const role = value.object.get("role") orelse return false;
+    return role == .string and
+        (std.mem.eql(u8, role.string, "user") or std.mem.eql(u8, role.string, "assistant")) and
+        value.object.get("content") != null;
 }
 
 fn onFinished(ui: anytype, finished: mei_process.Finished) void {

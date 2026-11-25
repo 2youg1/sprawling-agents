@@ -7,10 +7,12 @@ const std = @import("std");
 const builtin = @import("builtin");
 const windows = std.os.windows;
 const mei_line = @import("mei_line.zig");
+const termio = @import("termio.zig");
 
 pub const Event = union(enum) {
     line: []u8,
     finished: Finished,
+    git_head: ?[]u8,
 };
 
 pub const Finished = struct {
@@ -35,12 +37,18 @@ pub const Bus = struct {
     io: std.Io,
     mutex: std.Io.Mutex = .init,
     items: std.ArrayList(Event) = .empty,
+    notification: ?termio.Notification = null,
+
+    pub fn init(gpa: std.mem.Allocator, io: std.Io) Bus {
+        return .{ .gpa = gpa, .io = io, .notification = termio.Notification.init() catch null };
+    }
 
     pub fn deinit(self: *Bus) void {
         self.mutex.lockUncancelable(self.io);
         defer self.mutex.unlock(self.io);
         for (self.items.items) |ev| freeEvent(self.gpa, ev);
         self.items.deinit(self.gpa);
+        if (self.notification) |notice| notice.deinit();
     }
 
     pub fn push(self: *Bus, event: Event) void {
@@ -48,12 +56,18 @@ pub const Bus = struct {
         defer self.mutex.unlock(self.io);
         self.items.append(self.gpa, event) catch {
             freeEvent(self.gpa, event);
+            return;
         };
+        if (self.items.items.len == 1) {
+            if (self.notification) |notice| notice.set();
+        }
     }
 
     pub fn drainInto(self: *Bus, into: *std.ArrayList(Event)) void {
         self.mutex.lockUncancelable(self.io);
         defer self.mutex.unlock(self.io);
+        if (self.items.items.len == 0) return;
+        if (self.notification) |notice| notice.clear();
         into.appendSlice(self.gpa, self.items.items) catch {
             for (self.items.items) |ev| freeEvent(self.gpa, ev);
             self.items.clearRetainingCapacity();
@@ -61,13 +75,46 @@ pub const Bus = struct {
         };
         self.items.clearRetainingCapacity();
     }
+
+    pub fn waitForInput(self: *const Bus, timeout_ms: i32) bool {
+        if (self.notification) |notice| return termio.waitReadableOr(timeout_ms, notice);
+        return termio.waitReadable(timeout_ms);
+    }
+
+    pub fn waitForEvents(self: *const Bus, timeout_ms: i32) void {
+        if (self.notification) |notice| {
+            _ = notice.wait(timeout_ms);
+        } else {
+            self.io.sleep(std.Io.Duration.fromMilliseconds(@min(timeout_ms, 100)), .awake) catch {};
+        }
+    }
 };
 
 pub fn freeEvent(gpa: std.mem.Allocator, event: Event) void {
     switch (event) {
         .line => |s| gpa.free(s),
         .finished => |f| f.result.deinit(gpa),
+        .git_head => |head| if (head) |value| gpa.free(value),
     }
+}
+
+test "Mei event bus notifies until its queued records are drained" {
+    const gpa = std.testing.allocator;
+    var bus = Bus.init(gpa, std.testing.io);
+    defer bus.deinit();
+    const notice = bus.notification orelse return error.NotificationUnavailable;
+    try std.testing.expect(!notice.wait(0));
+    bus.push(.{ .line = try gpa.dupe(u8, "first") });
+    bus.push(.{ .line = try gpa.dupe(u8, "second") });
+    try std.testing.expect(notice.wait(0));
+    var drained: std.ArrayList(Event) = .empty;
+    defer drained.deinit(gpa);
+    bus.drainInto(&drained);
+    defer for (drained.items) |event| freeEvent(gpa, event);
+    try std.testing.expectEqual(@as(usize, 2), drained.items.len);
+    try std.testing.expect(!notice.wait(0));
+    bus.push(.{ .git_head = null });
+    try std.testing.expect(notice.wait(0));
 }
 
 const Signals = struct {
@@ -195,10 +242,6 @@ pub const Process = struct {
         if (self.signals.done.swap(true, .seq_cst)) return .ok;
         self.signals.cancelled.store(true, .seq_cst);
         return self.terminateTree();
-    }
-
-    pub fn isFinished(self: *const Process) bool {
-        return self.signals.done.load(.seq_cst) and self.driver == null;
     }
 
     pub fn reap(self: *Process) StopResult {

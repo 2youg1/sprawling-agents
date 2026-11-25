@@ -1,22 +1,32 @@
-import base64, os, sys, json, tempfile, threading, traceback
-null = os.devnull if hasattr(os, "devnull") else ("nul" if os.name == "nt" else "/dev/null")
+import os
+import sys
+import traceback
+from _thread import get_ident
+
 rx, tx = os.fdopen(os.dup(0), "rb"), os.fdopen(os.dup(1), "wb")
-os.dup2(os.open(null, os.O_RDONLY), 0)
+with open(os.devnull, "rb") as null:
+    os.dup2(null.fileno(), 0)
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 IMAGE_LIMIT = 5 * 1024 * 1024
 IMAGE_CALL_LIMIT = 2
+CAPTURE_FLAGS = os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
+capture_dir = os.environ.pop("MEI_CAPTURE_DIR")
+os.environ.pop("MEI_CAPTURE_CREATED", None)
+os.environ.pop("MEI_STEER_PATH", None)
+
 
 class Call:
     def __init__(self):
         self.images = []
-        self.thread = threading.current_thread()
-        self.open = True
+        self.thread = get_ident()
+
 
 call = None
 
+
 def show_image(path):
-    if call is None or not call.open or threading.current_thread() is not call.thread:
+    if call is None or get_ident() != call.thread:
         raise ValueError("show_image attaches only during the call that started it, on that call's thread; read the picture again in a new call")
     if len(call.images) >= IMAGE_CALL_LIMIT:
         raise ValueError(f"show_image accepts at most {IMAGE_CALL_LIMIT} pictures in one python call; pass the remaining paths in a later call")
@@ -25,30 +35,42 @@ def show_image(path):
     if len(data) > IMAGE_LIMIT:
         raise ValueError(f"show_image accepts at most {IMAGE_LIMIT} bytes per image")
     if data.startswith(b"\x89PNG\r\n\x1a\n"):
-        media_type = "image/png"
+        kind = 1
     elif data.startswith(b"\xff\xd8\xff"):
-        media_type = "image/jpeg"
+        kind = 2
     elif data.startswith((b"GIF87a", b"GIF89a")):
-        media_type = "image/gif"
+        kind = 3
     elif len(data) >= 12 and data.startswith(b"RIFF") and data[8:12] == b"WEBP":
-        media_type = "image/webp"
+        kind = 4
     else:
         raise ValueError("show_image accepts only PNG, JPEG, GIF, or WebP bytes")
-    call.images.append({"media_type": media_type, "data": base64.b64encode(data).decode("ascii")})
+    call.images.append((kind, data))
 
-g = {"__name__": "__main__", "show_image": show_image}
-capture_dir = os.environ.pop("MEI_CAPTURE_DIR", None)
-os.environ.pop("MEI_CAPTURE_CREATED", None)
-os.environ.pop("MEI_STEER_PATH", None)
-for line in rx:
-    code = json.loads(line.decode("utf-8"))
-    if not isinstance(code, str):
-        raise TypeError("control frame must be a JSON string")
+
+def redirect_output():
+    for _ in range(16):
+        name = "capture-" + os.urandom(8).hex()
+        try:
+            fd = os.open(os.path.join(capture_dir, name), CAPTURE_FLAGS, 0o600)
+        except FileExistsError:
+            continue
+        break
+    else:
+        raise FileExistsError(f"could not allocate a unique capture file in {capture_dir}")
+    try:
+        os.dup2(fd, 1)
+        os.dup2(fd, 2)
+    finally:
+        if fd not in (1, 2):
+            os.close(fd)
+    return name.encode("ascii")
+
+
+def execute(code):
+    global call
+    name = redirect_output()
     current = Call()
     call = current
-    f = tempfile.NamedTemporaryFile("w+b", delete=False, dir=capture_dir)
-    os.dup2(f.fileno(), 1)
-    os.dup2(f.fileno(), 2)
     failed = False
     try:
         exec(code, g)
@@ -56,11 +78,22 @@ for line in rx:
         failed = True
         traceback.print_exception(type(e), e, e.__traceback__.tb_next)
     finally:
-        current.open = False
+        call = None
         sys.stdout.flush()
         sys.stderr.flush()
-    name = os.path.basename(f.name)
-    f.close()
-    frame = {"capture": name, "images": current.images, "failed": failed}
-    tx.write(json.dumps(frame, separators=(",", ":")).encode("ascii") + b"\n")
+    tx.write(bytes((len(name), failed, len(current.images))) + name)
+    for kind, data in current.images:
+        tx.write(bytes((kind,)) + len(data).to_bytes(4, "little"))
+        tx.write(data)
     tx.flush()
+
+
+g = {"__name__": "__main__", "show_image": show_image}
+while length := rx.read(8):
+    if len(length) != 8:
+        raise EOFError("truncated control frame length")
+    size = int.from_bytes(length, "little")
+    code = rx.read(size)
+    if len(code) != size:
+        raise EOFError("truncated control frame code")
+    execute(code.decode("utf-8"))

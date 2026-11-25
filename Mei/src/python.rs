@@ -43,7 +43,6 @@ pub fn tool_description(environment: &Environment) -> String {
     )
 }
 
-const CLOSE_POLL: Duration = Duration::from_millis(20);
 const CLOSE_GRACE: Duration = Duration::from_secs(5);
 
 fn failure(
@@ -147,13 +146,18 @@ impl Py {
     }
 
     pub(crate) fn run_observed(&mut self, code: &str) -> Result<Execution> {
-        let frame = serde_json::to_vec(code).map_err(|err| {
-            failure(
-                "serialize a Python control frame",
-                err.to_string(),
-                "pass code as a UTF-8 Rust string",
-            )
-        })?;
+        let length = u64::try_from(code.len())
+            .map_err(|err| {
+                failure(
+                    "size a Python control frame",
+                    err.to_string(),
+                    "send a smaller Python tool call",
+                )
+            })?
+            .to_le_bytes();
+        let mut frame = Vec::with_capacity(length.len().saturating_add(code.len()));
+        frame.extend_from_slice(&length);
+        frame.extend_from_slice(code.as_bytes());
         self.write_frame(&frame)?;
         let frame = self.read_frame()?;
         let text = self.captures.observe(frame.capture)?;
@@ -162,7 +166,7 @@ impl Py {
             frame
                 .images
                 .iter()
-                .filter_map(|image| preview::thumbnail(&image.media_type, &image.data))
+                .filter_map(|image| preview::thumbnail(image.media_type, &image.data))
                 .collect()
         } else {
             Vec::new()
@@ -184,7 +188,6 @@ impl Py {
         })?;
         input
             .write_all(frame)
-            .and_then(|()| input.write_all(b"\n"))
             .and_then(|()| input.flush())
             .map_err(|err| {
                 failure(
@@ -196,15 +199,14 @@ impl Py {
     }
 
     fn read_frame(&mut self) -> Result<frame::Frame> {
-        let mut line = String::new();
-        let count = self.output.read_line(&mut line).map_err(|err| {
+        let available = self.output.fill_buf().map_err(|err| {
             failure(
                 "read a Python response frame",
                 err.to_string(),
-                "the private output channel must emit UTF-8 JSON strings",
+                "keep the private output channel connected to the embedded interpreter",
             )
         })?;
-        if count == 0 {
+        if available.is_empty() {
             let status = self.child.try_wait().map_err(|err| {
                 failure(
                     "reap Python after a closed channel",
@@ -218,7 +220,7 @@ impl Py {
                 "the interpreter or private channel died; start a new Mei process",
             ));
         }
-        frame::parse(&line)
+        frame::read(&mut self.output)
     }
 
     pub fn close(&mut self) -> Result<()> {
@@ -231,28 +233,7 @@ impl Py {
 
     fn close_within(&mut self, grace: Duration) -> Result<()> {
         drop(self.input.take());
-        let Some(polls) = grace.as_millis().checked_div(CLOSE_POLL.as_millis()) else {
-            return Err(failure(
-                "close and wait for Python",
-                "the close poll has no length",
-                "keep the close poll positive",
-            ));
-        };
-        for _ in 0..polls {
-            match self.child.try_wait() {
-                Ok(Some(_)) => return Ok(()),
-                Ok(None) => {}
-                Err(err) => {
-                    return Err(failure(
-                        "close and wait for Python",
-                        err.to_string(),
-                        "if the interpreter does not exit, kill it and wait again",
-                    ));
-                }
-            }
-            std::thread::sleep(CLOSE_POLL);
-        }
-        match self.child.try_wait() {
+        match crate::child_exit::wait(&mut self.child, grace) {
             Ok(Some(_)) => Ok(()),
             Ok(None) => self.terminate_process(),
             Err(err) => Err(failure(
@@ -278,21 +259,19 @@ impl Py {
     }
 
     fn terminate_process(&mut self) -> Result<()> {
-        let killed = self.child.kill();
-        let waited = self.child.wait();
-        match (killed, waited) {
-            (Ok(()), Ok(_)) => Ok(()),
-            (Err(err), _) => Err(failure(
-                "kill Python",
+        use crate::child_exit::TerminateError;
+
+        crate::child_exit::terminate(&mut self.child).map_err(|error| {
+            let (action, err) = match error {
+                TerminateError::Kill(err) => ("kill Python", err),
+                TerminateError::Wait(err) => ("wait for killed Python", err),
+            };
+            failure(
+                action,
                 err.to_string(),
                 "reap the process before starting another Mei run",
-            )),
-            (Ok(()), Err(err)) => Err(failure(
-                "wait for killed Python",
-                err.to_string(),
-                "reap the process before starting another Mei run",
-            )),
-        }
+            )
+        })
     }
 }
 
@@ -460,7 +439,9 @@ mod tests {
     #[test]
     fn an_invalid_control_frame_is_fatal() {
         let mut python = Py::spawn().unwrap();
-        python.write_frame(b"{}").unwrap();
+        python
+            .write_frame(b"\x01\x00\x00\x00\x00\x00\x00\x00\xff")
+            .unwrap();
         assert!(python.read_frame().is_err());
         python.kill_and_wait().unwrap();
     }
