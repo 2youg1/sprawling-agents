@@ -14,7 +14,7 @@ import type { ContextTool } from "../../parts/context_tools";
 import Glyph from "../../parts/glyph.solid";
 import { short } from "../reading";
 import { NAME, TOOL } from "./format";
-import type { Size } from "./pdf";
+import type { PdfDetail, Size } from "./pdf";
 import { readableRegion, type Point } from "./pdf_anchor";
 import type { pdfPicking, Picked } from "./pdf_pick";
 import { PdfPage } from "./pdf_page_view";
@@ -172,6 +172,7 @@ export function pdfActions(actions: Actions): readonly ContextTool[] {
 
 interface ZoomProps {
   readonly pdf: PDFDocumentProxy;
+  readonly detailDocument: PdfDetail;
   readonly page: number;
   readonly width: number;
   readonly size: Size;
@@ -263,6 +264,7 @@ export function PdfZoom(props: ZoomProps) {
         >
           <PdfPage
             pdf={props.pdf}
+            detailDocument={props.detailDocument}
             page={props.page}
             width={props.width * ZOOM}
             lang={props.lang}

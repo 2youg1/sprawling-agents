@@ -14,6 +14,10 @@ const PdfReading = lazy(() =>
   import("./pdf_view").then(({ PdfReading }) => ({ default: PdfReading })),
 );
 
+export function preloadPdfReader(): void {
+  void PdfReading.preload().catch(() => undefined);
+}
+
 export interface PdfProps {
   readonly bytes: Uint8Array;
   readonly version: string | null;
@@ -36,7 +40,7 @@ function PdfView(props: PdfProps) {
   const bytes = createMemo(() => props.bytes);
   const pdf = createMemo(() => {
     const value = opened();
-    return value?.kind === "open" ? value.pdf : null;
+    return value?.kind === "open" ? value : null;
   });
   const broken = createMemo(() => {
     const value = opened();
@@ -47,10 +51,11 @@ function PdfView(props: PdfProps) {
     setOpened(null);
     let gone = false;
     let close: (() => void) | undefined;
+    preloadPdfReader();
     void import("./pdf")
       .then(({ openPdf, gpuAvailability }) => {
         if (gone) return;
-        const opening = openPdf(from);
+        const opening = openPdf(from, "reading");
         close = opening.close;
         void opening.opened.then((result) => {
           if (!gone) setOpened(result);
@@ -71,7 +76,14 @@ function PdfView(props: PdfProps) {
   return (
     <Switch>
       <Match when={pdf()} keyed>
-        {(document) => <PdfReading {...props} pdf={document} graphics={graphics()} />}
+        {(document) => (
+          <PdfReading
+            {...props}
+            pdf={document.pdf}
+            detailDocument={document.detail}
+            graphics={graphics()}
+          />
+        )}
       </Match>
       <Match when={opened()?.kind === "locked"}>
         <p class="px-wide py-snug text-note text-text-quiet">{say(props.lang, "format_locked")}</p>

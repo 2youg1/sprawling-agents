@@ -106,8 +106,14 @@
   min-inline-size: max(100%, calc(2 * var(--pdf-page-width) + var(--spacing-pane)));
 }
 
-.pdf-sheet[hidden] {
-  display: none;
+.pdf-pages[data-layout="continuous"] {
+  position: relative;
+}
+
+.pdf-pages[data-layout="continuous"] > .pdf-sheet {
+  position: absolute;
+  inset-inline: 0;
+  margin-inline: auto;
 }
 
 .pdf-sheet {

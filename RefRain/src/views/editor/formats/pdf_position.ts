@@ -4,6 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { unit } from "./pdf_anchor";
+import type { Size } from "./pdf";
 import type { PdfProgress } from "./pdf_anchor";
 
 export const PDF_LAYOUTS = ["continuous", "spread", "single"] as const;
@@ -21,41 +22,75 @@ export function firstPdfPage(layout: PdfLayout, page: number): number {
 }
 
 export function numbered(pageList: HTMLElement, page: number): HTMLElement | null {
-  const element = pageList.children.item(page - 1);
-  return element instanceof HTMLElement ? element : null;
+  return pageList.querySelector(`.pdf-sheet[data-page="${String(page)}"]`);
 }
 
-export function positionAt(
-  scroller: HTMLElement,
-  pageList: HTMLElement,
-  height = 0,
-  page?: number,
-): PdfProgress | null {
-  if (scroller.clientWidth === 0 || pageList.childElementCount === 0) return null;
-  const here = scroller.scrollTop + height;
-  let begin = page ?? 1;
-  let end = page ?? pageList.childElementCount;
-  while (begin < end) {
-    const middle = Math.ceil((begin + end) / 2);
-    const next = numbered(pageList, middle);
-    if (next !== null && here >= next.offsetTop) begin = middle;
-    else end = middle - 1;
+const FALLBACK: Size = { width: 595, height: 842 };
+
+function lowBit(value: number): number {
+  const low = (value & -value) >>> 0;
+  if (low !== 0) return low;
+  const high = value / 2 ** 32;
+  return ((high & -high) >>> 0) * 2 ** 32;
+}
+
+export class PdfPageHeights {
+  private readonly sizes = new Map<number, Size>();
+  private readonly sums = new Map<number, number>();
+  private estimate: Size | undefined;
+
+  constructor(readonly count: number) {}
+
+  size(page: number): Size {
+    return this.sizes.get(page) ?? this.estimate ?? FALLBACK;
   }
-  const node = numbered(pageList, begin);
-  if (node === null || node.offsetHeight === 0) return null;
-  return { page: begin, offset: unit((here - node.offsetTop) / node.offsetHeight) };
-}
 
-export function scrollToPosition(
-  scroller: HTMLElement,
-  pageList: HTMLElement,
-  progress: PdfProgress,
-): void {
-  if (!Number.isSafeInteger(progress.page) || !Number.isFinite(progress.offset)) return;
-  const node = numbered(pageList, Math.min(pageList.childElementCount, progress.page));
-  if (node === null) return;
-  scroller.scrollTop =
-    progress.page === 1 && progress.offset <= 0
-      ? 0
-      : node.offsetTop + unit(progress.offset) * node.offsetHeight;
+  measure(page: number, size: Size): void {
+    const estimate = (this.estimate ??= size);
+    const previous = this.sizes.get(page) ?? estimate;
+    this.sizes.set(page, size);
+    const delta = size.height / size.width - previous.height / previous.width;
+    if (delta === 0) return;
+    for (let end = page; end <= this.count; end += lowBit(end)) {
+      this.sums.set(end, (this.sums.get(end) ?? 0) + delta);
+    }
+  }
+
+  height(page: number, width: number): number {
+    const size = this.size(page);
+    return (size.height / size.width) * width;
+  }
+
+  top(page: number, width: number, gap: number): number {
+    const preceding = page - 1;
+    let extra = 0;
+    let end = 0;
+    for (let step = 2 ** Math.floor(Math.log2(preceding)); step >= 1; step /= 2) {
+      if (end + step > preceding) continue;
+      end += step;
+      extra += this.sums.get(end) ?? 0;
+    }
+    return preceding * (this.height(0, width) + gap) + extra * width;
+  }
+
+  pageAt(top: number, width: number, gap: number): number {
+    const stride = this.height(0, width) + gap;
+    let preceding = 0;
+    let extra = 0;
+    for (let step = 2 ** Math.floor(Math.log2(this.count)); step >= 1; step /= 2) {
+      const end = preceding + step;
+      if (end >= this.count) continue;
+      const next = extra + (this.sums.get(end) ?? 0);
+      if (end * stride + next * width <= top) {
+        preceding = end;
+        extra = next;
+      }
+    }
+    return preceding + 1;
+  }
+
+  position(top: number, width: number, gap: number): PdfProgress {
+    const page = this.pageAt(top, width, gap);
+    return { page, offset: unit((top - this.top(page, width, gap)) / this.height(page, width)) };
+  }
 }
