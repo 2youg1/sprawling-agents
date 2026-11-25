@@ -270,7 +270,7 @@ A run's `exec` call runs in a sandbox arm, and the tool's own description tells 
 | `copied_tree` | a copy of the worktree | a copy of the worktree | a copy of the worktree |
 | `native` | a Job Object with AppContainer | a Seatbelt profile restricting writes and network access | the `bwrap` namespace wrapper |
 | `container` | Docker or Podman Desktop, sandboxed Python uses the image’s `python3` | Docker or Podman Desktop, sandboxed Python uses the image’s `python3` | rootless Podman or Docker, sandboxed Python uses the image’s `python3` |
-| `python` | host Python only, under the selected confinement | host Python only, under the selected confinement | host Python only, under the selected confinement |
+| `python` | Configured host interpreter for non-container calls. Sandboxed container calls use the image’s `python3`. | Configured host interpreter for non-container calls. Sandboxed container calls use the image’s `python3`. | Configured host interpreter for non-container calls. Sandboxed container calls use the image’s `python3`. |
 
 Without an explicit choice, [Confinement::choose](../../Sprawling/runtime/src/tools/exec/confinement.rs) selects `copied_tree` on Windows and macOS, and `native` on Linux when `bwrap` is present, otherwise `copied_tree`. Windows keeps this fallback until the native conformance requirements in [Exec SB1 item 3](../../Sprawling/runtime/spec/Tools/Exec.lean) pass. Set `[sandbox] arm` in the configuration layer's `.sprawling/CONFIG.toml` to select an arm explicitly; a missing requested mechanism refuses instead of silently weakening the choice. The run's tool disclosure describes the configured route, whereas doctor reports detected machine capabilities.
 
