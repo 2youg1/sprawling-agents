@@ -10,7 +10,6 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc;
 use std::thread;
-use std::time::Duration;
 
 use serde_json::{Value, json};
 
@@ -114,19 +113,7 @@ pub fn serve_with_meter(
     mut turn: impl FnMut(Turn) -> Result<Outcome>,
     lines_read: Option<Arc<AtomicU64>>,
 ) -> Result<()> {
-    let (tx, mut rx) = mpsc::channel::<std::io::Result<String>>();
-    let meter = lines_read.clone();
-    thread::spawn(move || {
-        let reader = BufReader::new(input);
-        for line in reader.lines() {
-            if tx.send(line).is_err() {
-                break;
-            }
-            if let Some(meter) = &meter {
-                meter.fetch_add(1, Ordering::SeqCst);
-            }
-        }
-    });
+    let mut input = Input::start(input, lines_read);
     let mut pending = VecDeque::new();
     let mut phase = Phase::Idle;
     let mut session_id = String::new();
@@ -136,17 +123,9 @@ pub fn serve_with_meter(
     loop {
         let line = match pending.pop_front() {
             Some(line) => line,
-            None => match rx.recv() {
-                Ok(Ok(line)) => line,
-                Ok(Err(err)) => {
-                    return Err(Error::Diagnostic(Diagnostic::new(
-                        Code::Protocol,
-                        "read an ACP line",
-                        err.to_string(),
-                        "keep stdin as UTF-8 JSON-RPC lines until the client closes it",
-                    )));
-                }
-                Err(_) => return Ok(()),
+            None => match input.next_line()? {
+                Some(line) => line,
+                None => return Ok(()),
             },
         };
         if line.trim().is_empty() {
@@ -190,16 +169,9 @@ pub fn serve_with_meter(
                             first,
                             cancelled: Arc::clone(&cancelled),
                         };
-                        let drained = run_turn_while_draining(TurnDrain {
-                            turn_input,
-                            turn: &mut turn,
-                            rx,
-                            session_id: &session_id,
-                            cancelled: &cancelled,
-                        })?;
-                        rx = drained.rx;
+                        let drained = run_turn_while_draining(input, turn_input, &mut turn)?;
+                        input = drained.input;
                         pending.append(&mut { drained.pending });
-                        drain_during_turn(&rx, &mut pending, &session_id, &cancelled)?;
                         let result = drained.result;
                         match result {
                             Ok(outcome) => {
@@ -267,92 +239,170 @@ pub fn serve_with_meter(
     }
 }
 
-struct TurnDrain<'a, F> {
-    turn_input: Turn,
-    turn: &'a mut F,
-    rx: mpsc::Receiver<std::io::Result<String>>,
-    session_id: &'a str,
-    cancelled: &'a Arc<AtomicBool>,
+enum InputEvent {
+    Line(std::io::Result<String>),
+    Eof,
+    TurnDone,
+}
+
+struct Input {
+    tx: mpsc::Sender<InputEvent>,
+    rx: mpsc::Receiver<InputEvent>,
+    eof: bool,
+}
+
+impl Input {
+    fn start(reader: impl Read + Send + 'static, meter: Option<Arc<AtomicU64>>) -> Self {
+        let (tx, rx) = mpsc::channel();
+        let eof = NotifyOnDrop {
+            sender: tx.clone(),
+            event: Some(InputEvent::Eof),
+        };
+        thread::spawn(move || {
+            for line in BufReader::new(reader).lines() {
+                if eof.sender.send(InputEvent::Line(line)).is_err() {
+                    return;
+                }
+                if let Some(meter) = &meter {
+                    meter.fetch_add(1, Ordering::SeqCst);
+                }
+            }
+            drop(eof);
+        });
+        Self { tx, rx, eof: false }
+    }
+
+    fn next_line(&mut self) -> Result<Option<String>> {
+        while !self.eof {
+            match self.rx.recv() {
+                Ok(InputEvent::Line(line)) => {
+                    return line.map(Some).map_err(|err| {
+                        Diagnostic::new(
+                            Code::Protocol,
+                            "read an ACP line",
+                            err.to_string(),
+                            "keep stdin as UTF-8 JSON-RPC lines until the client closes it",
+                        )
+                        .into()
+                    });
+                }
+                Ok(InputEvent::Eof) | Err(_) => self.eof = true,
+                Ok(InputEvent::TurnDone) => continue,
+            }
+        }
+        Ok(None)
+    }
+}
+
+struct NotifyOnDrop {
+    sender: mpsc::Sender<InputEvent>,
+    event: Option<InputEvent>,
+}
+
+impl Drop for NotifyOnDrop {
+    fn drop(&mut self) {
+        if let Some(event) = self.event.take() {
+            drop(self.sender.send(event));
+        }
+    }
+}
+
+struct TurnInput {
+    input: Input,
+    session: String,
+    cancelled: Arc<AtomicBool>,
+    pending: VecDeque<String>,
+}
+
+impl TurnInput {
+    fn read_until_done(mut self) -> Result<Self> {
+        while let Ok(event) = self.input.rx.recv() {
+            if matches!(event, InputEvent::TurnDone) {
+                break;
+            }
+            self.accept(event)?;
+        }
+        Ok(self)
+    }
+
+    fn accept(&mut self, event: InputEvent) -> Result<()> {
+        match event {
+            InputEvent::Line(Ok(line)) => {
+                note_cancel_or_queue(line, &self.session, &self.cancelled, &mut self.pending);
+            }
+            InputEvent::Line(Err(err)) => {
+                return Err(Diagnostic::new(
+                    Code::Protocol,
+                    "read an ACP line during a turn",
+                    err.to_string(),
+                    "keep stdin open until the prompt response is written",
+                )
+                .into());
+            }
+            InputEvent::Eof => self.input.eof = true,
+            InputEvent::TurnDone => {}
+        }
+        Ok(())
+    }
+
+    fn read_ready(&mut self) -> Result<()> {
+        while let Ok(event) = self.input.rx.try_recv() {
+            self.accept(event)?;
+        }
+        Ok(())
+    }
 }
 
 struct DrainedTurn {
     result: Result<Outcome>,
-    rx: mpsc::Receiver<std::io::Result<String>>,
+    input: Input,
     pending: VecDeque<String>,
 }
 
-fn run_turn_while_draining<F>(parts: TurnDrain<'_, F>) -> Result<DrainedTurn>
-where
-    F: FnMut(Turn) -> Result<Outcome>,
-{
-    let TurnDrain {
-        turn_input,
-        turn,
-        rx,
-        session_id,
-        cancelled,
-    } = parts;
-    let (done_tx, done_rx) = mpsc::channel::<()>();
-    let (back_tx, back_rx) = mpsc::channel::<
-        std::result::Result<(mpsc::Receiver<std::io::Result<String>>, VecDeque<String>), String>,
-    >();
-    let session = session_id.to_owned();
-    let flag = Arc::clone(cancelled);
-    let drain = thread::spawn(move || {
-        let mut pending = VecDeque::new();
-        let outcome = loop {
-            if done_rx.try_recv().is_ok() {
-                break Ok((rx, pending));
-            }
-            match rx.recv_timeout(Duration::from_millis(5)) {
-                Ok(Ok(line)) => note_cancel_or_queue(&line, &session, &flag, &mut pending),
-                Ok(Err(err)) => break Err(err.to_string()),
-                Err(mpsc::RecvTimeoutError::Timeout) => {}
-                Err(mpsc::RecvTimeoutError::Disconnected) => break Ok((rx, pending)),
-            }
-        };
-        drop(back_tx.send(outcome));
-    });
+fn run_turn_while_draining(
+    input: Input,
+    turn_input: Turn,
+    turn: &mut impl FnMut(Turn) -> Result<Outcome>,
+) -> Result<DrainedTurn> {
+    if input.eof {
+        return Ok(DrainedTurn {
+            result: turn(turn_input),
+            input,
+            pending: VecDeque::new(),
+        });
+    }
+    let mut draining = TurnInput {
+        input,
+        session: turn_input.session_id.clone(),
+        cancelled: Arc::clone(&turn_input.cancelled),
+        pending: VecDeque::new(),
+    };
+    draining.read_ready()?;
+    let done = NotifyOnDrop {
+        sender: draining.input.tx.clone(),
+        event: Some(InputEvent::TurnDone),
+    };
+    let drain = thread::spawn(move || draining.read_until_done());
     let result = turn(turn_input);
-    match done_tx.send(()) {
-        Ok(()) | Err(_) => {}
-    }
-    let reclaimed = back_rx.recv().map_err(|_| {
-        Error::Diagnostic(Diagnostic::new(
+    drop(done);
+    let mut drained = drain.join().map_err(|_| {
+        Diagnostic::new(
             Code::Protocol,
-            "reclaim ACP stdin after a turn",
-            "the cancel drain thread exited without returning the reader",
-            "restart `mei --acp`",
-        ))
-    })?;
-    match drain.join() {
-        Ok(()) => {}
-        Err(_) => {
-            return Err(Error::Diagnostic(Diagnostic::new(
-                Code::Protocol,
-                "join the ACP cancel drain",
-                "the drain thread panicked",
-                "restart `mei --acp`",
-            )));
-        }
-    }
-    let (rx, pending) = reclaimed.map_err(|err| {
-        Error::Diagnostic(Diagnostic::new(
-            Code::Protocol,
-            "read an ACP line during a turn",
-            err,
-            "keep stdin open until the prompt response is written",
-        ))
-    })?;
+            "join the ACP cancel drain",
+            "the drain thread panicked",
+            "restart mei --acp",
+        )
+    })??;
+    drained.read_ready()?;
     Ok(DrainedTurn {
         result,
-        rx,
-        pending,
+        input: drained.input,
+        pending: drained.pending,
     })
 }
 
 fn note_cancel_or_queue(
-    line: &str,
+    line: String,
     session_id: &str,
     cancelled: &AtomicBool,
     pending: &mut VecDeque<String>,
@@ -360,7 +410,7 @@ fn note_cancel_or_queue(
     if line.trim().is_empty() {
         return;
     }
-    if let Ok(message) = serde_json::from_str::<Value>(line)
+    if let Ok(message) = serde_json::from_str::<Value>(&line)
         && message.get("method").and_then(Value::as_str) == Some("session/cancel")
     {
         let matches = message
@@ -373,30 +423,7 @@ fn note_cancel_or_queue(
         }
         return;
     }
-    pending.push_back(line.to_owned());
-}
-
-fn drain_during_turn(
-    rx: &mpsc::Receiver<std::io::Result<String>>,
-    pending: &mut VecDeque<String>,
-    session_id: &str,
-    cancelled: &Arc<AtomicBool>,
-) -> Result<()> {
-    loop {
-        match rx.try_recv() {
-            Ok(Ok(line)) => note_cancel_or_queue(&line, session_id, cancelled, pending),
-            Ok(Err(err)) => {
-                return Err(Error::Diagnostic(Diagnostic::new(
-                    Code::Protocol,
-                    "read an ACP line during a turn",
-                    err.to_string(),
-                    "keep stdin open until the prompt response is written",
-                )));
-            }
-            Err(mpsc::TryRecvError::Empty) => return Ok(()),
-            Err(mpsc::TryRecvError::Disconnected) => return Ok(()),
-        }
-    }
+    pending.push_back(line);
 }
 
 pub fn enter_cwd(cwd: &Path) -> Result<()> {
@@ -411,4 +438,25 @@ pub fn enter_cwd(cwd: &Path) -> Result<()> {
             .with_path(cwd.display().to_string()),
         )
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[allow(clippy::panic, reason = "simulate an abandoned input reader")]
+    fn an_unwinding_input_reader_notifies_the_receiver() {
+        struct AbandonedReader;
+
+        impl Read for AbandonedReader {
+            fn read(&mut self, _: &mut [u8]) -> std::io::Result<usize> {
+                panic!("input reader unwound");
+            }
+        }
+
+        let input = Input::start(AbandonedReader, None);
+        let event = input.rx.recv_timeout(std::time::Duration::from_secs(1));
+        assert!(matches!(event, Ok(InputEvent::Eof)));
+    }
 }

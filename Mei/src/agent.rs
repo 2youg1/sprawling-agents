@@ -4,12 +4,12 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use std::collections::BTreeSet;
-use std::io::Write;
+use std::io::{BufWriter, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 
-use crate::error::{Error, Result, protocol};
+use crate::error::{Result, protocol};
 use crate::observation;
 use crate::python::{Execution, Py};
 use crate::steer::{self, Intake};
@@ -62,28 +62,20 @@ fn refuse_if_cancelled(cancelled: Option<&AtomicBool>) -> Result<()> {
 }
 
 pub fn drive(request: &mut Value, live: &mut Live<'_>, trace: &mut dyn Write) -> Result<String> {
-    run(request, live, trace)
+    let mut buffered = BufWriter::new(trace);
+    let result = run(request, live, &mut buffered);
+    drop(buffered.into_parts());
+    result
 }
 
 fn found(value: Option<&Value>) -> String {
     value.map_or_else(|| "<missing>".to_owned(), |value| value.to_string())
 }
 
-fn message_path(request: &Value) -> String {
-    request
-        .get("messages")
-        .and_then(Value::as_array)
-        .and_then(|messages| messages.len().checked_sub(1))
-        .map_or_else(
-            || "messages".to_owned(),
-            |index| format!("messages[{index}]"),
-        )
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct Call {
-    id: String,
-    code: String,
+struct Call<'a> {
+    id: &'a str,
+    code: &'a str,
 }
 
 pub(crate) fn run(
@@ -93,9 +85,9 @@ pub(crate) fn run(
 ) -> Result<String> {
     let mut first_response = true;
     loop {
-        let response = ports.post(request, trace)?;
+        let mut response = ports.post(request, trace)?;
         if let Some(usage) = response.get("usage") {
-            write_message(
+            observation::write(
                 trace,
                 &json!({"type": "mei.obs", "kind": "usage", "usage": usage}),
                 "trace a mei.obs usage line",
@@ -114,15 +106,18 @@ pub(crate) fn run(
                 .with_value(found(response.get("stop_reason")))
             })?
             .to_owned();
-        let content = response.get("content").cloned().ok_or_else(|| {
-            protocol(
-                "read response.content",
-                "content is missing",
-                "return a complete Anthropic Messages response with content",
-            )
-            .with_path("response.content")
-            .with_value(found(response.get("content")))
-        })?;
+        let content = response
+            .get_mut("content")
+            .map(Value::take)
+            .ok_or_else(|| {
+                protocol(
+                    "read response.content",
+                    "content is missing",
+                    "return a complete Anthropic Messages response with content",
+                )
+                .with_path("response.content")
+                .with_value("<missing>")
+            })?;
         if !content.is_string() && !content.is_array() {
             return Err(protocol(
                 "read response.content",
@@ -137,18 +132,13 @@ pub(crate) fn run(
             trace_prompt(request, trace)?;
             first_response = false;
         }
-        append(
-            request,
-            json!({"role": "assistant", "content": content.clone()}),
-            Some(stop.as_str()),
-            trace,
-        )?;
-        let base = message_path(request);
+        let (index, content) = append(request, content, Some(&stop), trace)?;
+        let base = format!("messages[{index}]");
         match stop.as_str() {
             "pause_turn" => continue,
-            "end_turn" => return text(&content, &base),
+            "end_turn" => return text(content, &base),
             "tool_use" => {
-                let calls = calls(&content, &base)?;
+                let calls = calls(content, &base)?;
                 if calls.is_empty() {
                     return Err(protocol(
                         "validate a python tool wave",
@@ -156,7 +146,7 @@ pub(crate) fn run(
                         "return at least one valid python tool_use block, or use another stop_reason",
                     )
                     .with_path(format!("{base}.content"))
-                    .with_value(found(Some(&content)))
+                    .with_value(found(Some(content)))
                     .into());
                 }
                 let mut results = Vec::with_capacity(calls.len());
@@ -167,9 +157,9 @@ pub(crate) fn run(
                         &json!({"type": "mei.obs", "kind": "tool_start", "id": call.id}),
                         "trace the started Python call",
                     )?;
-                    let output = ports.exec(&call.code)?;
+                    let output = ports.exec(call.code)?;
                     previews.extend(output.previews);
-                    let mut result = serde_json::Map::from_iter([
+                    let mut result = Map::from_iter([
                         ("type".to_owned(), Value::from("tool_result")),
                         ("tool_use_id".to_owned(), Value::from(call.id)),
                         ("content".to_owned(), output.content),
@@ -181,12 +171,7 @@ pub(crate) fn run(
                 }
                 let arrived = ports.steer()?;
                 steer::land(&mut results, &arrived);
-                append(
-                    request,
-                    json!({"role": "user", "content": results}),
-                    None,
-                    trace,
-                )?;
+                append(request, Value::Array(results), None, trace)?;
                 for preview in previews {
                     observation::write(
                         trace,
@@ -219,31 +204,44 @@ pub(crate) fn run(
     }
 }
 
-fn append(
-    request: &mut Value,
-    message: Value,
+fn append<'a>(
+    request: &'a mut Value,
+    content: Value,
     stop: Option<&str>,
     trace: &mut dyn Write,
-) -> Result<()> {
-    let Some(messages) = request.get_mut("messages").and_then(Value::as_array_mut) else {
-        return Err(protocol(
-            "append a message",
-            "request.messages is missing or is not an array",
-            "construct one Messages request with messages as an array before calling agent::run",
-        )
-        .with_path("request.messages")
-        .with_value(found(request.get("messages")))
-        .into());
-    };
-    messages.push(message.clone());
-    let logged = stop.map_or(message.clone(), |stop| {
-        let mut logged = message;
-        if let Some(object) = logged.as_object_mut() {
-            object.insert("stop_reason".to_owned(), Value::from(stop));
+) -> Result<(usize, &'a Value)> {
+    let messages = match request.get_mut("messages") {
+        Some(Value::Array(messages)) => messages,
+        value => {
+            return Err(protocol(
+                "append a message",
+                "request.messages is missing or is not an array",
+                "construct one Messages request with messages as an array before calling agent::run",
+            )
+            .with_path("request.messages")
+            .with_value(found(value.as_deref()))
+            .into());
         }
-        logged
-    });
-    write_message(trace, &logged, "trace an appended message")
+    };
+    let role = stop.map_or("user", |_| "assistant");
+    let mut fields = Map::from_iter([
+        ("role".to_owned(), Value::from(role)),
+        ("content".to_owned(), content),
+    ]);
+    if let Some(stop) = stop {
+        fields.insert("stop_reason".to_owned(), Value::from(stop));
+    }
+    let mut message = Value::Object(fields);
+    let logged = observation::write(trace, &message, "trace an appended message");
+    if stop.is_some()
+        && let Some(fields) = message.as_object_mut()
+    {
+        fields.remove("stop_reason");
+    }
+    let index = messages.len();
+    let stored = messages.push_mut(message);
+    logged?;
+    Ok((index, &stored["content"]))
 }
 
 fn trace_prompt(request: &Value, trace: &mut dyn Write) -> Result<()> {
@@ -255,21 +253,7 @@ fn trace_prompt(request: &Value, trace: &mut dyn Write) -> Result<()> {
     else {
         return Ok(());
     };
-    write_message(trace, prompt, "trace the initial user prompt")
-}
-
-fn write_message(trace: &mut dyn Write, message: &Value, action: &str) -> Result<()> {
-    serde_json::to_writer(&mut *trace, message).map_err(|err| {
-        protocol(action, err.to_string(), "keep stderr writable").with_path("trace")
-    })?;
-    trace
-        .write_all(b"\n")
-        .and_then(|()| trace.flush())
-        .map_err(|err| {
-            Error::from(
-                protocol(action, err.to_string(), "keep stderr writable").with_path("trace"),
-            )
-        })
+    observation::write(trace, prompt, "trace the initial user prompt")
 }
 
 fn text(content: &Value, base: &str) -> Result<String> {
@@ -307,7 +291,7 @@ fn text(content: &Value, base: &str) -> Result<String> {
     Ok(answer)
 }
 
-fn calls(content: &Value, base: &str) -> Result<Vec<Call>> {
+fn calls<'a>(content: &'a Value, base: &str) -> Result<Vec<Call<'a>>> {
     let mut calls = Vec::new();
     let mut ids = BTreeSet::new();
     for (index, block) in content.as_array().into_iter().flatten().enumerate() {
@@ -360,7 +344,7 @@ fn calls(content: &Value, base: &str) -> Result<Vec<Call>> {
             .with_value(found(block.get("name")))
             .into());
         }
-        if !ids.insert(id.to_owned()) {
+        if !ids.insert(id) {
             return Err(protocol(
                 "validate a python tool wave",
                 format!("duplicate tool_use id `{id}`"),
@@ -370,10 +354,7 @@ fn calls(content: &Value, base: &str) -> Result<Vec<Call>> {
             .with_value(id)
             .into());
         }
-        calls.push(Call {
-            id: id.to_owned(),
-            code: code.to_owned(),
-        });
+        calls.push(Call { id, code });
     }
     Ok(calls)
 }

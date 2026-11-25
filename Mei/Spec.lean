@@ -38,6 +38,7 @@ import Mei.spec.Session
 | `workspace` | 新会话顶层 AGENTS 的读取与首消息构造 |
 | `doctor` | 当前 Mei 代次的 python/uv 缓存、探测与必要安装 |
 | `capture` | inline/spilled 捕获的文件所有权与回收 |
+| `child_exit` | 有截止时间的子进程退出等待，用于 Python 和环境安装器 |
 | `error` | 人可见诊断：Description / Cause / Resolution |
 | `acp` | ACP v1 agent：stdio JSON-RPC、相位、prompt 文本提取、`session/update` 与 stopReason |
 | `MEI.md` | 构建时静态系统提示；改之须重建；不作运行时注入面 |
@@ -226,11 +227,15 @@ resume 只重放日志已有消息，不读取或补注当前 AGENTS。工具描
 携带精确版本，与持久变量/imports/cwd、异常后恢复、主动打印、16 KiB 内联预算、完整捕获路径、
 subprocess、`sys.executable` 和 `show_image(path)` 一致；内联数字由 `INLINE_BYTES` 生成；不写 REPL 或核内超时。
 `show_image` 是 python 命名空间内的展示原语，不是第二工具；按文件魔数只接受 PNG/JPEG/GIF/WebP，
-单图编码前至多 5 MiB，图片经私有控制帧的 base64 字段返回，不污染 stdout capture。
+单图编码前至多 5 MiB，图片经私有控制帧返回，独立于 stdout capture。
 无图片时 tool_result content 保持字符串；有图片时为 text（可含大输出提示）+ image 内容块，并完整进入日志。
 `MEI_CAPTURE_DIR` 是 Face 分配当前 run 目录的内部环境接口；缺席时无头核创建临时 run 目录。
 Calyx 先独占创建空目录，再以 `MEI_CAPTURE_CREATED=1` 让 Mei 接管；没有这个标记时既有目录一律拒绝。
-私有控制信道请求传代码，响应传 ASCII capture 文件名、图片块与布尔型 `failed`；缺失或非布尔型 `failed` 属于非法帧。`Store` 在捕获 root 下拼接原生路径；spilled 提示给完整 Unicode 路径，
+私有控制信道请求为 8 字节小端无符号长度和等长 UTF-8 代码。响应依次携带 1 字节捕获文件名长度、
+1 字节失败标志（0 或 1）、1 字节图片数量、等长 ASCII 捕获文件名和图片。每张图片由 1 字节
+格式（PNG/JPEG/GIF/WebP 依次为 1–4）、4 字节小端长度和等长原始字节组成。文件名不得为空，
+图片数量至多 2、单图长度为 1 到 5 MiB，非法标志、格式、长度或截断为核错误。
+`Store` 在捕获 root 下拼接原生路径；spilled 提示给完整 Unicode 路径，
 或给能在 Python 中无损还原非 Unicode 原生路径的表达式。
 唯一工具 schema 与 agent 整波预检跨 provider 生效，不声明 provider 专有的 `strict` 模式。
 `HARNESS_EXTRA` 浅合并一次；拒绝 `stream: true` 与 `HARNESS_EXTRA.tools`。
@@ -269,7 +274,8 @@ pub struct Outcome {
 一条 stdio 连接只打开一次 `session/new`（再开返回 `-32601`）；不承诺通用 ACP v1 全能力。
 `session/new` 接受 `cwd`（绝对路径，UTF-8）与忽略的 `mcpServers`，返回 `sessionId`。
 `session/prompt` 拼接 `type=text` 与 `type=resource_link`（保留 name/uri）；二者皆空则拒。
-回合中并发排空 stdin：匹配当前 `sessionId` 的 `session/cancel` 置位取消；下一 `post`/`exec` 前拒
+回合中并发排空 stdin，输入行、EOF 和回合完成通过同一队列唤醒接收者；到达完成通知后再排空已就绪输入。
+匹配当前 `sessionId` 的 `session/cancel` 置位取消；下一 `post`/`exec` 前拒
 绝新工作。见取消则 `finish` 为 `cancelled`（`Mei.spec.Acp`），即使同回合 `agent::drive` 已返回错误。
 最终文本经 `session/update` 的 `agent_message_chunk` 写出后再返回 `stopReason`。同一 ACP session
 内多次 prompt 共享 Messages 与 python 进程；进程退出时收口解释器。
@@ -315,9 +321,10 @@ Steer：任务进行中 Face 追加的指示。不打断当前 `exec` / `post`�
   独立 GET，不为自定义 `HARNESS_MODEL` 的旧网关增加前置目录请求；路由观测失败只写 unavailable。
   路由观测是答案到达后的辅助观测，用它自己的短预算（连接与读各不超过 2 s）：网关接受后不再发字节时，
   已到的答案不被辅助观测拖住。
-- `boot.py`：请求是每帧一行 JSON string，响应是 `{capture, images, failed}` 对象；stdout/stderr 重定向到当前 run 的捕获文件；同一执行命名空间保留
+- `boot.py`：请求与响应使用 §8 的定长前缀；stdout/stderr 重定向到当前 run 内独占新建的捕获文件；同一执行命名空间保留
   变量与 imports，解释器进程保留 cwd；异常只形成 traceback 反馈，循环继续；
-  `show_image` 只把图片的 media type 与 base64 数据加入本次调用：一次调用最多 2 张、单张最多 5 MiB，且只在该调用自己的线程上追加，别的线程的或调用结束后的提交被拒绝并给出重读方式；结束后捕获文件的 ASCII basename 经控制信道回传；
+  `show_image` 只把图片的格式与原始字节加入本次调用。Rust 在构造模型工具结果时编码 base64，
+  交互预览直接读取原始字节。捕获文件的 ASCII basename 在调用结束后经控制信道回传。
   不改写文件、无 alarm。
   `MEI_CAPTURE_DIR`、`MEI_CAPTURE_CREATED` 与 `MEI_STEER_PATH` 在模型代码运行前由 `boot.py` 移出环境，递归子 Mei 不会误继承父 run 目录或 steer 文件。
 - `Py::run` 先读文件元数据；仅不超过 16 KiB 时做有界读取。完整 UTF-8 文本直接作为
@@ -327,6 +334,7 @@ Steer：任务进行中 Face 追加的指示。不打断当前 `exec` / `post`�
 - 成功 `close` 先完成 spilled 交接，再回收 run 所有的 inline；inline 删除失败只报警并保留清理记录，答复仍成功。
   失败 `kill_and_wait` 回收整个未提交 run。`Py` 被丢弃时，子解释器已退出且未 `close` 的 run 视为未交接，回收其未提交 run。
   Calyx 在强制取消后只删除它独占创建的 run 目录。`close` 的 5s 宽限后 kill+wait；成功收口的强制清理不是运行失败。
+  Windows 等待子进程句柄就绪，Linux 等待 pidfd 可读。无这类等待源的平台在截止时间内退避检查。
 - doctor 以 `CARGO_PKG_VERSION` 和缓存 schema 判定代次；缓存命中不执行探测或安装，但记录里的两个程序
   必须仍是普通文件，否则整条记录作废并重建。
   缺失/EOL python 的修复先刷新 Mei 私有的最新稳定 uv，再在隔离目录安装最新稳定 python，
@@ -360,7 +368,7 @@ inline 文件占用、spilled 跨进程读取、失败/取消 run、宿主崩溃
 
 /-! ## 13 依赖选型
 
-`serde_json` 处理协议；`base64` 解码工具图像，`image` 只启用 PNG/JPEG 解码以生成有界字符预览。保留原始工具结果给模型，Face 可直接显示预览，无需再实现格式解码。TCP、进程和回调使用标准库。被否：reqwest、clap、Model/Tool trait、
+`serde_json` 处理网关与 JSONL；`base64` 编码工具图像，`image` 只启用 PNG/JPEG 解码以生成有界字符预览。保留原始工具结果给模型，Face 可直接显示预览，无需再实现格式解码。TCP、进程和回调使用标准库，有限时退出等待在 Windows 用 `wait-timeout`、Linux 用 `rustix`。被否：reqwest、clap、Model/Tool trait、
 Mei 自更新器、为输出捕获引入异步 runtime。uv 官方 installer、`uv python install` 与
 `UV_UNMANAGED_INSTALL` / `UV_PYTHON_INSTALL_DIR` / `UV_PYTHON_BIN_DIR` 的合同见官方文档，
 跟踪关系记入 `docs/third-party.md`。
@@ -451,6 +459,15 @@ doctor 测试用假探测/安装闭包和隔离缓存，不执行真实下载；
 原有间隔发送。被否：等到整个读取片用尽再读。探测的读取片等于整个预算，截止前到达的响应会丢失。 -/
 
 /-! D23 Python 的私有帧传回异常标志，Mei 把异常标到 `tool_result.is_error`，仍将完整捕获内容送回模型。每个已经验证的调用执行前发 `mei.obs tool_start`。工作区指令成功读取时发 `mei.obs workspace`，只携带加载标志。交互运行把 PNG/JPEG 解码为有界灰阶字符预览，经 `mei.obs image` 发给 Calyx。原图片完整保留在工具结果里。理由：前端以真实运行结果识别状态，避免从 traceback 文本或普通 stderr 猜测；灰阶预览可在备用屏重排，不依赖宿主图形扩展。 -/
+/-! D25 Rust 和内嵌 Python 共同构建，私有控制信道使用有长度的二进制帧。引导器可省去 JSON 和 base64
+导入，图片经过管道时保持原始大小，Rust 只在模型边界做一次 base64 编码。被否：在私有信道发送 JSON
+及 base64，那会增加启动导入、管道传输量，并让交互预览重复解码。 -/
+/-! D26 ACP 排空者由输入与回合完成事件唤醒。EOF 结束输入，但已排队的回合仍可结束；
+完成前已经到达的匹配取消仍参与结束判定。被否：两条独立通知通道加定时检查，由定时间隔拖延回合结束。 -/
+/-! D27 Python 和环境安装器的退出等待使用 Windows 子进程句柄或 Linux pidfd。同一调用者在截止后保留 kill
+和 reap 的责任。Linux 内核不提供 pidfd 或沙箱拒绝它时，以及没有原生等待实现的平台，使用有界退避。
+kill 失败后只检查退出状态，已退出便完成收口，仍在运行便返回诊断。成功发出 kill 后由调用者收割。
+被否：在库级代码接管进程全局的 SIGCHLD。 -/
 /-! D21 任务进行中的 Steer 接到本波最新一条 tool_result 文本末尾，不打断当前工具调用。
 
 决定：`agent::run` 在整波 `exec` 全部返回之后才 `steer()` 取尽已到达文本，按到达序追加到
