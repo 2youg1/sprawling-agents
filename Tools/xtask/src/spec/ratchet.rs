@@ -3,16 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Assertions 6 and 7 of the `spec` gate (Tools/xtask/Spec.lean §8-42):
-//! two counts that may only fall, each pinned in `Tools/xtask/budgets.toml`.
-//! A count above its pin lists the offenders; a count below it asks for
-//! the pin to be lowered in the same change, so the room it freed cannot
-//! be spent again later.
-
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use super::rustpath::Modules;
+use super::source;
 use super::theorems::{self, Class};
 use crate::budget;
 use crate::lean;
@@ -20,12 +15,9 @@ use crate::modmap;
 use crate::report::{Violation, XtaskError};
 use crate::walk;
 
-/// The two counts, each with its register row.
 #[derive(Clone, Copy)]
 enum Ratchet {
-    /// Assertion 6: stateful parts that prove nothing.
     PartsWithoutTheorem,
-    /// Assertion 7: backticked Rust paths that name nothing.
     UnresolvedPaths,
 }
 
@@ -49,12 +41,9 @@ impl Ratchet {
         }
     }
 }
-/// The key both rows state their pin under.
 const PINNED: &str = "pinned";
-/// The module map shapes whose specification parts are counted (D23).
 const STATEFUL: [&str; 2] = ["state machine", "typestate"];
 
-/// The text files of the tree, read once, by repo-relative path.
 pub(crate) struct Tree {
     pub(crate) lean: BTreeMap<String, String>,
     pub(crate) rust: BTreeMap<String, String>,
@@ -83,9 +72,8 @@ pub(super) fn check(root: &Path, out: &mut Vec<Violation>) -> Result<(), XtaskEr
     compare(&register, Ratchet::PartsWithoutTheorem, &untheorem, out);
     let mut files = BTreeMap::new();
     for anchor in &anchors {
-        // A row may note its role after the path, as `kernel::ledger (port)`.
         let module = anchor.module.split_whitespace().next().unwrap_or_default();
-        files.insert(module.to_owned(), read_or_empty(root, &anchor.file)?);
+        files.insert(module.to_owned(), read_module(root, &anchor.file)?);
         if let (Some(top), Some((dir, _))) =
             (module.split("::").next(), anchor.file.split_once("/src/"))
             && !files.contains_key(top)
@@ -93,18 +81,19 @@ pub(super) fn check(root: &Path, out: &mut Vec<Violation>) -> Result<(), XtaskEr
             for root_file in ["lib.rs", "main.rs"] {
                 let path = format!("{dir}/src/{root_file}");
                 if root.join(&path).is_file() {
-                    files.insert(top.to_owned(), read_or_empty(root, &path)?);
+                    files.insert(top.to_owned(), read_module(root, &path)?);
                     break;
                 }
             }
         }
     }
-    let unresolved = unresolved(&Modules::new(files), &tree);
+    let modules = Modules::new(files);
+    source::check_threat_model(root, &modules, &tree, out);
+    let unresolved = unresolved(&modules, &tree);
     compare(&register, Ratchet::UnresolvedPaths, &unresolved, out);
     Ok(())
 }
 
-/// Every specification part and its class (D22), by repo-relative path.
 pub(crate) fn classes(tree: &Tree) -> BTreeMap<String, Class> {
     let checks: Vec<&String> = tree
         .rust
@@ -125,7 +114,6 @@ pub(crate) fn classes(tree: &Tree) -> BTreeMap<String, Class> {
         .collect()
 }
 
-/// Every backticked Rust path that resolves to nothing, as `file:line: path`.
 pub(crate) fn unresolved(modules: &Modules, tree: &Tree) -> Vec<String> {
     let lean = tree
         .lean
@@ -134,7 +122,7 @@ pub(crate) fn unresolved(modules: &Modules, tree: &Tree) -> Vec<String> {
     let markdown = tree
         .markdown
         .iter()
-        .filter(|(rel, _)| !rel.ends_with("CHANGELOG.md"))
+        .filter(|(rel, _)| rel.as_str() != source::THREAT_MODEL && !rel.ends_with("CHANGELOG.md"))
         .flat_map(|(rel, text)| numbered(rel, text, |_| true));
     let rustdoc = tree.rust.iter().flat_map(|(rel, text)| {
         numbered(rel, text, |line| {
@@ -155,7 +143,6 @@ pub(crate) fn unresolved(modules: &Modules, tree: &Tree) -> Vec<String> {
         .collect()
 }
 
-/// The lines of `text` that `keep` accepts, each with `rel:line`.
 fn numbered<'t>(
     rel: &'t str,
     text: &'t str,
@@ -167,7 +154,6 @@ fn numbered<'t>(
         .map(move |(index, line)| (format!("{rel}:{}", index.saturating_add(1)), line))
 }
 
-/// A `.lean` under a `spec/` directory, the checker's own code aside.
 fn is_part(rel: &str) -> bool {
     let mut dirs = rel.split('/').rev().skip(1);
     let under_parts = dirs.any(|dir| dir == lean::PARTS);
@@ -182,8 +168,6 @@ fn is_part(rel: &str) -> bool {
     }
 }
 
-/// Whether `part` is the file a stateful anchor names, or below the
-/// directory of the same name.
 fn anchored(stateful: &BTreeSet<String>, part: &str) -> bool {
     stateful.iter().any(|module| {
         let file = lean::module_file(module);
@@ -195,8 +179,6 @@ fn anchored(stateful: &BTreeSet<String>, part: &str) -> bool {
     })
 }
 
-/// The pin of `row` against `found`: equal is green, anything else is a
-/// violation that says which way to move.
 fn compare(register: &toml::Value, ratchet: Ratchet, found: &[String], out: &mut Vec<Violation>) {
     let row = ratchet.row();
     let count = found.len();
@@ -239,7 +221,8 @@ fn read_tree(root: &Path) -> Result<Tree, XtaskError> {
         markdown: BTreeMap::new(),
     };
     for file in walk::files(root)? {
-        let rel = walk::rel(root, &file);
+        let walked = walk::rel(root, &file);
+        let rel = super::checker_rel(&walked);
         let bucket = match file.extension().and_then(|ext| ext.to_str()) {
             Some("lean") => &mut tree.lean,
             Some("rs") => &mut tree.rust,
@@ -247,18 +230,18 @@ fn read_tree(root: &Path) -> Result<Tree, XtaskError> {
             Some(_) | None => continue,
         };
         if !walk::in_isolation_zone(&rel) {
-            bucket.insert(rel, walk::read_text(&file)?);
+            bucket.insert(rel.into_owned(), walk::read_text(&file)?);
         }
     }
     Ok(tree)
 }
 
-fn read_or_empty(root: &Path, rel: &str) -> Result<String, XtaskError> {
+fn read_module(root: &Path, rel: &str) -> Result<Option<String>, XtaskError> {
     let path = root.join(rel);
     if path.is_file() {
-        walk::read_text(&path)
+        walk::read_text(&path).map(Some)
     } else {
-        Ok(String::new())
+        Ok(None)
     }
 }
 

@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-/// The skeleton lands in the directory cargo metadata gives the lib.
 #[test]
 fn a_relocated_package_gets_its_spec_skeleton_in_its_own_directory() {
     let root = crate::root::fixture::relocated("spec");
@@ -13,8 +12,6 @@ fn a_relocated_package_gets_its_spec_skeleton_in_its_own_directory() {
     assert!(made.is_ok() && landed, "{made:?}");
 }
 
-/// The skeleton is Lean: the notice as Lean comments, then the seventeen
-/// section comments `Sprawling/city/skills/sdd` lists, numbered in order.
 #[test]
 fn the_skeleton_opens_with_the_notice_and_numbers_the_seventeen_sections_in_order() {
     let text = super::skeleton("k");
@@ -33,8 +30,6 @@ fn the_skeleton_opens_with_the_notice_and_numbers_the_seventeen_sections_in_orde
     );
 }
 
-/// Everything the gate reports on a fixture, as `location: violation`,
-/// sorted; the fixture is removed before anything is asserted.
 fn judged(root: &std::path::Path) -> Result<Vec<String>, String> {
     for (path, text) in [
         ("architecture.toml", "module = []\n"),
@@ -58,7 +53,6 @@ fn judged(root: &std::path::Path) -> Result<Vec<String>, String> {
     Ok(texts)
 }
 
-/// Two specifications in one package, and none in another.
 #[test]
 fn a_package_holds_exactly_one_effective_specification() {
     let root = crate::root::fixture::relocated("spec-effective");
@@ -73,8 +67,6 @@ fn a_package_holds_exactly_one_effective_specification() {
     );
 }
 
-/// A SPEC named in prose is in the tree; a pattern, a string in code and
-/// the history are not citations.
 #[test]
 fn prose_names_no_spec_the_tree_lacks() {
     let root = crate::root::fixture::relocated("spec-dangling");
@@ -100,8 +92,6 @@ fn prose_names_no_spec_the_tree_lacks() {
     );
 }
 
-/// The imports each side may make, no proof left undischarged, and the
-/// paths a specification cites.
 #[test]
 fn lean_imports_along_the_crate_graph_and_proves_what_it_states() {
     let root = crate::root::fixture::relocated("spec-source");
@@ -141,9 +131,6 @@ fn lean_imports_along_the_crate_graph_and_proves_what_it_states() {
     );
 }
 
-/// The checker's own specification: its entry imports its parts, a part
-/// may not import the checker, the checker may not import it, the paths
-/// it cites are on disk, and it is the checker's one specification.
 #[test]
 fn the_checker_has_one_specification_that_imports_its_parts_and_never_the_checker() {
     let root = crate::root::fixture::relocated("spec-checker");
@@ -186,9 +173,6 @@ fn the_checker_has_one_specification_that_imports_its_parts_and_never_the_checke
     );
 }
 
-/// The four classes, read off the text: a theorem in a comment is prose,
-/// a head with no binder is closed, and a check is derived only from a
-/// Rust file that holds a test and names the part and the theorem.
 #[test]
 fn a_part_is_text_closed_quantified_or_checked() {
     use super::theorems::Class;
@@ -236,11 +220,6 @@ fn a_part_is_text_closed_quantified_or_checked() {
     );
 }
 
-/// Both ratchets on one fixture: the stateful module's two parts prove
-/// nothing and exceed their pin, so each is named; three backticked paths
-/// name nothing, below a pin of five, so the pin is asked to fall. A
-/// re-export, a crate-root item, a variant, a module named with a note,
-/// a path outside the workspace and the history resolve or are not read.
 #[test]
 fn the_two_counts_are_held_to_their_pins() {
     let root = crate::root::fixture::relocated("spec-ratchet");
@@ -293,9 +272,6 @@ fn the_two_counts_are_held_to_their_pins() {
     );
 }
 
-/// A number heads one decision in its specification; a letter suffix is
-/// another number, another specification may reuse it, and a line that
-/// only cites a decision is not a heading.
 #[test]
 fn a_decision_number_heads_one_decision_in_its_specification() {
     let root = crate::root::fixture::relocated("spec-decisions");
@@ -317,5 +293,104 @@ fn a_decision_number_heads_one_decision_in_its_specification() {
             "crates/j/spec/Part.lean:4: D3 also heads a decision at crates/j/Spec.lean:1"
                 .to_owned(),
         ])
+    );
+}
+
+#[test]
+fn the_model_rejects_each_kind_of_missing_citation() {
+    for (reference, kind) in [
+        ("removed::part", "Rust module"),
+        ("docs/missing.md", "file"),
+        ("crates/j/src/check.rs::ordinary_helper", "Rust test"),
+        (
+            "Tools/adversary/spec/Proof.lean::imaginary",
+            "Lean theorem or lemma",
+        ),
+    ] {
+        let root = crate::root::fixture::relocated("spec-threat-model");
+        let write = |path: &str, text: &str| crate::root::fixture::write(&root, path, text);
+        write("tools/k/k-SPEC.md", "# k\n");
+        write("crates/j/Spec.lean", "");
+        write("crates/j/src/machine.rs", "");
+        write(
+            "architecture.toml",
+            "module = [{ name = \"j::machine\", file = \"crates/j/src/machine.rs\", owns = \"m\", \
+             shape = \"decision\", status = \"built\", spec = \"crates.j.Spec\" }]\n",
+        );
+        write(
+            "crates/j/src/check.rs",
+            "mod checks { #[test] fn present() {} fn ordinary_helper() {} }\n",
+        );
+        write(
+            "tools/adversary/spec/Proof.lean",
+            "theorem present : True := trivial\n-- theorem imaginary : True := trivial\n",
+        );
+        write(
+            "docs/threat-model.md",
+            &format!(
+                "| `j::machine` | `crates/j/src/machine.rs` | `crates/j/src/check.rs::present` | \
+                 `Tools/adversary/spec/Proof.lean::present` |\n| `{reference}` |\n"
+            ),
+        );
+        assert_eq!(
+            judged(&root),
+            Ok(vec![format!(
+                "docs/threat-model.md:2: {kind} citation `{reference}` does not resolve"
+            )])
+        );
+    }
+}
+
+const MODEL_FILES: [&str; 8] = [
+    ".github/scripts/refresh.task",
+    "deps.lock",
+    "install.ps1",
+    "install.sh",
+    "justfile",
+    "scripts/check.sh",
+    "scripts/inputs.lock",
+    "scripts/run.cmd",
+];
+
+fn checked_model_files(label: &str, files_on_disk: &[&str]) -> Result<Vec<String>, String> {
+    use std::fmt::Write as _;
+
+    let root = crate::root::fixture::relocated(label);
+    let write = |path: &str, text: &str| crate::root::fixture::write(&root, path, text);
+    write("tools/k/k-SPEC.md", "# k\n");
+    write("crates/j/Spec.lean", "");
+    for path in files_on_disk {
+        write(path, "");
+    }
+    let mut model = String::from(
+        "| `cargo` | `cargo xtask gates spec` | `sh scripts/check.sh` | `--locked` | `ledger_append` | `ledger_append.budget_p50_us` | `watch/act` |\n",
+    );
+    for path in MODEL_FILES {
+        writeln!(model, "| `{path}` |").unwrap();
+    }
+    write("docs/threat-model.md", &model);
+    judged(&root)
+}
+
+#[test]
+fn the_model_reports_each_missing_script_lockfile_and_named_file() {
+    let expected: Vec<String> = MODEL_FILES
+        .iter()
+        .zip(2..)
+        .map(|(path, line)| {
+            format!("docs/threat-model.md:{line}: file citation `{path}` does not resolve")
+        })
+        .collect();
+    assert_eq!(
+        checked_model_files("spec-model-files-missing", &[]),
+        Ok(expected)
+    );
+}
+
+#[test]
+fn the_model_accepts_existing_files_without_mistaking_commands_for_paths() {
+    assert_eq!(
+        checked_model_files("spec-model-files-present", &MODEL_FILES),
+        Ok(Vec::new())
     );
 }

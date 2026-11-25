@@ -56,6 +56,7 @@
 | [`glossary.md`](glossary.md) | What each word means; the `lexicon` gate holds the code and the documents to these words. |
 | [`third-party.md`](third-party.md) | Whose work this stands on, and the licence obligations. |
 | [`SECURITY.md`](SECURITY.md) | The private route for reporting a vulnerability, and what is in scope. |
+| [`threat-model.md`](threat-model.md) | Assets, trust boundaries, defensive evidence and residual risks. |
 | [`CHANGELOG.md`](CHANGELOG.md) | What each release changed for someone who runs or builds the city. |
 
 One file here is part of the product rather than a document about it: [`dist/QUICKSTART.md`](dist/QUICKSTART.md) is copied into every release archive, so a change to it is a change to what a person runs.

@@ -4,8 +4,11 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
+use std::path::{Component, Path};
 
+use super::ratchet::Tree;
+use super::rustpath::{Modules, inline_code, rust_path};
+use super::theorems;
 use crate::architecture;
 use crate::depmap;
 use crate::lean;
@@ -17,6 +20,23 @@ use crate::walk;
 const CHECKER_LIBRARY: &str = "Sprawling";
 
 const TOOLCHAIN: [&str; 3] = ["Init", "Std", "Lean"];
+
+pub(super) const THREAT_MODEL: &str = "docs/threat-model.md";
+
+const MODEL_FILE_EXTENSIONS: &[&str] = &[
+    ".cmd", ".js", ".lock", ".mjs", ".nix", ".ps1", ".py", ".sh", ".ts", ".tsx", ".yaml", ".yml",
+    ".zig",
+];
+
+const MODEL_FILE_NAMES: &[&str] = &[
+    ".git-blame-ignore-revs",
+    ".gitattributes",
+    ".gitignore",
+    "LICENSE",
+    "justfile",
+    "lean-toolchain",
+    "zig-version",
+];
 
 #[derive(Clone, Copy)]
 enum Owner<'a> {
@@ -196,7 +216,7 @@ fn cited_paths(root: &Path, rel: &str, text: &str, top: &BTreeSet<String>) -> Ve
             let anchored = path
                 .split_once('/')
                 .is_some_and(|(first, _)| top.contains(first));
-            if !cited || !anchored || root.join(path).is_file() {
+            if !cited || !anchored || repository_file_exists(root, path) {
                 continue;
             }
             out.push(finding(
@@ -208,6 +228,101 @@ fn cited_paths(root: &Path, rel: &str, text: &str, top: &BTreeSet<String>) -> Ve
         }
     }
     out
+}
+
+pub(super) fn check_threat_model(
+    root: &Path,
+    modules: &Modules,
+    tree: &Tree,
+    out: &mut Vec<Violation>,
+) {
+    let Some(text) = tree.markdown.get(THREAT_MODEL) else {
+        return;
+    };
+    for (index, line) in text.lines().enumerate() {
+        for span in inline_code(line) {
+            if let Some(kind) = unresolved_citation(root, modules, tree, span) {
+                out.push(finding(
+                    format!("{THREAT_MODEL}:{}", index.saturating_add(1)),
+                    "the threat model cites existing files, modules and evidence names (Tools/xtask/Spec.lean §8-42)",
+                    format!("{kind} citation `{span}` does not resolve"),
+                    "update this citation to its current location or record the evidence gap",
+                ));
+            }
+        }
+    }
+}
+
+fn unresolved_citation(
+    root: &Path,
+    modules: &Modules,
+    tree: &Tree,
+    span: &str,
+) -> Option<&'static str> {
+    if rust_path(span) {
+        return (!modules.contains_module(span)).then_some("Rust module");
+    }
+    if let Some((path, name)) = span.split_once("::") {
+        if path.ends_with(".rs") {
+            let found = tree
+                .rust
+                .get(path)
+                .is_some_and(|text| has_rust_test(text, name));
+            return (!found).then_some("Rust test");
+        }
+        if path.ends_with(".lean") {
+            let found = tree.lean.get(path).is_some_and(|text| {
+                theorems::theorems(&lean::code(text))
+                    .iter()
+                    .any(|theorem| theorem.name == name)
+            });
+            return (!found).then_some("Lean theorem or lemma");
+        }
+    }
+    (is_model_file_citation(span) && !repository_file_exists(root, span)).then_some("file")
+}
+
+fn is_model_file_citation(span: &str) -> bool {
+    if release::path_tokens(span).as_slice() != [span] {
+        return false;
+    }
+    let basename = span.rsplit('/').next().unwrap_or(span);
+    MODEL_FILE_NAMES.contains(&basename)
+        || (basename != span && basename.contains('.'))
+        || release::CITED_EXTENSIONS
+            .iter()
+            .chain(MODEL_FILE_EXTENSIONS)
+            .any(|ext| basename.ends_with(ext))
+}
+
+fn repository_file_exists(root: &Path, path: &str) -> bool {
+    let path = Path::new(path);
+    path.components()
+        .all(|part| matches!(part, Component::Normal(_)))
+        && root.join(path).is_file()
+}
+
+fn has_rust_test(text: &str, name: &str) -> bool {
+    fn in_items(items: &[syn::Item], wanted: &str) -> bool {
+        items.iter().any(|item| match item {
+            syn::Item::Fn(function) => {
+                function.sig.ident == wanted
+                    && function.attrs.iter().any(|attribute| {
+                        attribute
+                            .path()
+                            .segments
+                            .last()
+                            .is_some_and(|part| part.ident == "test")
+                    })
+            }
+            syn::Item::Mod(module) => module
+                .content
+                .as_ref()
+                .is_some_and(|(_, items)| in_items(items, wanted)),
+            _ => false,
+        })
+    }
+    syn::parse_file(text).is_ok_and(|file| in_items(&file.items, name))
 }
 
 fn top_directories(root: &Path) -> Result<BTreeSet<String>, XtaskError> {
