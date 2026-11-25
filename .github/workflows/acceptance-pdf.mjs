@@ -882,8 +882,18 @@ try {
   assert.equal(await scale.getAttribute("aria-valuetext"), "130%");
   const enlarged = await sheet(restored, 3).boundingBox();
   assert.ok(enlarged && Math.abs(enlarged.width / fitted.width - 1.3) < 0.01);
+  await keyboardTools(restored);
+  await pdfTool(restored, "pdf_select_region").click();
+  await restored.keyboard.press("ArrowRight");
+  const boxOn = (number) => sheet(restored, number).locator(".pdf-region:not(.pdf-reference)");
+  await boxOn(3).waitFor();
   await button(restored, "pdf_next_page").click();
   assert.deepEqual(await shownPages(), [5, 6]);
+  assert.equal(await boxOn(3).count(), 0);
+  await surface(restored).focus();
+  await restored.keyboard.press("ArrowRight");
+  await boxOn(5).waitFor();
+  await restored.keyboard.press("Escape");
   await layout.selectOption("single");
   assert.deepEqual(await shownPages(), [5]);
   await layout.selectOption("continuous");
