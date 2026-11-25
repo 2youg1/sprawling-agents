@@ -54,7 +54,7 @@ More effort costs more and takes longer per answer, and it helps planning and wo
 
 ## A city
 
-A **city** is one directory on your computer, and everything else is inside it. Copy the directory to another computer and it is the same city; delete it and nothing outside it changes.
+You open a **city** by choosing a workspace. The host keeps the Ledger, private project storage and run checkouts in a separate private city directory. Use `sprawling export` to back up or transfer the city. See [moving a city](../operate/operating.md#moving-a-city) for restore and verification.
 
 | Word | What it is |
 |---|---|
@@ -63,7 +63,7 @@ A **city** is one directory on your computer, and everything else is inside it. 
 | **resident** | A standing identity at an address, with an `URBANITE.md` that says who it is and what work to bring it. It survives across runs |
 | **run** | One piece of work with a start and an end: an address, a task, a definition of done, a model. A resident is an identity; a run is the cost |
 | **session** | A stretch of conversation in one room. Dispatching into a room continues its session; `/new` starts another at the same address |
-| **Ledger** | The city's one history, under `<city>/.sprawling/ledger`. Every effect is written there as an event before it happens, and every page you read is rebuilt from it |
+| **Ledger** | The city's one history, under `<private-city-dir>/.sprawling/ledger`. Every effect is written there as an event before it happens, and every page you read is rebuilt from it |
 
 Every city is raised with one building already standing: `hall`, City Hall, where two residents serve every other building.
 
@@ -537,7 +537,8 @@ Then update through the original channel:
 | Bun | `bun install --global sprawling@latest` | `bun install --global sprawling@<npm-version>` |
 | Cargo | `cargo install sprawling --locked` | `cargo install sprawling --locked --version <crate-version>` |
 | cargo-binstall | `cargo binstall sprawling` | `cargo binstall sprawling --version <crate-version>` |
-| shell/PowerShell installer | stop the city and run the same installer again with `SPRAWLING_RELEASE_CHANNEL=nightly` set, every time: the installed binary remembers its channel, the installer does not | set `SPRAWLING_VERSION` to the exact published tag, as described above |
+| shell/PowerShell installer (curated release) | stop the city and run the [installer](#1-install) with `SPRAWLING_RELEASE_CHANNEL` set to `release` and `SPRAWLING_VERSION` unset to select the current curated release | set `SPRAWLING_VERSION` to the exact published curated tag following [version selection](#select-and-verify-a-version) |
+| shell/PowerShell installer (nightly) | stop the city and follow the [nightly installer commands](#follow-a-nightly-snapshot), which set `SPRAWLING_RELEASE_CHANNEL=nightly`. Unset `SPRAWLING_VERSION` to follow the newest snapshot | set `SPRAWLING_VERSION` to the exact nightly tag while it is still available |
 | Manual archive | download and verify the selected archive; if you installed it before, run the `install` command of the binary inside it | keep or download the archive of the selected tag |
 | AUR sprawling-bin | in the original checkout, `git pull --ff-only && makepkg -si` | inspect and build the PKGBUILD revision for the selected release |
 | Repository Nix flake | check out the selected tag or commit and run the commands under [With Nix](#with-nix) | use the original pinned checkout and lockfile; a fixed commit does not follow newer releases |

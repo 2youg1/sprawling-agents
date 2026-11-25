@@ -54,7 +54,7 @@
 
 ## 一座城市
 
-一座**城市**是你机器上的一个目录，其余一切都在它里面。把目录拷到另一台机器，它还是同一座城市；把它删掉，城市之外什么都不变。
+选择一个工作区即可打开一座**城市**。主机在独立的私有城市目录里保存账本、私有项目数据和 run 的工作树。备份或迁移城市时用 `sprawling export` 导出，恢复与验证见[迁移城市](../operate/operating.md#moving-a-city)。
 
 | 词 | 是什么 |
 |---|---|
@@ -63,7 +63,7 @@
 | **居民**（resident） | 一个地址上的常驻身份，带一份 `URBANITE.md` 说明自己是谁、什么样的活该交给它。它跨越多次 run 存在 |
 | **run** | 一件有始有终的活：一个地址、一项任务、一个完成标准、一个模型。居民是身份，run 是成本 |
 | **会话**（session） | 一个房间里的一段对话。往一个房间派活会接着它的会话；`/new` 在同一个地址另开一段 |
-| **账本**（Ledger） | 城市唯一的历史，在 `<city>/.sprawling/ledger`。每个效果发生之前，先作为一条事件写进去，你读到的每个页面都由它重建 |
+| **账本**（Ledger） | 城市唯一的历史，在 `<private-city-dir>/.sprawling/ledger`。每个效果发生之前，先作为一条事件写进去，你读到的每个页面都由它重建 |
 
 每座城市建起来时就已经有一栋楼：`hall`，也就是市政厅，两位服务所有楼的居民住在这里。
 
@@ -537,7 +537,8 @@ command = "markitdown-mcp"
 | Bun | `bun install --global sprawling@latest` | `bun install --global sprawling@<npm-version>` |
 | Cargo | `cargo install sprawling --locked` | `cargo install sprawling --locked --version <crate-version>` |
 | cargo-binstall | `cargo binstall sprawling` | `cargo binstall sprawling --version <crate-version>` |
-| shell/PowerShell 安装器 | 停止城市后重跑原安装器，每次都要设 `SPRAWLING_RELEASE_CHANNEL=nightly`：二进制记住自己的通道，安装器不记住 | 按前文把 `SPRAWLING_VERSION` 设为实际发布的完整 tag |
+| shell/PowerShell 安装器（正式发行） | 停止城市后按[安装步骤](#1-安装)重跑安装器，将 `SPRAWLING_RELEASE_CHANNEL` 设为 `release`，清除 `SPRAWLING_VERSION` 以选择当前正式发行 | 按[版本选择](#选一个版本核对来源)把 `SPRAWLING_VERSION` 设为对应的完整正式发行 tag |
+| shell/PowerShell 安装器（nightly） | 停止城市后按 [nightly 安装命令](#跟随-nightly-快照)操作，其中设置了 `SPRAWLING_RELEASE_CHANNEL=nightly`。清除 `SPRAWLING_VERSION` 即可跟随最新快照 | 在对应快照仍可下载时，把 `SPRAWLING_VERSION` 设为完整的 nightly tag |
 | 手动归档 | 下载并验证所选归档；此前安装过时，运行该归档内二进制的 `install` 命令 | 保留或下载所选 tag 的归档 |
 | AUR sprawling-bin | 在原 checkout 里 `git pull --ff-only && makepkg -si` | 检查并构建所选发行对应的 PKGBUILD 修订 |
 | 仓库 Nix flake | 检出所选 tag 或 commit，再运行[用 Nix](#用-nix) 里的命令 | 使用原来那份固定的 checkout 和 lockfile；固定 commit 不会跟随新版 |

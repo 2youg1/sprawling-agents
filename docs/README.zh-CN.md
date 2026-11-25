@@ -34,7 +34,7 @@ bun install --global sprawling@latest
 sprawling up ./cities/first
 ```
 
-打开页面后，连接一个模型 provider，为 `main` 选择模型，再把第一项任务交给 Mayor。在终端输入 `/web` 可重新打开页面，输入 `/quit` 可关闭城市。[安装指南](start/getting-started.zh-CN.md#1-安装)列出独立安装脚本、预编译包和版本验证方式。
+打开页面后，连接一个模型 provider，为 `main` 选择模型，再把第一项任务交给 Mayor。终端启动后显示安静宿主。先按 Esc 进入 CLI，再输入 `/web` 重新打开页面并返回安静宿主，或输入 `/quit` 停止城市。[安装指南](start/getting-started.zh-CN.md#1-安装)列出独立安装脚本、预编译包和版本验证方式。
 
 ## 项目地图
 

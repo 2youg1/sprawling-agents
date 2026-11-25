@@ -34,7 +34,7 @@ bun install --global sprawling@latest
 sprawling up ./cities/first
 ```
 
-In the browser, connect a model provider, select a model for `main`, and give the Mayor a first task. Use `/web` in the terminal to reopen the page and `/quit` to close the city. The [installation guide](docs/start/getting-started.md#1-install) also covers standalone installers, prebuilt archives and release verification.
+In the browser, connect a model provider, select a model for `main`, and give the Mayor a first task. The terminal starts as the quiet host. Press Esc to enter the CLI, then type `/web` to reopen the page and return to the quiet host, or `/quit` to stop the city. The [installation guide](docs/start/getting-started.md#1-install) also covers standalone installers, prebuilt archives and release verification.
 
 ## Projects
 
