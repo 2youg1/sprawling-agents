@@ -5,20 +5,15 @@
 
 use std::io::Cursor;
 
-use base64::Engine as _;
 use image::{ImageFormat, ImageReader, Limits};
 
-pub(super) fn thumbnail(media: &str, data: &str) -> Option<String> {
+pub(super) fn thumbnail(media: &str, data: &[u8]) -> Option<String> {
     let format = match media {
         "image/png" => ImageFormat::Png,
         "image/jpeg" => ImageFormat::Jpeg,
         _ => return None,
     };
-    let bytes = match base64::engine::general_purpose::STANDARD.decode(data) {
-        Ok(bytes) => bytes,
-        Err(_) => return None,
-    };
-    let mut reader = ImageReader::with_format(Cursor::new(bytes), format);
+    let mut reader = ImageReader::with_format(Cursor::new(data), format);
     let mut limits = Limits::default();
     limits.max_image_width = Some(8192);
     limits.max_image_height = Some(8192);
@@ -67,8 +62,7 @@ mod tests {
         ] {
             let mut bytes = Cursor::new(Vec::new());
             samples.write_to(&mut bytes, format).unwrap();
-            let encoded = base64::engine::general_purpose::STANDARD.encode(bytes.into_inner());
-            let rendered = thumbnail(mime, &encoded).unwrap();
+            let rendered = thumbnail(mime, bytes.get_ref()).unwrap();
             assert!(rendered.contains('█'));
             assert!(rendered.contains(' '));
         }

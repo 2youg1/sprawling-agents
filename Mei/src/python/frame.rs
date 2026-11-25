@@ -3,13 +3,19 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use serde_json::{Value, json};
+use std::io::Read;
 
+use base64::Engine as _;
+use serde_json::{Map, Value};
+
+use super::{IMAGE_CALL_LIMIT, IMAGE_MIB};
 use crate::error::{Code, Diagnostic, Error, Result};
 
+const IMAGE_BYTES: usize = IMAGE_MIB * 1024 * 1024;
+
 pub struct Image {
-    pub(super) media_type: String,
-    pub(super) data: String,
+    pub(super) media_type: &'static str,
+    pub(super) data: Vec<u8>,
 }
 
 pub struct Frame {
@@ -23,56 +29,73 @@ fn failure(subject: impl Into<String>, value: impl Into<String>) -> Error {
         Code::Python,
         "parse a Python response frame",
         subject,
-        "keep the private channel limited to {capture, images, failed} with base64 PNG/JPEG/GIF/WebP images",
+        "restart Mei with its embedded Python bootstrap and keep the private control channel intact",
     )
     .with_path("python.response")
     .with_value(value)
     .into()
 }
 
-fn image(value: &Value) -> Result<Image> {
-    let media_type = value
-        .get("media_type")
-        .and_then(Value::as_str)
-        .filter(|kind| {
-            matches!(
-                *kind,
-                "image/png" | "image/jpeg" | "image/gif" | "image/webp"
-            )
-        })
-        .ok_or_else(|| failure("image media_type is unsupported", value.to_string()))?;
-    let data = value
-        .get("data")
-        .and_then(Value::as_str)
-        .filter(|data| !data.is_empty())
-        .ok_or_else(|| failure("image data is missing or empty", value.to_string()))?;
-    Ok(Image {
-        media_type: media_type.to_owned(),
-        data: data.to_owned(),
-    })
+fn field(input: &mut impl Read, target: &mut [u8], name: &'static str) -> Result<()> {
+    input
+        .read_exact(target)
+        .map_err(|err| failure(format!("read {name}: {err}"), target.len().to_string()))
 }
 
-pub fn parse(line: &str) -> Result<Frame> {
-    let value: Value =
-        serde_json::from_str(line).map_err(|err| failure(err.to_string(), line.to_owned()))?;
-    let capture = value
-        .get("capture")
-        .and_then(Value::as_str)
-        .filter(|capture| !capture.is_empty())
-        .ok_or_else(|| failure("capture is missing or empty", value.to_string()))?;
-    let images = value
-        .get("images")
-        .and_then(Value::as_array)
-        .ok_or_else(|| failure("images is missing or is not an array", value.to_string()))?
-        .iter()
-        .map(image)
-        .collect::<Result<Vec<_>>>()?;
-    let failed = value
-        .get("failed")
-        .and_then(Value::as_bool)
-        .ok_or_else(|| failure("failed is missing or is not a boolean", value.to_string()))?;
+fn image(input: &mut impl Read) -> Result<Image> {
+    let mut header = [0; 5];
+    field(input, &mut header, "image header")?;
+    let [kind, a, b, c, d] = header;
+    let media_type = match kind {
+        1 => "image/png",
+        2 => "image/jpeg",
+        3 => "image/gif",
+        4 => "image/webp",
+        _ => return Err(failure("unsupported image format", kind.to_string())),
+    };
+    let length = u32::from_le_bytes([a, b, c, d]);
+    let size = usize::try_from(length)
+        .map_err(|err| failure(format!("read image length: {err}"), length.to_string()))?;
+    if !(1..=IMAGE_BYTES).contains(&size) {
+        return Err(failure(
+            "image length is outside the allowed range",
+            length.to_string(),
+        ));
+    }
+    let mut data = vec![0; size];
+    field(input, &mut data, "image bytes")?;
+    Ok(Image { media_type, data })
+}
+
+pub fn read(input: &mut impl Read) -> Result<Frame> {
+    let mut header = [0; 3];
+    field(input, &mut header, "response header")?;
+    let [length, failed, count] = header;
+    if length == 0 {
+        return Err(failure("capture file name is empty", "0"));
+    }
+    let failed = match failed {
+        0 => false,
+        1 => true,
+        _ => return Err(failure("failed is not a boolean", failed.to_string())),
+    };
+    let count = usize::from(count);
+    if count > IMAGE_CALL_LIMIT {
+        return Err(failure("too many pictures", count.to_string()));
+    }
+    let mut capture = vec![0; usize::from(length)];
+    field(input, &mut capture, "capture file name")?;
+    if !capture.is_ascii() {
+        return Err(failure(
+            "capture file name is not ASCII",
+            format!("{capture:?}"),
+        ));
+    }
+    let capture = String::from_utf8(capture)
+        .map_err(|err| failure(format!("read capture file name: {err}"), length.to_string()))?;
+    let images = (0..count).map(|_| image(input)).collect::<Result<_>>()?;
     Ok(Frame {
-        capture: capture.to_owned(),
+        capture,
         images,
         failed,
     })
@@ -84,17 +107,24 @@ pub fn content(text: String, images: Vec<Image>) -> Value {
     }
     let mut blocks = Vec::new();
     if !text.is_empty() {
-        blocks.push(json!({"type": "text", "text": text}));
+        blocks.push(Value::Object(Map::from_iter([
+            ("type".to_owned(), Value::from("text")),
+            ("text".to_owned(), Value::String(text)),
+        ])));
     }
     blocks.extend(images.into_iter().map(|image| {
-        json!({
-            "type": "image",
-            "source": {
-                "type": "base64",
-                "media_type": image.media_type,
-                "data": image.data,
-            }
-        })
+        let source = Map::from_iter([
+            ("type".to_owned(), Value::from("base64")),
+            ("media_type".to_owned(), Value::from(image.media_type)),
+            (
+                "data".to_owned(),
+                Value::String(base64::engine::general_purpose::STANDARD.encode(image.data)),
+            ),
+        ]);
+        Value::Object(Map::from_iter([
+            ("type".to_owned(), Value::from("image")),
+            ("source".to_owned(), Value::Object(source)),
+        ]))
     }));
     Value::Array(blocks)
 }
@@ -103,41 +133,55 @@ pub fn content(text: String, images: Vec<Image>) -> Value {
 #[allow(clippy::unwrap_used, reason = "test code")]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn text_only_frames_keep_the_legacy_string_result() {
-        let frame = parse(r#"{"capture":"out.txt","images":[],"failed":false}"#).unwrap();
+        let mut input = b"\x07\x00\x00out.txt".as_slice();
+        let frame = read(&mut input).unwrap();
+        assert_eq!(frame.capture, "out.txt");
         assert!(!frame.failed);
         assert_eq!(
             content("answer".to_owned(), frame.images),
             Value::String("answer".to_owned())
         );
+        assert!(input.is_empty());
     }
 
     #[test]
     fn images_become_anthropic_blocks_without_base64_in_text() {
-        let frame = parse(r#"{"capture":"out.txt","images":[{"media_type":"image/png","data":"aW1hZ2U="}],"failed":true}"#).unwrap();
+        let bytes = b"\x07\x01\x02out.txt\x01\x05\x00\x00\x00image\x04\x03\x00\x00\x00raw";
+        let mut input = bytes.as_slice();
+        let frame = read(&mut input).unwrap();
         assert!(frame.failed);
         assert_eq!(
             content("opened".to_owned(), frame.images),
             json!([
                 {"type": "text", "text": "opened"},
-                {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "aW1hZ2U="}}
+                {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "aW1hZ2U="}},
+                {"type": "image", "source": {"type": "base64", "media_type": "image/webp", "data": "cmF3"}},
             ])
         );
+        assert!(input.is_empty());
     }
 
     #[test]
     fn malformed_frames_and_media_are_refused() {
-        for line in [
-            "{}",
-            r#"{"capture":"out.txt","images":[{"media_type":"text/plain","data":"eA=="}],"failed":false}"#,
-            r#"{"capture":"out.txt","images":[]}"#,
-            r#"{"capture":"out.txt","images":[],"failed":"true"}"#,
-            r#"{"capture":"out.txt","images":[],"failed":0}"#,
-            r#"{"capture":"out.txt","images":[],"failed":null}"#,
-        ] {
-            assert!(parse(line).is_err());
+        let bad: &[&[u8]] = &[
+            b"",
+            b"\x01\x00",
+            b"\x00\x00\x00",
+            b"\x01\x02\x00x",
+            b"\x01\x00\x03x",
+            b"\x01\x00\x00\xff",
+            b"\x01\x00\x00",
+            b"\x01\x00\x01x\x05\x01\x00\x00\x00x",
+            b"\x01\x00\x01x\x01\x00\x00\x00\x00",
+            b"\x01\x00\x01x\x01\x01\x00\x50\x00",
+            b"\x01\x00\x01x\x01\x01\x00\x00\x00",
+        ];
+        for mut bytes in bad.iter().copied() {
+            assert!(read(&mut bytes).is_err());
         }
     }
 }

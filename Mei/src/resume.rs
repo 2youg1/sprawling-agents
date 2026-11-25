@@ -3,13 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! Explicit, complete JSONL message recovery (`Mei/spec/Session.lean`).
-//! Observation metadata is checked here and never sent as a message field.
-
 use std::io::BufRead;
 use std::path::Path;
 
-use serde_json::{Value, json};
+use serde_json::Value;
 
 use crate::error::{Code, Diagnostic, Result};
 
@@ -31,9 +28,6 @@ fn offending_value(value: Option<&Value>) -> String {
     value.map_or_else(|| "<missing>".to_owned(), Value::to_string)
 }
 
-/// Reads role/content in file order from a complete Mei observation log.
-/// The first prompt and final `end_turn` keep partial or foreign JSONL out
-/// of the request; no model or Python process has started at this point.
 pub fn read(path: &Path) -> Result<Vec<Value>> {
     let file = std::fs::File::open(path).map_err(|err| {
         failure(
@@ -42,42 +36,49 @@ pub fn read(path: &Path) -> Result<Vec<Value>> {
             path.display().to_string(),
         )
     })?;
+    let mut reader = std::io::BufReader::new(file);
     let mut messages = Vec::new();
-    let mut last_entry = None;
-    for (index, line) in std::io::BufReader::new(file).lines().enumerate() {
-        let line_number = index.saturating_add(1);
-        let where_failed = format!("{}:{line_number}", path.display());
-        let line = line.map_err(|err| {
-            failure(
-                "read the Mei resume log",
-                err.to_string(),
-                where_failed.clone(),
-            )
-        })?;
-        let value: Value = serde_json::from_str(&line).map_err(|err| {
+    let mut last_stop = None;
+    let mut line = String::new();
+    let mut line_number = 0_usize;
+    loop {
+        line_number = line_number.saturating_add(1);
+        let where_failed = || format!("{}:{line_number}", path.display());
+        line.clear();
+        let count = reader
+            .read_line(&mut line)
+            .map_err(|err| failure("read the Mei resume log", err.to_string(), where_failed()))?;
+        if count == 0 {
+            break;
+        }
+        let source = line.strip_suffix('\n').map_or(line.as_str(), |source| {
+            source.strip_suffix('\r').unwrap_or(source)
+        });
+        let value: Value = serde_json::from_str(source).map_err(|err| {
             failure(
                 "parse a Mei resume log line",
                 err.to_string(),
-                where_failed.clone(),
+                where_failed(),
             )
         })?;
         if value.get("type").and_then(Value::as_str) == Some("mei.obs") {
             continue;
         }
-        let object = value.as_object().ok_or_else(|| {
-            failure(
+        let Value::Object(mut object) = value else {
+            return Err(failure(
                 "validate a Mei resume log line",
                 "each line must be one message object",
-                where_failed.clone(),
+                where_failed(),
             )
             .with_value(value.to_string())
-        })?;
+            .into());
+        };
         let role_value = object.get("role");
         let role = role_value.and_then(Value::as_str).ok_or_else(|| {
             failure(
                 "validate a Mei resume log line",
                 "role must be user or assistant",
-                where_failed.clone(),
+                where_failed(),
             )
             .with_value(offending_value(role_value))
         })?;
@@ -85,19 +86,19 @@ pub fn read(path: &Path) -> Result<Vec<Value>> {
             return Err(failure(
                 "validate a Mei resume log line",
                 "role must be user or assistant",
-                where_failed,
+                where_failed(),
             )
             .with_value(offending_value(role_value))
             .into());
         }
         let content_value = object.get("content");
-        let content = content_value
+        content_value
             .filter(|content| content.is_string() || content.is_array())
             .ok_or_else(|| {
                 failure(
                     "validate a Mei resume log line",
                     "content must be a string or an array",
-                    where_failed.clone(),
+                    where_failed(),
                 )
                 .with_value(offending_value(content_value))
             })?;
@@ -105,29 +106,24 @@ pub fn read(path: &Path) -> Result<Vec<Value>> {
             return Err(failure(
                 "validate the initial Mei prompt",
                 "the first line must contain the initial user prompt",
-                where_failed,
+                where_failed(),
             )
             .with_value(offending_value(role_value))
             .into());
         }
-        messages.push(json!({"role": role, "content": content}));
-        last_entry = Some(value);
+        last_stop = object.remove("stop_reason");
+        object.retain(|key, _| matches!(key.as_str(), "role" | "content"));
+        messages.push(Value::Object(object));
     }
-    let complete = last_entry.as_ref().is_some_and(|entry| {
-        entry.get("role").and_then(Value::as_str) == Some("assistant")
-            && entry.get("stop_reason").and_then(Value::as_str) == Some("end_turn")
-    });
+    let last_role = messages.last().and_then(|entry| entry.get("role"));
+    let assistant_last = last_role.and_then(Value::as_str) == Some("assistant");
+    let complete = assistant_last && last_stop.as_ref().and_then(Value::as_str) == Some("end_turn");
     if !complete {
-        let offending = last_entry.as_ref().map_or_else(
-            || "<empty log>".to_owned(),
-            |entry| {
-                if entry.get("role").and_then(Value::as_str) == Some("assistant") {
-                    offending_value(entry.get("stop_reason"))
-                } else {
-                    offending_value(entry.get("role"))
-                }
-            },
-        );
+        let offending = match last_role {
+            None => "<empty log>".to_owned(),
+            Some(_) if assistant_last => offending_value(last_stop.as_ref()),
+            value => offending_value(value),
+        };
         return Err(failure(
             "validate the complete Mei session",
             "the log is empty or does not end with an assistant end_turn",
@@ -144,6 +140,7 @@ pub fn read(path: &Path) -> Result<Vec<Value>> {
 mod tests {
     use super::*;
     use crate::error::Error;
+    use serde_json::json;
 
     #[test]
     fn a_complete_log_preserves_messages_and_drops_observation_metadata() {
