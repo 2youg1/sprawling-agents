@@ -4,7 +4,7 @@ This guide explains contribution preparation, feature admission and submission. 
 
 ## 0 Development tools
 
-Install `just` once with `cargo install just --locked`, then run `just prereqs` to find the other tools and their install commands. For JavaScript or TypeScript, use `bun` rather than `node`. The [verification tiers](verification.md) decide which checks to run while editing, before submission and on the integrated tree; use that policy before starting a full check.
+Install `just` once with `cargo install just --locked`, then run `just prereqs` to find the other tools and their install commands. For JavaScript or TypeScript, use `bun` rather than `node`. The [verification tiers](maintain/verification.md) decide which checks to run while editing, before submission and on the integrated tree; use that policy before starting a full check.
 
 Start a fresh checkout by reading [AGENTS.md](../AGENTS.md). Its required instructions and skills are tracked here; no global agent configuration or skill installation is needed. Contributors may separately choose [actionbook/rust-skills](https://github.com/actionbook/rust-skills) as auxiliary Rust reading. Its suggestions are not project rules and do not replace the built-in workflow.
 
@@ -14,7 +14,7 @@ Before acting on an issue or opening one, search related open and closed issues 
 
 Before editing, read [AGENTS.md](../AGENTS.md#read-before-you-write) completely and follow its task routing table. Read the affected crate's specification and relevant Lean parts, and the implementing source, callers, neighbouring modules and tests. Trace callers, data flow, invariants and failure paths before changing a shared interface, and identify the Lean properties the implementation must preserve. State the problem, the required result and the constraints before implementation, choose the smallest coherent change that meets the result, and include only the source and documents it needs; consider how the next maintainer will understand and extend the design.
 
-Read the official documentation of the tools you use and load the vendor's agent guide or skill when one exists, as the same reading requirements specify. Before changing a client screen, read [the frontend method](frontend-method.md); the client's SPEC-first and red-stage exemptions are defined in [The view layer](../AGENTS.md#the-view-layer).
+Read the official documentation of the tools you use and load the vendor's agent guide or skill when one exists, as the same reading requirements specify. Before changing a client screen, read [the frontend method](maintain/frontend-method.md); the client's SPEC-first and red-stage exemptions are defined in [The view layer](../AGENTS.md#the-view-layer).
 
 A new core feature must clear all five tests before any implementation: the need exceeds what a skill can meet; no hook plugin should own the behaviour; MCP, CLI or ACP integration cannot reasonably meet the requirement and its guarantees; it serves most users; it is neither a theme nor a workflow for one deployment. Otherwise keep it out of core; if it is still worth building, prefer an extension or a separate repository and bring the result back in an issue. If the seams are too narrow, an issue may propose the smallest interface needed before any implementation. The commit body carries one prose paragraph — the need, the alternatives, why the core should own it, with concrete scenarios and evidence for "most users". Bug fixes are exempt, except a new feature bundled with one. Use the applicable submission template when opening an issue or pull request.
 
@@ -26,7 +26,7 @@ Choose the smallest complete change that removes the cause; never preserve a def
 
 ## 3 Three tiers of verification
 
-Use [Verification](verification.md) for the narrow local checks, branch CI, batch CI and the local equivalent when runners cannot be reached. A result applies to the tree checked, and the same document defines how to record and reuse that evidence.
+Use [Verification](maintain/verification.md) for the narrow local checks, branch CI, batch CI and the local equivalent when runners cannot be reached. A result applies to the tree checked, and the same document defines how to record and reuse that evidence.
 
 ## 4 Rules and checks
 
@@ -36,7 +36,7 @@ A red gate has three exits: fix the code, narrow the rule to a precise scope, or
 
 ## 4.1 Continuous integration
 
-Before submission, apply [tier 1](verification.md#tier-1--while-iterating) to the complete final diff and record each command and result in the pull request. Then follow [tier 2](verification.md#tier-2--the-branchs-ci) for branch CI. A contributor without push access opens the pull request only after the fork run is green; link that exact run and identify any check left to the maintainer because the fork lacks its required resources.
+Before submission, apply [tier 1](maintain/verification.md#tier-1--while-iterating) to the complete final diff and record each command and result in the pull request. Then follow [tier 2](maintain/verification.md#tier-2--the-branchs-ci) for branch CI. A contributor without push access opens the pull request only after the fork run is green; link that exact run and identify any check left to the maintainer because the fork lacks its required resources.
 
 ## 5 Comments and documentation
 
@@ -91,7 +91,7 @@ Follow [Commits](../AGENTS.md#commits) for the subject, the findings the body re
 
 ## 7 Tests
 
-Use [Testing](testing.md) to choose meaningful checks and distinguish negative fixtures, a regression's red stage, and deliberate failure or environment experiments. Keep rejection assertions in passing outer tests in the default suite; use the opt-in and return conditions defined there for experiments, and fix regressions before merging rather than hiding a defect through test selection.
+Use [Testing](maintain/testing.md) to choose meaningful checks and distinguish negative fixtures, a regression's red stage, and deliberate failure or environment experiments. Keep rejection assertions in passing outer tests in the default suite; use the opt-in and return conditions defined there for experiments, and fix regressions before merging rather than hiding a defect through test selection.
 
 When adding a gate, build a fixture that violates the rule and assert that the gate rejects it; keep that assertion in the default suite so a gate that stops rejecting the bad input turns the test red.
 
@@ -105,11 +105,11 @@ Use [Where code goes](../AGENTS.md#where-code-goes) for the line-ending authorit
 
 **The compile-failure counterexamples are byte comparisons against a compiler's output, so the toolchain installation is part of them.** Installing the `rust-src` component makes rustc render a source snippet inside a `note:` that the committed `.stderr` files do not carry, and every counterexample that meets one goes red without a line of this repository changing. A tool that pulls that component in can turn `just check` red on the next run; remove it (`rustup component remove rust-src`) rather than blessing the longer output, which would only move the failure to CI. The passing outer tests remain required; this environment correction does not authorize skipping them.
 
-Use [The loop](verification.md#the-loop) for build-lock and slow-build handling.
+Use [The loop](maintain/verification.md#the-loop) for build-lock and slow-build handling.
 
 ## 9 Command surface
 
-[The loop](verification.md#the-loop) lists the repository commands and their purposes; `just --list` prints every recipe available in the checkout.
+[The loop](maintain/verification.md#the-loop) lists the repository commands and their purposes; `just --list` prints every recipe available in the checkout.
 
 ## 10 Issue labels and triage
 

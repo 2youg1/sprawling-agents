@@ -83,7 +83,7 @@ cargo run -p sprawling -- serve --help
 
 `just build-web` writes the bundle to `Sprawling/app/web-dist`, and `BUNDLE_DIR` in `build.rs` is the one declaration of that location. `build.rs` gzips whatever is there into `OUT_DIR`, at a fixed level and with a zeroed mtime, so the same source bytes embed identically on every build. Without the bundle the binary still builds and prints a warning: it carries a placeholder page, `CLIENT_COMPLETE` is false, and `sprawling status` says so. A build of this crate therefore needs no JavaScript toolchain, and `cargo xtask budget` refuses a release binary whose file table holds no client. The `.crate` archive carries `web-dist/**` through the manifest's `include`, because the directory is gitignored build output.
 
-`--version` answers before any verb runs, and `--help` before any verb acts, so a verb that changes something cannot be set off by a request for its help. How a person installs and uses the binary is [`docs/getting-started.md`](../../docs/getting-started.md); how a script drives it is [`docs/wire.md`](../../docs/wire.md); how a running city is operated is [`docs/operating.md`](../../docs/operating.md).
+`--version` answers before any verb runs, and `--help` before any verb acts, so a verb that changes something cannot be set off by a request for its help. How a person installs and uses the binary is [`docs/start/getting-started.md`](../../docs/start/getting-started.md); how a script drives it is [`docs/wire.md`](../../docs/wire.md); how a running city is operated is [`docs/operate/operating.md`](../../docs/operate/operating.md).
 
 ## Who uses it
 

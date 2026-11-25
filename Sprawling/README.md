@@ -1,8 +1,18 @@
 # Sprawling
 
-Every product Rust package of the city lives under `Sprawling/`. Standalone archetypes can live at the repository root when their design makes them independent of the city; `Mei/` is the current example, with no production edge into this directory. The packages are separate crates so that the compiler enforces the dependency rule in [`ARCHITECTURE.md`](../docs/ARCHITECTURE.md) section 3: a crate can name only the crates its line in the `depmap` block allows, and `kernel` names none. They are not separate so that code can be reused elsewhere.
+Sprawling is the city host. Its crates own project and resident identity, model dispatch, permissions, process boundaries, the Ledger and the CLI. The [app crate](app/README.md) assembles them and serves [RefRain](../RefRain/README.md). [Calyx](../Calyx/README.md) owns terminal rendering and interaction, [Mei](../Mei/README.md) is a standalone harness, and [Tools](../Tools/README.md) holds development machinery.
 
-Development-only packages and fixtures live under [`Tools/`](../Tools/README.md). Their manifests keep them outside the product graph, and none enters the `sprawling` binary or a release archive.
+## Run and check a local build
+
+From the repository root, use the toolchain pins and prerequisites in the [contribution guide](../docs/CONTRIBUTING.md#0-development-tools).
+
+```sh
+just build-web
+cargo run --locked -p sprawling -- up ./cities/first
+cargo test --locked -p sprawling-kernel --lib
+```
+
+For release installation and first use, follow [Getting started](../docs/start/getting-started.md). For a program driving the executable, see the [CLI and wire reference](../docs/wire.md). The [architecture](../docs/ARCHITECTURE.md) defines dependency direction. Each crate's SPEC defines its interfaces and decisions.
 
 ## The packages
 

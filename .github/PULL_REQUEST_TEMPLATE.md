@@ -13,9 +13,9 @@
 
 ## Checklist
 
-- [ ] **Affected local checks green on the final diff** — select them by impact under [verification.md](docs/verification.md#tier-1--while-iterating), starting with the affected tests and gates and adding the behaviour checks they do not cover; list each command and its result. `just check` is required only when that policy selects it:
+- [ ] **Affected local checks green on the final diff** — select them by impact under [verification.md](https://github.com/2youg1/sprawling-agents/blob/main/docs/verification.md#tier-1--while-iterating), starting with the affected tests and gates and adding the behaviour checks they do not cover; list each command and its result. `just check` is required only when that policy selects it:
 - [ ] **Branch `ci` green before opening this PR** — link the exact run on the same branch. A contributor without push access runs it in a fork first (CONTRIBUTING §4.1):
-- [ ] **Gate machinery is separate** — a path classified by [gates.md](docs/gates.md) sits in a commit apart from the source it judges. A red gate is resolved by fixing the code, narrowing its precise scope, or deleting the gate; no exception was added.
+- [ ] **Gate machinery is separate** — a path classified by [gates.md](https://github.com/2youg1/sprawling-agents/blob/main/docs/gates.md) sits in a commit apart from the source it judges. A red gate is resolved by fixing the code, narrowing its precise scope, or deleting the gate; no exception was added.
 - [ ] **Touched gate debt is cleared** — every file changed here satisfies `length`, `comments` and `unsafe`; untouched legacy violations remain listed rather than becoming exemptions:
 - [ ] **SPEC in step with the code** — the crate's SPEC (`Spec.lean` and its parts, or `<crate>-SPEC.md` until it migrates) updated in the same change-set as any interface change it describes.
 - [ ] **Module map in step** — a new production module registered in `architecture.toml` before or with it (`xtask modmap`); a test module needs no entry.

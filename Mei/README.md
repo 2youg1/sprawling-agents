@@ -4,7 +4,7 @@
 
 Archetype:Mei is a minimal Agent Harness: a model receives a task, acts through one persistent **python** tool, sees each small result, and repeats until it has a final answer. A large or non-UTF-8 result stays complete on disk and returns only a notice with its full path, or a Python expression that losslessly reconstructs a non-Unicode native path. This package is the **headless** core. Mei does not contain a terminal shell.
 
-The interactive face is [Calyx](../Calyx/). `@sprawling/mei` ships both the headless `mei` binary and the `calyx` face; a TTY without `-p` becomes Calyx, while `-p` or a pipe stays headless. Scripts use the headless path alone. `mei --acp` speaks [Agent Client Protocol](https://agentclientprotocol.com/) version 1 as an agent over stdio so an ACP client (including the sprawling city harness) can call Mei like any other ACP agent; see [integrations](../docs/integrations.md).
+The interactive face is [Calyx](../Calyx/). `@sprawling/mei` ships both the headless `mei` binary and the `calyx` face; a TTY without `-p` becomes Calyx, while `-p` or a pipe stays headless. Scripts use the headless path alone. `mei --acp` speaks [Agent Client Protocol](https://agentclientprotocol.com/) version 1 as an agent over stdio so an ACP client (including the sprawling city harness) can call Mei like any other ACP agent; see [integrations](../docs/integrate/integrations.md).
 
 > **Safety first:** Mei has no sandbox, permission prompts, or undo. Generated Python can read and write files, use the network, and run commands with the current account's authority. Use only disposable project copies and a separate, revocable API key with a spending limit. Never supply private data, important credentials, or the only copy of a project.
 
@@ -199,6 +199,8 @@ One reading on Windows 11 x86-64 (16 cores), release binaries from this tree, us
 The core and its python guest exist only while a task runs; Calyx alone is the idle cost. The large session adds about 26 MiB to Calyx and 16 MiB to the core. These are working-set readings on one machine, not a cross-platform benchmark; a different counter, session or platform gives different numbers.
 
 ## Prompt and tool contract
+
+The [Agent SPEC](spec/Agent.lean) defines the call arguments and validation rules. The `python_tool` function in [`src/launch.rs`](src/launch.rs) builds the JSON `input_schema`. The fixture below records one example.
 
 `Mei/src/MEI.md` is compiled into `system`; the sole python definition occupies `tools[0]`. The table below uses a fixed documentation fixture with Python `3.12.13` and uv `0.12.3`; actual version attributes come from doctor. Byte counts exclude message envelopes and anything a provider adds itself.
 

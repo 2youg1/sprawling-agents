@@ -4,7 +4,7 @@
 
 Archetype:Mei 是极简 Agent Harness：模型接收任务，通过唯一持久的 **python** 工具行动，看到每个小结果，再循环到最终答复。大输出或非 UTF-8 输出完整落盘，只返回提示和完整路径，或能无损还原非 Unicode 原生路径的 Python 表达式。本包是**无头**核心，Mei 本身不含终端壳。
 
-交互面是 [Calyx](../Calyx/)。`@sprawling/mei` 同时携带无头 `mei` 与 `calyx`；TTY 且无 `-p` 时进入 Calyx，`-p` 或管道仍走无头路径。脚本只使用无头路径。`mei --acp` 以 [Agent Client Protocol](https://agentclientprotocol.com/) version 1 的 agent 角色在 stdio 上应答，城 harness 或其他 ACP client 可像调用其它 ACP agent 一样调用 Mei；见 [integrations](../docs/integrations.md)。
+交互面是 [Calyx](../Calyx/)。`@sprawling/mei` 同时携带无头 `mei` 与 `calyx`；TTY 且无 `-p` 时进入 Calyx，`-p` 或管道仍走无头路径。脚本只使用无头路径。`mei --acp` 以 [Agent Client Protocol](https://agentclientprotocol.com/) version 1 的 agent 角色在 stdio 上应答，城 harness 或其他 ACP client 可像调用其它 ACP agent 一样调用 Mei；见 [integrations](../docs/integrate/integrations.md)。
 
 > **安全优先：** Mei 没有沙箱、权限提示或撤销。生成的 Python 可以读写文件、访问网络，并以当前账户权限运行命令。只用于一次性项目副本和单独、可撤销且有限额的 API key。不要提供私密数据、重要凭证或项目唯一副本。
 
@@ -199,6 +199,8 @@ Calyx 通过 Program Status Protocol（OSC 7501）报告 `working`、`done`、`e
 核与 python 只在任务运行时存在；空闲时只有 Calyx 占内存。大会话给 Calyx 增加约 26 MiB，给核增加约 16 MiB。这是单机工作集读数，不是跨平台基准；计数器、会话或平台不同，数字就不同。
 
 ## Prompt 与工具合同
+
+[Agent SPEC](spec/Agent.lean) 定义调用参数与验证规则。[`src/launch.rs`](src/launch.rs) 中的 `python_tool` 构造 JSON `input_schema`。下方的固定样例记录了一次请求的内容。
 
 `Mei/src/MEI.md` 在构建时进入 `system`；唯一的 python 定义位于 `tools[0]`。下表使用 Python `3.12.13`、uv `0.12.3` 的固定文档夹具；实际版本属性来自 doctor。字节数不含消息信封和 provider 自行添加的内容。
 

@@ -6,7 +6,7 @@
 
 For future rounds, this file binds the cross-agent benchmark to a design that a reader can audit without rerunning it. It names the series, estimators, sample-size rules, parameters, schemas and commands behind every published statistic.
 
-The [performance guide](../performance.md#evaluate-a-change-without-hiding-its-distribution) governs every published evaluation and wins if the two documents disagree. This file supplies the benchmark-specific choices that the guide leaves open. A round directory owns its observations and exports; it does not redefine this method.
+The [performance guide](../maintain/performance.md#evaluate-a-change-without-hiding-its-distribution) governs every published evaluation and wins if the two documents disagree. This file supplies the benchmark-specific choices that the guide leaves open. A round directory owns its observations and exports; it does not redefine this method.
 
 The method, claims, thresholds and seeds are pre-registered before the round's first observation. A later change creates a new analysis version rather than silently editing an already published round.
 
