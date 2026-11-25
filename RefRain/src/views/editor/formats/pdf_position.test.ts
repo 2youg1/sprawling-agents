@@ -49,6 +49,7 @@ test("indexed PDF positions agree with a direct layout across mixed page heights
     const size = measured.get(page) ?? natural;
     const height = (size.height / size.width) * width;
     expect(heights.top(page, width, gap)).toBeCloseTo(top, 5);
+    expect(heights.pageAt(heights.top(page, width, gap), width, gap)).toBe(page);
     const point = heights.position(top + height * 0.37, width, gap);
     expect(point.page).toBe(page);
     expect(point.offset).toBeCloseTo(0.37, 8);

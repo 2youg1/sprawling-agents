@@ -902,6 +902,13 @@ try {
   await layout.selectOption("continuous");
   const mounted = await shownPages();
   assert.ok(mounted.includes(5) && mounted.length < 8, "only nearby pages are mounted");
+  assert.ok(
+    mounted.every(
+      (number, index) =>
+        Math.abs(number - 5) <= 4 && (index === 0 || number === mounted[index - 1] + 1),
+    ),
+    "the mounted pages form a continuous window around the reading anchor",
+  );
   assert.equal((await position(restored)).page, 5);
   evidence.frames = await page.evaluate(() =>
     window.refrainPdfPaints.map((frame) => ({
@@ -940,18 +947,20 @@ try {
     assert.ok(Number.isSafeInteger(SCAN_PAGE) && SCAN_PAGE > 0, "choose a one-based scan page");
     await openDocument(restored, SCAN);
     const scanned = sheet(restored, SCAN_PAGE);
-    await surface(restored).evaluate((scroller, number) => {
-      const first = scroller.querySelector('.pdf-sheet[data-page="1"]');
-      const strip = scroller.querySelector(".pdf-pages");
-      const stride =
-        first.getBoundingClientRect().height + parseFloat(getComputedStyle(strip).rowGap);
-      scroller.scrollTop = stride * (number - 1);
-    }, SCAN_PAGE);
+    if ((await scanned.count()) === 0) {
+      await layout.selectOption("single");
+      const next = button(restored, "pdf_next_page");
+      for (let number = 1; number < SCAN_PAGE; number++) {
+        assert.ok(await next.isEnabled(), "the scan contains the requested page");
+        await next.click();
+      }
+      await layout.selectOption("continuous");
+    }
     await scanned.evaluate((row) => {
       const scroller = row.closest(".pdf-scroll");
       scroller.scrollTop += row.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
     });
-    await scanned.locator(".pdf-clear").waitFor();
+    await scanned.locator('.pdf-original[data-pdf-quality="full"]').waitFor();
     evidence.scan = {
       sha256: createHash("sha256").update(scan).digest("hex"),
       position: await position(restored),

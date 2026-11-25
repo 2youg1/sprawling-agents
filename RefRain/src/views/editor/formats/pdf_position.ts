@@ -64,7 +64,10 @@ export class PdfPageHeights {
   top(page: number, width: number, gap: number): number {
     const preceding = page - 1;
     let extra = 0;
-    for (let end = preceding; end > 0; end -= lowBit(end)) {
+    let end = 0;
+    for (let step = 2 ** Math.floor(Math.log2(preceding)); step >= 1; step /= 2) {
+      if (end + step > preceding) continue;
+      end += step;
       extra += this.sums.get(end) ?? 0;
     }
     return preceding * (this.height(0, width) + gap) + extra * width;

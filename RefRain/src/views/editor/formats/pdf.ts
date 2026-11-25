@@ -3,115 +3,14 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import {
-  GlobalWorkerOptions,
-  OPS,
-  PasswordException,
-  RenderingCancelledException,
-  TextLayer,
-  getDocument,
-} from "pdfjs-dist";
+import { OPS, RenderingCancelledException, TextLayer } from "pdfjs-dist";
 import { Result } from "effect";
 import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
-import worker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import { cropPdf, type PdfRegion } from "./pdf_anchor";
+import type { PdfDetail } from "./pdf_document";
 import { neutralTones } from "./pdf_tones";
 
-GlobalWorkerOptions.workerSrc = worker;
-
-const SHIPPED: ReadonlyMap<string, string> = new Map(
-  Object.entries(
-    import.meta.glob<string>(
-      [
-        "../../../../node_modules/pdfjs-dist/cmaps/*.bcmap",
-        "../../../../node_modules/pdfjs-dist/standard_fonts/Foxit{Symbol,Dingbats}.pfb",
-        "../../../../node_modules/pdfjs-dist/wasm/{openjpeg,jbig2,qcms_bg}.wasm",
-      ],
-      { query: "?url", import: "default", eager: true },
-    ),
-  ).map(([path, url]) => [path.slice(path.lastIndexOf("/") + 1), url]),
-);
-
-class Shipped {
-  fetch({ filename }: { readonly kind: string; readonly filename: string }): Promise<Uint8Array> {
-    const url = SHIPPED.get(filename);
-    if (url === undefined)
-      return Promise.reject(new Error(`${filename} is not part of this bundle`));
-    const read = (cache: RequestCache) =>
-      fetch(url, { cache }).then((response) =>
-        response.ok
-          ? response.arrayBuffer()
-          : Promise.reject(new Error(`${filename}: ${String(response.status)}`)),
-      );
-    return read("default")
-      .catch(() => read("reload"))
-      .then((buffer) => new Uint8Array(buffer));
-  }
-}
-
-const DOOR = "bundle/";
-
-export type Opened =
-  | { readonly kind: "open"; readonly pdf: PDFDocumentProxy; readonly detail: PdfDetail }
-  | { readonly kind: "locked" }
-  | { readonly kind: "broken"; readonly reason: string };
-
-export interface Opening {
-  readonly opened: Promise<Opened>;
-  readonly close: () => void;
-}
-
-export type PdfDetail = () => Promise<PDFDocumentProxy>;
-
-const PROGRESSIVE_FILE_BYTES = 4 * 1024 ** 2;
-const PREVIEW_IMAGE_BYTES = 1024 ** 2;
-
-function loadPdf(bytes: Uint8Array, imageBudget?: number) {
-  return getDocument({
-    data: bytes.slice(),
-    BinaryDataFactory: Shipped,
-    useWorkerFetch: false,
-    cMapUrl: DOOR,
-    cMapPacked: true,
-    standardFontDataUrl: DOOR,
-    wasmUrl: DOOR,
-    enableXfa: false,
-    enableHWA: webgl2Available(),
-    ...(imageBudget === undefined ? {} : { canvasMaxAreaInBytes: imageBudget, stopAtErrors: true }),
-  });
-}
-
-export function openPdf(bytes: Uint8Array, purpose: "reading" | "text" = "text"): Opening {
-  const preview = purpose === "reading" && bytes.byteLength >= PROGRESSIVE_FILE_BYTES;
-  const task = loadPdf(bytes, preview ? PREVIEW_IMAGE_BYTES : undefined);
-  let sharp: ReturnType<typeof loadPdf> | undefined;
-  let closed = false;
-  function detail(): Promise<PDFDocumentProxy> {
-    if (closed) return Promise.reject(new DOMException("PDF reader closed", "AbortError"));
-    if (!preview) return task.promise;
-    sharp ??= loadPdf(bytes);
-    return sharp.promise;
-  }
-  return {
-    opened: (preview ? task.promise.catch(recoverOpen) : task.promise).then(
-      (pdf): Opened => ({ kind: "open", pdf, detail }),
-      (reason: unknown): Opened =>
-        reason instanceof PasswordException
-          ? { kind: "locked" }
-          : { kind: "broken", reason: String(reason) },
-    ),
-    close: () => {
-      if (closed) return;
-      closed = true;
-      void Promise.allSettled(
-        sharp === undefined ? [task.destroy()] : [task.destroy(), sharp.destroy()],
-      );
-    },
-  };
-
-  function recoverOpen(reason: unknown): Promise<PDFDocumentProxy> {
-    return closed || reason instanceof PasswordException ? Promise.reject(reason) : detail();
-  }
-}
+export { gpuAvailability, openPdf, type Opened, type PdfDetail } from "./pdf_document";
 
 export interface Size {
   readonly width: number;
@@ -171,6 +70,11 @@ export function drawPdf(options: PagePaint) {
     detail?.abort();
     detail = undefined;
   }
+  function text(page: PDFPageProxy): void {
+    if (textStarted || options.textLayer === undefined) return;
+    textStarted = true;
+    paintText(page, options.width, options.textLayer, signal, options.failure);
+  }
   return {
     close: () => {
       pause();
@@ -186,15 +90,14 @@ export function drawPdf(options: PagePaint) {
       detail = current;
       void start()
         .then(async (page) => {
-          if (page === null || current.signal.aborted) return;
-          if (!textStarted && options.textLayer !== undefined) {
-            textStarted = true;
-            paintText(page, options.width, options.textLayer, signal, options.failure);
-          }
-          await paintDetail(page, options, current.signal);
+          if (current.signal.aborted) return;
+          if (page !== null) text(page);
+          await paintDetail(page, options, current.signal, text);
           if (!current.signal.aborted) complete = true;
         })
-        .catch(failed)
+        .catch((reason: unknown) => {
+          if (detail === current && !current.signal.aborted) failed(reason);
+        })
         .finally(() => {
           if (detail === current) detail = undefined;
         });
@@ -261,20 +164,23 @@ async function paintPreview(options: PagePaint, signal: AbortSignal): Promise<PD
       return renderRaster(original, preview, signal, true).finally(() => original.cleanup());
     });
     if (first === null) return null;
-    options.present(first, previewTones(first), false);
+    options.present(first, Result.getOrNull(Result.try(() => previewTones(first))), false);
   }
   return cancelled(signal) ? null : page;
 }
 
 async function paintDetail(
-  page: PDFPageProxy,
+  page: PDFPageProxy | null,
   options: PagePaint,
   signal: AbortSignal,
+  text: (page: PDFPageProxy) => void,
 ): Promise<void> {
   if (options.cached?.full === true) return;
   const document = await options.detail?.();
   if (signal.aborted) return;
   const source = document === undefined ? page : await document.getPage(options.number);
+  if (source === null) return;
+  if (!signal.aborted) text(source);
   if (source === page) return paintSharp(source, options, signal);
   return paintSharp(source, options, signal).finally(() => {
     source.cleanup();
@@ -286,7 +192,7 @@ async function paintSharp(
   options: PagePaint,
   signal: AbortSignal,
 ): Promise<void> {
-  const display = raster(source, options.width, Math.max(1.35, window.devicePixelRatio));
+  const display = fullViewport(source, options.width);
   const original = await renderRaster(source, display, signal);
   if (original === null) return;
   const operators = await source.getOperatorList().catch(() => null);
@@ -297,6 +203,29 @@ async function paintSharp(
     true,
     signal,
   );
+}
+
+function fullViewport(page: PDFPageProxy, width: number) {
+  return raster(page, width, Math.max(1.35, window.devicePixelRatio));
+}
+
+export async function cropFullPage(
+  detail: PdfDetail,
+  width: number,
+  picked: { readonly page: number; readonly region: PdfRegion },
+  signal: AbortSignal,
+): Promise<Blob | null> {
+  const pdf = await detail();
+  if (signal.aborted) return null;
+  const page = await pdf.getPage(picked.page);
+  return renderRaster(page, fullViewport(page, width), signal)
+    .then((canvas) => {
+      if (canvas === null) return null;
+      return cropPdf(canvas, picked.region).finally(() => {
+        canvas.width = canvas.height = 0;
+      });
+    })
+    .finally(() => page.cleanup());
 }
 
 const layers = new WeakMap<HTMLDivElement, { page: PDFPageProxy; layer: TextLayer }>();
@@ -443,25 +372,6 @@ async function mapTones(
     const posted = Result.try(() => worker.postMessage({ bitmap, scan }, [bitmap]));
     if (Result.isFailure(posted)) cancel();
   }).finally(() => bitmap.close());
-}
-
-let capturedWebgl: boolean | undefined;
-
-function webgl2Available(): boolean {
-  if (capturedWebgl !== undefined) return capturedWebgl;
-  const probe = document.createElement("canvas").getContext("webgl2");
-  capturedWebgl = probe !== null;
-  probe?.getExtension("WEBGL_lose_context")?.loseContext();
-  return capturedWebgl;
-}
-
-export function gpuAvailability(): Promise<{ webgpu: boolean; webgl2: boolean }> {
-  const webgl2 = webgl2Available();
-  if (!Reflect.has(navigator, "gpu")) return Promise.resolve({ webgpu: false, webgl2 });
-  return navigator.gpu.requestAdapter().then(
-    (adapter) => ({ webgpu: adapter !== null, webgl2 }),
-    () => ({ webgpu: false, webgl2 }),
-  );
 }
 
 export function pagesText(pdf: PDFDocumentProxy): Promise<readonly string[]> {

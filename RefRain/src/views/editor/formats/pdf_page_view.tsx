@@ -66,6 +66,7 @@ export function PdfPage(props: PageProps) {
       if (surface === undefined) return;
       setFailed(undefined);
       const display = (raster: PdfRaster): void => {
+        setFailed(undefined);
         if (visible?.page === number && visible.width === width) {
           releaseRaster(visible.raster);
         } else release();
@@ -85,6 +86,7 @@ export function PdfPage(props: PageProps) {
         width,
         present: (original, tones, full) => {
           original.className = "pdf-original";
+          if (full) original.dataset.pdfQuality = "full";
           const clear =
             tones instanceof HTMLCanvasElement || tones === null ? tones : enhanced(tones);
           if (clear !== null) clear.className = "pdf-clear";

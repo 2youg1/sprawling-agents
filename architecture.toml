@@ -1604,6 +1604,7 @@ module = [
   { name = "benchstat::report", file = "Tools/benchstat/src/report.rs", owns = "canonical exports and the generated Markdown section", shape = "projection", since = "S16", status = "built", spec = "Tools.benchstat.Spec" },
   { name = "benchstat::report::sections", file = "Tools/benchstat/src/report/sections.rs", owns = "Markdown section builders and cell display helpers for the generated report", shape = "projection", since = "CS20", status = "built", spec = "Tools.benchstat.Spec" },
   { name = "refrain::pdf_raster_cache", file = "RefRain/src/views/editor/formats/pdf_raster_cache.ts", owns = "the byte-bounded cache of detached PDF page rasters", shape = "adapter", since = "CS27", status = "built", spec = "RefRain.Spec" },
+  { name = "refrain::pdf_document", file = "RefRain/src/views/editor/formats/pdf_document.ts", owns = "opening PDF documents, decoder resources and preview and full-detail worker lifetimes", shape = "adapter", since = "CS27", status = "built", spec = "RefRain.Spec" },
   { name = "refrain::pdf_window", file = "RefRain/src/views/editor/formats/pdf_window.ts", owns = "the PDF viewport window and directional preview admission", shape = "decision", since = "CS27", status = "built", spec = "RefRain.Spec" },
 ]
 

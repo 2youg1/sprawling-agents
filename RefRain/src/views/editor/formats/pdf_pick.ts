@@ -21,6 +21,7 @@ interface PickingDoor {
   readonly centeredPage: () => number;
   readonly version: () => string | null;
   readonly attach: () => ((selection: PdfSelection) => void) | undefined;
+  readonly cropFull: (picked: Picked, signal: AbortSignal) => Promise<Blob | null>;
   readonly offer: (picked: Picked, event: PointerEvent | KeyboardEvent) => void;
 }
 
@@ -31,10 +32,10 @@ export function pdfPicking(door: PickingDoor) {
   const [problem, setProblem] = createSignal<"pdf_crop_failed" | "pdf_changed">();
   const [attaching, setAttaching] = createSignal(false);
   let drag: { pointer: number; bounds: DOMRect; page: number; start: Point } | null = null;
-  let alive = true;
+  const lifetime = new AbortController();
   let committing = false;
   onCleanup(() => {
-    alive = false;
+    lifetime.abort();
   });
 
   function pageOf(target: EventTarget | null): HTMLElement | null {
@@ -185,16 +186,18 @@ export function pdfPicking(door: PickingDoor) {
       committing = false;
       return;
     }
-    const canvas = page?.querySelector<HTMLCanvasElement>(".pdf-original");
-    if (canvas == null) {
+    if (page === null) {
       setProblem("pdf_crop_failed");
       return;
     }
+    const canvas = page.querySelector<HTMLCanvasElement>('.pdf-original[data-pdf-quality="full"]');
     committing = true;
     setAttaching(true);
-    await cropPdf(canvas, picked.region)
+    const image =
+      canvas === null ? door.cropFull(picked, lifetime.signal) : cropPdf(canvas, picked.region);
+    await image
       .then((image) => {
-        if (!alive) return;
+        if (lifetime.signal.aborted) return;
         if (door.version() !== source) {
           setProblem("pdf_changed");
           return;
@@ -207,11 +210,11 @@ export function pdfPicking(door: PickingDoor) {
         setSelecting(false);
       })
       .catch(() => {
-        if (alive) setProblem("pdf_crop_failed");
+        if (!lifetime.signal.aborted) setProblem("pdf_crop_failed");
       })
       .finally(() => {
         committing = false;
-        if (alive) setAttaching(false);
+        if (!lifetime.signal.aborted) setAttaching(false);
       });
   }
 

@@ -21,7 +21,7 @@ import { say } from "../../../core/lang";
 import { scopedUi } from "../../../ui";
 import { attachContextTools, ContextTools, createContextTools } from "../../parts/context_tools";
 import Glyph from "../../parts/glyph.solid";
-import type { PdfDetail, Size } from "./pdf";
+import { cropFullPage, type PdfDetail, type Size } from "./pdf";
 import { pointAt, readableRegion, unit } from "./pdf_anchor";
 import type { PdfProgress, PdfRegion, Point } from "./pdf_anchor";
 import { PdfSheet } from "./pdf_page_view";
@@ -111,9 +111,7 @@ export function PdfReading(props: ReadingProps) {
     return { page, offset: unit((top - node.offsetTop) / node.offsetHeight) };
   }
 
-  function center(): PdfProgress | null {
-    return position((scroller?.clientHeight ?? 0) / 2);
-  }
+  const center = () => position((scroller?.clientHeight ?? 0) / 2);
 
   function readingPoint(): PdfProgress | null {
     return placed !== undefined && scroller?.scrollTop === placed.top ? placed.point : position();
@@ -180,6 +178,7 @@ export function PdfReading(props: ReadingProps) {
     centeredPage: () => center()?.page ?? 1,
     version: () => props.version,
     attach: () => props.onSelection,
+    cropFull: (picked, signal) => cropFullPage(props.detailDocument, width(), picked, signal),
     offer: (picked, event) => {
       const pointer = event instanceof PointerEvent;
       menus.open(request(picked), {
