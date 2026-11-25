@@ -36,12 +36,14 @@ class Shipped {
     const url = SHIPPED.get(filename);
     if (url === undefined)
       return Promise.reject(new Error(`${filename} is not part of this bundle`));
-    return fetch(url)
-      .then((response) =>
+    const read = (cache: RequestCache) =>
+      fetch(url, { cache }).then((response) =>
         response.ok
           ? response.arrayBuffer()
           : Promise.reject(new Error(`${filename}: ${String(response.status)}`)),
-      )
+      );
+    return read("default")
+      .catch(() => read("reload"))
       .then((buffer) => new Uint8Array(buffer));
   }
 }
