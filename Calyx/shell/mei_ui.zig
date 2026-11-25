@@ -25,6 +25,7 @@ const effort = @import("mei_effort.zig");
 const workspace = @import("mei_workspace.zig");
 
 const replay_batch: usize = 64;
+const application: program_status.Application = .mei;
 
 pub fn run(init: std.process.Init) u8 {
     const gpa = init.gpa;
@@ -193,7 +194,7 @@ pub const Ui = struct {
     }
 
     fn loop(self: *Ui) u8 {
-        if (self.screen.takeMei() == .lost) return self.giveBack(1);
+        if (self.screen.take(@tagName(application), null) == .lost) return self.giveBack(1);
         self.openFace();
         self.refreshGit();
         self.pushBanner();
@@ -221,7 +222,6 @@ pub const Ui = struct {
         _ = self;
         termio.enterAlternate() catch {};
         termio.trackPointer() catch {};
-        termio.setTitle("mei") catch {};
     }
 
     fn releaseFace(self: *Ui) void {
@@ -816,7 +816,7 @@ pub const Ui = struct {
         const stepped = program_status.step(self.held, event);
         self.held = stepped.held;
         if (stepped.report) |report| {
-            const ansi = report.writeAnsi(self.gpa) catch return;
+            const ansi = report.writeAnsi(self.gpa, application) catch return;
             defer self.gpa.free(ansi);
             self.drawn(self.screen.report(ansi));
         }
