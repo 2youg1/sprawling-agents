@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { appendFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import { createBuilding, dispatch } from "../src/core/commands";
 import { encodeFrame } from "../src/core/frames";
@@ -19,8 +19,9 @@ import { DevTools } from "./walk_devtools";
 import type { Frame, Lighting, Outcome } from "./walk_devtools";
 
 const ROOT = join(import.meta.dir, "..", "..");
-const GROUND = join(ROOT, "target", "walk");
-const BINARIES = join(process.env.CARGO_TARGET_DIR ?? join(ROOT, "target"), "debug");
+const TARGET = resolve(ROOT, process.env.CARGO_TARGET_DIR ?? "target");
+const GROUND = join(TARGET, "walk");
+const BINARIES = join(TARGET, "debug");
 const EXE = process.platform === "win32" ? ".exe" : "";
 const AT = "127.0.0.1:8799";
 export const ORIGIN = `http://${AT}`;
@@ -165,7 +166,9 @@ async function serve(
     served.kill();
   });
   for (let tries = 0; tries < 150; tries += 1) {
-    const code = /pairing code\s+(\S+)/.exec(said.replace(STYLING, ""))?.[1];
+    const code = /pairing code[ \t]+([a-z0-9]{4}-[a-z0-9]{4})\b/i.exec(
+      said.replace(STYLING, ""),
+    )?.[1];
     if (code !== undefined) return { code, process: served };
     await Bun.sleep(200);
   }
@@ -286,16 +289,23 @@ export async function prepareCity(
   webDir: string | undefined,
   populated: boolean,
   pairWith: (tools: DevTools, code: string) => Promise<void> = pair,
+  workspace: "walk" | "send" = "walk",
 ): Promise<PreparedCity> {
-  rmSync(GROUND, { recursive: true, force: true });
-  const city = join(GROUND, "city");
-  const home = join(GROUND, "home");
+  const ground = join(TARGET, workspace);
+  rmSync(ground, { recursive: true, force: true });
+  const city = join(ground, "city");
+  const home = join(ground, "home");
   mkdirSync(home, { recursive: true });
-  const provider = await standIn(join(GROUND, "exchanges.jsonl"));
+  const provider = await standIn(join(ground, "exchanges.jsonl"));
   const env = {
     ...process.env,
     HOME: home,
     USERPROFILE: home,
+    LOCALAPPDATA: home,
+    TMP: home,
+    TEMP: home,
+    TMPDIR: home,
+    XDG_RUNTIME_DIR: home,
     SPRAWLING_MODEL_URL: provider.url,
     SPRAWLING_MODEL: populated ? MODEL : undefined,
   };
@@ -304,7 +314,7 @@ export async function prepareCity(
   const served = await serve(city, env, webDir);
   const run = populated ? settle(env, city) : null;
   const tools = held(
-    await DevTools.open(join(GROUND, "profile"), DEVTOOLS_PORT),
+    await DevTools.open(join(ground, "profile"), DEVTOOLS_PORT),
     "open the browser",
   );
   started.push(() => {
