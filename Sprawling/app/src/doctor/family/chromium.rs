@@ -3,18 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The Chromium browsers, and where each platform puts them
-//! (`Sprawling/app/spec/Doctor.lean` §8-57).
-//!
-//! Data, with no branch in it. None of these is a way into a session on
-//! its own: the driver beside them is, and it has its own row, so this
-//! file answers only the question "which Chromium is on this machine".
-
 use super::{Confidence, Member};
 use crate::doctor::PerPlatform;
 
-/// Chrome first, because its driver is the one with published builds
-/// for every version.
 pub(super) const MEMBERS: &[Member] = &[
     Member {
         name: "chrome",
@@ -85,5 +76,20 @@ pub(super) const MEMBERS: &[Member] = &[
             linux: &["/usr/bin/vivaldi", "/opt/vivaldi/vivaldi"],
         },
         start_menu: "Vivaldi",
+    },
+    Member {
+        name: "helium",
+        program: "helium",
+        homepage: "https://helium.computer/",
+        confidence: Confidence::NeedsConfirmation,
+        places: PerPlatform {
+            windows: &[
+                r"C:\Program Files\imput\Helium\Application\chrome.exe",
+                r"%LOCALAPPDATA%\imput\Helium\Application\chrome.exe",
+            ],
+            macos: &["/Applications/Helium.app/Contents/MacOS/Helium"],
+            linux: &["/usr/bin/helium"],
+        },
+        start_menu: "Helium",
     },
 ];

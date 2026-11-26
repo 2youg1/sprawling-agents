@@ -62,6 +62,7 @@ export const Appearance = Schema.Struct({
   mono: Face,
   mono_stack: Schema.String,
   motion: Motion,
+  neutral_palette: Schema.optional(Schema.Boolean),
   reading: Schema.optional(Schema.NullOr(ReadingFace)),
   sans: Face,
   sans_stack: Schema.String,

@@ -20,6 +20,9 @@ pub(crate) const GECKO: &str = "gecko";
 pub(crate) const CHROMIUM: &str = "chromium";
 pub(crate) const WEBKIT: &str = "webkit";
 
+const LOCAL_APP_DATA: &str = "LOCALAPPDATA";
+pub(super) const LOCAL_APP_DATA_PREFIX: &str = r"%LOCALAPPDATA%\";
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Family {
     Gecko,
@@ -182,7 +185,11 @@ pub(crate) fn member_at(family: Family, at: &Path) -> Option<&'static Member> {
                     .places
                     .at(platform)
                     .iter()
-                    .any(|place| Path::new(place) == at)
+                    .filter_map(|place| installation_path(place))
+                    .any(|place| match platform {
+                        Platform::Windows => place.as_os_str().eq_ignore_ascii_case(at.as_os_str()),
+                        Platform::MacOs | Platform::Linux => place == at,
+                    })
             })
     });
     placed.or_else(|| {
@@ -194,23 +201,25 @@ pub(crate) fn member_at(family: Family, at: &Path) -> Option<&'static Member> {
 }
 
 fn claims(family: Family, path: &Path) -> bool {
-    let Some(stem) = path.file_stem().and_then(|stem| stem.to_str()) else {
-        return family == Family::Gecko;
-    };
     let owner = [Family::Gecko, Family::Chromium, Family::WebKit]
         .into_iter()
-        .find(|candidate| {
-            candidate
-                .members()
-                .iter()
-                .any(|member| member.program.eq_ignore_ascii_case(stem))
-        });
+        .find(|candidate| member_at(*candidate, path).is_some());
     owner.unwrap_or(Family::Gecko) == family
+}
+
+fn installation_path(place: &str) -> Option<PathBuf> {
+    match place.strip_prefix(LOCAL_APP_DATA_PREFIX) {
+        Some(tail) => std::env::var_os(LOCAL_APP_DATA)
+            .map(PathBuf::from)
+            .filter(|base| base.is_absolute())
+            .map(|base| base.join(tail)),
+        None => Some(PathBuf::from(place)),
+    }
 }
 
 fn first_file(places: &[&str]) -> Option<PathBuf> {
     places
         .iter()
-        .map(PathBuf::from)
+        .filter_map(|place| installation_path(place))
         .find(|candidate| candidate.is_file())
 }

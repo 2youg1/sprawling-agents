@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { watchControlFeedback } from "./core/control_feedback";
-import { derived, get } from "./core/store";
+import { derived } from "./core/store";
 import { mountSolid } from "./views/solid_mount";
 
 import App from "./app";
@@ -29,7 +29,7 @@ import { openConnection } from "./core/socket";
 import { timeAtRoot } from "./core/timing";
 import type { Opening } from "./ui";
 import Pairing, { PairingPending } from "./views/pairing.solid";
-import { applyAppearance, watchMachineLighting } from "./views/setup/appearance";
+import { watchAppearance } from "./views/setup/appearance";
 import { documentStage, wearKeptTheme } from "./views/setup/colours";
 import "./theme.css";
 
@@ -39,8 +39,7 @@ if (root !== null) {
   const open = openCodeIn(window.location.hash);
   if (open !== null) window.history.replaceState(null, "", withoutOpenCode(window.location));
   const prefs = preferences();
-  applyAppearance(document.documentElement, get(prefs.held).appearance);
-  watchMachineLighting(document.documentElement, prefs);
+  watchAppearance(document.documentElement, prefs);
   wearKeptTheme(documentStage(document), prefs);
   wallpaperSettings();
   timeAtRoot(document);

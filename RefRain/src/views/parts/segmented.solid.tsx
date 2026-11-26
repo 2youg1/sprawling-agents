@@ -8,7 +8,7 @@ import { lookOf } from "./segmented";
 import type { HoldCell, SegmentedProps } from "./segmented";
 import Look from "./segmented.look.solid";
 
-export default function Segmented<V extends string>(props: SegmentedProps<V>) {
+export function useSegmented<V extends string>(props: SegmentedProps<V>) {
   const uid = createUniqueId();
   const drawn = new Map<V, HTMLButtonElement>();
   const refs = new Map<V, HoldCell>();
@@ -24,11 +24,15 @@ export default function Segmented<V extends string>(props: SegmentedProps<V>) {
     refs.set(value, wired);
     return wired;
   }
-  const look = createMemo(() =>
+  return createMemo(() =>
     lookOf(props, uid, {
       focus: (value) => drawn.get(value)?.focus(),
       hold,
     }),
   );
+}
+
+export default function Segmented<V extends string>(props: SegmentedProps<V>) {
+  const look = useSegmented(props);
   return <Look {...look()} />;
 }

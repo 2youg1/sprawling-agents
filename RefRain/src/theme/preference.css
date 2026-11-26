@@ -96,6 +96,27 @@
   --density: 0.75;
 }
 
+.colours-presets {
+  grid-column: 1 / -1;
+}
+
+.theme-previews {
+  display: grid;
+  grid-template-columns: max-content repeat(2, minmax(0, max-content));
+  align-items: center;
+}
+
+.theme-preview-row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+}
+
+.theme-preview[aria-checked="true"] {
+  border-color: var(--color-accent);
+}
+
 [data-density="compact"] .summary {
   display: none;
 }

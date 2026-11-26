@@ -43,6 +43,7 @@ export function adopted(held: Preferences, answer: PreferencesAnswer): Preferenc
 export function appearanceOnWire(next: Appearance): WireAppearance {
   return {
     lighting: next.lighting,
+    neutral_palette: next.neutralPalette,
     sans: next.sans,
     mono: next.mono,
     sans_stack: next.sansStack,
@@ -65,6 +66,7 @@ export function appearanceOnWire(next: Appearance): WireAppearance {
 function appearanceOfCity(stated: WireAppearance, held: Appearance): Appearance {
   return {
     lighting: stated.lighting,
+    neutralPalette: stated.neutral_palette ?? false,
     sans: stated.sans,
     mono: stated.mono,
     sansStack: stated.sans_stack,

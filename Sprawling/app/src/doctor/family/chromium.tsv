@@ -5,3 +5,4 @@ edge	msedge	C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe|C:\Prog
 brave	brave-browser	C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe	/Applications/Brave Browser.app/Contents/MacOS/Brave Browser	/usr/bin/brave-browser|/opt/brave.com/brave/brave
 chromium	chromium	C:\Program Files\Chromium\Application\chrome.exe	/Applications/Chromium.app/Contents/MacOS/Chromium	/usr/bin/chromium|/usr/bin/chromium-browser|/snap/bin/chromium
 vivaldi	vivaldi	C:\Program Files\Vivaldi\Application\vivaldi.exe	/Applications/Vivaldi.app/Contents/MacOS/Vivaldi	/usr/bin/vivaldi|/opt/vivaldi/vivaldi
+helium	helium	C:\Program Files\imput\Helium\Application\chrome.exe|%LOCALAPPDATA%\imput\Helium\Application\chrome.exe	/Applications/Helium.app/Contents/MacOS/Helium	/usr/bin/helium

@@ -14,6 +14,9 @@ Calling a face this city did not invent requires knowing the shape of the reques
 
 | Project | Licence | What is followed | Where to look | Tracked to |
 |---|---|---|---|---|
+| [imputnet/helium-windows](https://github.com/imputnet/helium-windows) | GPL-3.0 | The current-user and system installation paths for Helium's `chrome.exe` | `installer/helium.nsi` | `292ebd0ea2f2` |
+| [imputnet/helium-macos](https://github.com/imputnet/helium-macos) | GPL-3.0 | The `Helium.app` bundle name used in macOS packaging | `sign_and_package_app.sh` | `3f6d296353b1` |
+| [imputnet/helium-linux](https://github.com/imputnet/helium-linux) | GPL-3.0 | The Linux executable name `helium` | `patches/helium/linux/rename-chrome-binary.patch` | `a25707d6a236` |
 | [MoonshotAI/kimi-cli](https://github.com/MoonshotAI/kimi-cli) | Apache-2.0 | the platform table the three Kimi hosts in `gateway::provider::preset` are read from: each host's base path and that it answers on the OpenAI-compatible face | `src/kimi_cli/auth/` | `b5f48ef2aaf1` |
 | [openai/openai-openapi](https://github.com/openai/openai-openapi) | MIT | the request and answer of the embeddings face, which every compatible server copied; the request, the `output` items and the named stream events of the responses face; and the `reasoning_effort` values and the `max_completion_tokens` ceiling field of the chat face | `openapi.yaml` | `2a24deae6f89` |
 | [huggingface/text-embeddings-inference](https://github.com/huggingface/text-embeddings-inference) | Apache-2.0 | the request and answer of the rerank face, which has no OpenAI shape to copy | `docs/openapi.json` | `0afbf3f5ee54` |

@@ -133,6 +133,10 @@ pub enum Tier {
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Appearance {
     pub lighting: Lighting,
+
+    #[serde(default)]
+    pub neutral_palette: bool,
+
     pub sans: Face,
     pub mono: Face,
 
@@ -231,6 +235,7 @@ impl Default for Appearance {
     fn default() -> Self {
         Appearance {
             lighting: Lighting::System,
+            neutral_palette: false,
             sans: Face::Paper,
             mono: Face::Paper,
             sans_stack: String::new(),

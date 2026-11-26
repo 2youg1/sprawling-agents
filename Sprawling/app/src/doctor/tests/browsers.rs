@@ -5,7 +5,7 @@
 
 use std::collections::BTreeSet;
 
-use crate::doctor::family::{Confidence, Family, member_at};
+use crate::doctor::family::{Confidence, Family, LOCAL_APP_DATA_PREFIX, member_at};
 use crate::doctor::{Detection, Platform, REQUIREMENTS, Tier};
 
 #[test]
@@ -34,7 +34,10 @@ fn every_family_is_a_row_and_every_member_says_where_it_is_installed() {
             for platform in Platform::ALL {
                 for place in member.places.at(platform).iter() {
                     assert!(
-                        place.starts_with('/') || place.contains(":\\"),
+                        place.starts_with('/')
+                            || place.contains(":\\")
+                            || (platform == Platform::Windows
+                                && place.starts_with(LOCAL_APP_DATA_PREFIX)),
                         "{} names {place}, which is not a place",
                         member.name
                     );

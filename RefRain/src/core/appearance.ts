@@ -68,6 +68,7 @@ export function featuresOffered(faces: readonly Face[]): ReadonlySet<TypeFeature
 
 export interface Appearance {
   readonly lighting: Lighting;
+  readonly neutralPalette: boolean;
   readonly sans: Face;
   readonly mono: Face;
   readonly sansStack: string;

@@ -19,6 +19,7 @@ import { GalleryCase } from "./case";
 
 const LIBRON: Appearance = {
   lighting: "system",
+  neutralPalette: false,
   sans: "maple",
   mono: "maple",
   sansStack: "",

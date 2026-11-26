@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import { get, writable } from "../../core/store";
+import { writable } from "../../core/store";
 import type { Readable } from "../../core/store";
 
 import type { Key } from "../../core/lang";
@@ -14,7 +14,6 @@ import type {
   Density,
   Face,
   Glass,
-  Lighting,
   Motion,
   ReadingFace,
   TypeFeature,
@@ -33,7 +32,6 @@ declare global {
 export type Axis = "sans" | "mono";
 
 export type Setting =
-  | "lighting"
   | "face"
   | "mono"
   | "reading"
@@ -53,11 +51,6 @@ const LINE_HEIGHT_PROPERTY = "--leading-read";
 const TRACKING_PROPERTY = "--tracking";
 const BLEND_PROPERTY = "--blend-opacity";
 
-export const LIGHTING_WORDS: Record<Lighting, Key> = {
-  system: "appearance_lighting_system",
-  dark: "appearance_lighting_dark",
-  light: "appearance_lighting_light",
-};
 export const FACE_WORDS: Record<Face, Key> = {
   paper: "appearance_face_paper",
   maple: "appearance_face_maple",
@@ -119,18 +112,40 @@ function wearFace(root: HTMLElement, axis: Axis, face: Face, stack: string): voi
 
 const MACHINE_LIGHT = "(prefers-color-scheme: light)";
 
-function machineLighting(): "dark" | "light" {
-  return window.matchMedia(MACHINE_LIGHT).matches ? "light" : "dark";
-}
+export function watchAppearance(root: HTMLElement, kept: PreferenceDoor): void {
+  const media = window.matchMedia(MACHINE_LIGHT);
+  let current: Appearance | undefined;
 
-export function watchMachineLighting(root: HTMLElement, kept: PreferenceDoor): void {
-  window.matchMedia(MACHINE_LIGHT).addEventListener("change", () => {
-    const held = get(kept.held).appearance;
-    if (held.lighting === "system") applyAppearance(root, held);
+  function wearPalette(held: Appearance): void {
+    const lighting = () =>
+      held.lighting === "system" ? (media.matches ? "light" : "dark") : held.lighting;
+    const palette = held.neutralPalette && held.lighting !== "system" ? "graphite" : "blue";
+    const paint = () => {
+      if (held !== current) return;
+      root.dataset.theme = lighting();
+      root.dataset.palette = palette;
+    };
+    if (root.dataset.theme === lighting() && root.dataset.palette === palette) return;
+    const document = root.ownerDocument;
+    if (root.dataset.theme === undefined || !("startViewTransition" in document) || motionOff(root)) {
+      paint();
+    } else {
+      void document.startViewTransition(paint).ready.catch(() => undefined);
+    }
+  }
+
+  kept.held.subscribe(({ appearance }) => {
+    if (appearance === current) return;
+    current = appearance;
+    applyAppearance(root, appearance);
+    wearPalette(appearance);
+  });
+  media.addEventListener("change", () => {
+    if (current?.lighting === "system") wearPalette(current);
   });
 }
 
-export function applyAppearance(root: HTMLElement, held: Appearance): void {
+function applyAppearance(root: HTMLElement, held: Appearance): void {
   wearFace(root, "sans", held.sans, held.sansStack);
   wearFace(root, "mono", held.mono, held.monoStack);
   root.dataset.read = held.reading;
@@ -166,23 +181,6 @@ export function applyAppearance(root: HTMLElement, held: Appearance): void {
   } else {
     root.style.setProperty(BLEND_PROPERTY, `${String(held.blend)}%`);
   }
-  wearLighting(root, held.lighting === "system" ? machineLighting() : held.lighting);
-}
-
-function wearLighting(root: HTMLElement, lighting: "dark" | "light"): void {
-  const was = root.dataset.theme;
-  if (
-    was === undefined ||
-    was === lighting ||
-    !("startViewTransition" in document) ||
-    motionOff(root)
-  ) {
-    root.dataset.theme = lighting;
-    return;
-  }
-  void document.startViewTransition(() => {
-    root.dataset.theme = lighting;
-  });
 }
 
 export function stackRefused(stack: string): boolean {

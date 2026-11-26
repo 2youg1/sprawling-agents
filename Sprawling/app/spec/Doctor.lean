@@ -278,18 +278,19 @@ pub(crate) struct Requirement { …, homepage: Option<&'static str>, … }
 pub(super) fn installed_at(program: &str, start_menu: &str) -> Option<PathBuf>;
 ```
 
-- **三族，而不是三个牌子**：Gecko（firefox、zen、librewolf、waterfox、floorp、firefox-developer、firefox-nightly、tor-browser）、Chromium（chrome、edge、brave、chromium、vivaldi）、WebKit（safari，经 `safaridriver`）。每个成员给出三平台的安装路径；一族的答案是**第一个答得上来的成员**。
+- **三族，而不是三个牌子**：Gecko（firefox、zen、librewolf、waterfox、floorp、firefox-developer、firefox-nightly、tor-browser）、Chromium（chrome、edge、brave、chromium、vivaldi、helium）、WebKit（safari，经 `safaridriver`）。每个成员给出三平台的安装路径；一族的答案是**第一个答得上来的成员**。
+- **Helium 的 Windows 安装目录参与牌子识别**：`imputnet/helium-windows` 的 `installer/helium.nsi` 在 `Program Files` 或 `%LOCALAPPDATA%` 下打开 `imput\Helium\Application\chrome.exe`。需求表声明两种位置，探测与路径归类共用同一份解析；从文件主干认牌子无法区分同名的 Chromium 程序。macOS 的 `Helium.app` 和 Linux 的 `helium` 程序沿用标准路径与 PATH 探测，各平台上游路径与版本见 `docs/third-party.md` §1。Helium 的会话支持待确认，所以排在已验证牌子之后。
 - **驱动是另一行，不是这一行**：一个 Chromium 浏览器自己开不出会话，进得去的是它旁边那个主版本号相符的驱动。故 `chromium` 一行是 `Optional`（它回答的是「运行中的机器上有哪个 Chromium」），而 `chromedriver` 与 `msedgedriver` 各自成行并进 `BrowserEngine` 组——这与 `Engine::choose` 吃的两件东西一一对上，**不制造第二份「怎样才算有浏览器」的权威**。被否决的备选：让 `chromium` 一行在找到浏览器却没有驱动时报 `Broken`，那要借用 `Fault::HalfWritten` 的措辞（「删掉重装」），而它对一个装好的浏览器是假话。
 - **`OneOf(Group)` 而不是四行各自 `Required`**：四条进得去的路，三条关着一条开着，对一个人是「有一个浏览器引擎」而不是「缺三样」。`verdict` 因此把一组折成一个名字（`a browser engine`），排在逐项点名的那些之后；`paint::count` 用同一条规则数总结行，于是总结行与判定行**恒不互相矛盾**。
 - **`Need::OneOf` 在线上说 `Required`**：`wire::DoctorNeed` 只有两个词，而页面要的是「它挡不挡路」；「这一组满足没有」由该档次的 `missing` 回答。第三个词会让页面必须同时读两处才能给一行上色，而 `DoctorNeed` 加一个变体会让今天在跑的客户端解不出整份答案。
-- **`SPRAWLING_BROWSER` 只拼一次，且是引擎读的同一处**：变量压过一切探测。路径按文件名主干认族；**认不出的归 Gecko**，因为无驱动的那条起法是任何分支都接受的那一条，而 xtask render 正是这样设它。被否决的备选是「认不出就当没有」：那会对着一个人正看着的文件报「不在 PATH 上」。
+- **`SPRAWLING_BROWSER` 只拼一次，且是引擎读的同一处**：变量压过一切探测。路径先按安装位置再按文件名主干认族；**认不出的归 Gecko**，因为无驱动的那条起法是任何分支都接受的那一条，而 xtask render 正是这样设它。被否决的备选是「认不出就当没有」：那会对着一个人正看着的文件报「不在 PATH 上」。
 - **Windows 的两把钥匙经 `reg.exe` 读，不引新依赖**：per-user 安装落在带账户名的目录里，表里的字面路径找不到它；`App Paths\<程序>.exe` 与 `StartMenuInternet\<牌子>\shell\open\command` 两个键说得出。只 `reg query`，不写；找不到就换下一个成员。被否决的备选是加一个 registry crate——一个平台、一个问题，换一份人要下载的二进制里的第三方代码。
 - **`enables` 不再说 WebUI 要某个浏览器**：WebUI 任何浏览器都打得开，要 Gecko／Chromium／WebKit 的只有 browser tool。
 - **`Tried` 之外的成员排在最后并带一句说明**：Tor Browser 的启动器与代理会挡在会话前面（`, confirm it by hand once`），Safari 的 BiDi 支持是局部的（`, experimental`）。`member_at` 把找到的路径认回牌子，于是报告说 `zen` 而不只是 `gecko`，`DoctorItem.homepage` 给的是**那个牌子的下载或安装页**，让人点进去就能自行安装。
 
 **本章测试**：`every_family_is_a_row_and_every_member_says_where_it_is_installed`；`a_found_browser_is_reported_by_the_brand_it_is`（Developer Edition 的程序文件也叫 `firefox`，只有目录分得开）；`a_member_that_needs_confirming_is_never_the_first_answer`；`a_verdict_counts_the_required_items_of_its_own_tier_only` 的三段——只有 Zen、只有 Edge 加驱动、四条路全关。
 
-**本章验收**：只装 Zen 的 Windows 机器上 `cargo run -p sprawling -- doctor` 报 `gecko present … (zen)` 且 `ready to use`。
+**本章验收**：只装 Zen 的 Windows 机器上 `cargo run -p sprawling -- doctor` 报 `gecko present … (zen)` 且 `ready to use`。只装 Helium 的 Windows 机器上，同一命令与设置里的诊断报告都显示 Chromium 族已安装，浏览器路径和下载页指向 Helium。
 -/
 
 /-!
@@ -662,7 +663,7 @@ pub(super) fn look(family, platform, search_path) -> Presence;
 - **读不出版本仍然是 Present，`Version::Silent` 的意思随之扩成一句**：「版本号读不出来」——一个印了空行的程序与一个旁边没有版本文件的浏览器，对报告是同一件事，而两者都不使这一项缺席（§8-166 已定：不说话的工具仍是装了的工具）。`describe` 因此是 `no version` 而不是 `said nothing`：后者对一个从未被问过版本的浏览器是假话。
 - **失去的那一件事如实记**：`ask_version` 顺带证明了「这个程序起得来」，读文件不证明。一个在盘上却起不来的浏览器此后报 Present，而真相在 `browser_bidi::lazy` 起它时以 `E_BROWSER_UNAVAILABLE` 出现。这是用「每次服务都开窗」换「探测期发现起不来」：前者每次启动都发生，后者只在真要用浏览器那一次才要紧。
 - **驱动仍然问**：`chromedriver`／`msedgedriver` 是 `Detection::Program`，它们真的打印版本且不开窗，`ask_version` 与它的 deadline 因此留在那条路上，只是不再有浏览器走它。
-- **被否决的备选**：① 只在 Windows 上改读法——同一个事实（浏览器的版本）会有两个家，而另外两个平台上的 spawn 同样是几百毫秒与一个别人的进程；② 读 `HKCU\Software\<牌子>\BLBeacon\version`——每个牌子一把钥匙、每个人一份注册表，而版本目录一条规则答全五个 Chromium 牌子，且它是装它的程序刚写下的那一个；③ 给 `Version` 加一个「来源」变体上线——`DoctorVersion` 的四个词回答的是「版本是什么」，来源是城的内政，上线会让今天在跑的客户端解不出整份答案（§8-57 对 `DoctorNeed` 的同一条理由）。
+- **被否决的备选**：① 只在 Windows 上改读法——同一个事实（浏览器的版本）会有两个家，而另外两个平台上的 spawn 同样是几百毫秒与一个别人的进程；② 读 `HKCU\Software\<牌子>\BLBeacon\version`——每个牌子一把钥匙、每个人一份注册表，而版本目录一条规则答整族 Chromium 牌子，且它是装它的程序刚写下的那一个；③ 给 `Version` 加一个「来源」变体上线——`DoctorVersion` 的四个词回答的是「版本是什么」，来源是城的内政，上线会让今天在跑的客户端解不出整份答案（§8-57 对 `DoctorNeed` 的同一条理由）。
 
 **本章测试**：`version_file::tests::a_browser_says_its_version_through_the_files_beside_it`（三种布局各一份夹具目录：Gecko 的 `application.ini`、Chromium 的两个版本目录取数字大的那个、macOS bundle 的 `Info.plist`；旁边什么都没有的程序答 `Silent`）；`no_browser_is_started_to_learn_its_version`（`family.rs` 的正文里没有 `ask_version` 这个拼写，于是这条不变量在唯一能破它的那个文件上被钉住）。
 

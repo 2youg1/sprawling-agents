@@ -148,6 +148,7 @@
  * dark in exactly the places this stylesheet cannot reach. Saying it here,
  * beside the eleven rungs that make the page light, leaves one answer to
  * the question of what lighting holds. */
+[data-theme-preview="light"],
 :root[data-theme="light"] {
   color-scheme: light;
 
@@ -175,4 +176,17 @@
   --color-text-quiet: oklch(0.420 0.014 250);
   --color-text-faint: oklch(0.545 0.014 250);
   --color-text-disabled: oklch(0.748 0.014 250);
+}
+
+@supports (color: oklch(from currentcolor l c h)) {
+  [data-theme-preview][data-palette="graphite"],
+  :root[data-palette="graphite"] {
+    --color-page: oklch(from var(--color-g0) l 0 h);
+    --color-chrome: oklch(from var(--color-g1) l 0 h);
+    --color-raised: oklch(from var(--color-g2) l 0 h);
+    --color-raised-hover: oklch(from var(--color-g3) l 0 h);
+    --color-accent: oklch(from var(--color-g8) l 0 h);
+    --color-accent-hover: oklch(from var(--color-g9) l 0 h);
+    --color-accent-solid: oklch(from var(--color-g10) l 0 h);
+  }
 }
