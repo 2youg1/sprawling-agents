@@ -101,6 +101,7 @@ export default function Remote() {
       told: persisted ? null : { kind: "unpersisted" },
       busy: false,
     });
+    u.conn.retry();
   }
 
   async function lock(device: Device): Promise<void> {
