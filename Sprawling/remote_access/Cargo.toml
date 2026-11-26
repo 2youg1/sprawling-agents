@@ -6,21 +6,15 @@ license.workspace = true
 rust-version.workspace = true
 repository.workspace = true
 publish.workspace = true
-description = "The remote door of a sprawling city: pairing, key exchange, and the routes that carry its bytes and decide nothing."
+description = "The remote door of a sprawling city: pairing, identity, and sealed sessions."
 
 [lib]
 name = "remote_access"
 
 [dependencies]
 aws-lc-rs = { workspace = true }
-# A route's child process starts from `child::command` (`Sprawling/remote_access/Spec.lean` D24).
-child = { workspace = true }
 kernel = { workspace = true }
-serde_json = { workspace = true }
 zeroize = { workspace = true }
-
-[target.'cfg(windows)'.dependencies]
-win32job = { workspace = true }
 
 [lints]
 workspace = true

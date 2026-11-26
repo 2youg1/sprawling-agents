@@ -325,7 +325,7 @@ fn a_pending_windows_read_keeps_the_response_on_the_same_socket() {
 
     let mut pending = Some(send);
     let mut pulses = Vec::new();
-    let found = read_to_eof(
+    let found = read_response(
         &mut stream,
         &Timeouts {
             connect: Duration::from_secs(2),
@@ -346,6 +346,93 @@ fn a_pending_windows_read_keeps_the_response_on_the_same_socket() {
         },
     );
     writer.join().unwrap();
-    assert_eq!(found.unwrap(), response);
+    assert_eq!(found.unwrap(), (serde_json::json!({}), false));
     assert!(pulses.is_empty());
+}
+
+fn read_generation(reader: &mut BufReader<TcpStream>) -> Value {
+    let mut line = String::new();
+    reader.read_line(&mut line).unwrap();
+    assert_eq!(line, "POST /v1/messages HTTP/1.0\r\n");
+    let mut length = None;
+    loop {
+        line.clear();
+        reader.read_line(&mut line).unwrap();
+        if line == "\r\n" {
+            break;
+        }
+        assert!(!line.is_empty());
+        if let Some(value) = line.strip_prefix("Content-Length: ") {
+            length = Some(value.trim().parse::<usize>().unwrap());
+        }
+    }
+    let mut bytes = vec![0; length.unwrap()];
+    reader.read_exact(&mut bytes).unwrap();
+    serde_json::from_slice(&bytes).unwrap()
+}
+
+#[test]
+fn a_self_delimited_gateway_serves_two_posts_on_one_socket() {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let base = format!("http://{}", listener.local_addr().unwrap());
+    let worker = thread::spawn(move || {
+        let (stream, _) = listener.accept().unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        let mut reader = BufReader::new(stream);
+        for expected in [1, 2] {
+            assert_eq!(read_generation(&mut reader), Value::from(expected));
+            let answer = format!(
+                "HTTP/1.0 200 OK\r\nConnection: Keep-Alive\r\nContent-Length: 1\r\n\r\n{expected}"
+            );
+            reader.get_mut().write_all(answer.as_bytes()).unwrap();
+        }
+    });
+    let client = Client::with_timeouts(
+        &base,
+        "test".into(),
+        Timeouts {
+            connect: Duration::from_secs(2),
+            io: Duration::from_secs(2),
+            pulse: Duration::from_secs(1),
+        },
+    )
+    .unwrap();
+    for value in [1, 2] {
+        let request = Value::from(value);
+        assert_eq!(client.post(&request, &mut Vec::new()).unwrap(), request);
+    }
+    worker.join().unwrap();
+}
+
+#[test]
+fn a_gateway_can_close_an_idle_connection_before_the_next_post() {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let base = format!("http://{}", listener.local_addr().unwrap());
+    let (closed, wait) = std::sync::mpsc::channel();
+    let worker = thread::spawn(move || {
+        for n in [1, 2] {
+            let (stream, _) = listener.accept().unwrap();
+            let mut reader = BufReader::new(stream);
+            assert_eq!(read_generation(&mut reader), Value::from(n));
+            reader
+                .get_mut()
+                .write_all(
+                    b"HTTP/1.0 200 OK\r\nConnection: keep-alive\r\nContent-Length: 2\r\n\r\n42",
+                )
+                .unwrap();
+            reader.get_mut().shutdown(std::net::Shutdown::Both).unwrap();
+            closed.send(()).unwrap();
+        }
+    });
+    let client = Client::new(&base, "test".into()).unwrap();
+    for n in [1, 2] {
+        assert_eq!(
+            client.post(&Value::from(n), &mut Vec::new()).unwrap(),
+            Value::from(42)
+        );
+        wait.recv_timeout(Duration::from_secs(2)).unwrap();
+    }
+    worker.join().unwrap();
 }

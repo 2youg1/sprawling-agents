@@ -9,8 +9,7 @@ import type { Refused } from "./handshake";
 const HEADER_BYTES = 5;
 const MAX_FRAME_BYTES = 64 * 1024 * 1024;
 const MAX_READY_FRAMES = 8;
-const PIPE_HEADER = "x-sprawling-pipe";
-const BINARY = "application/octet-stream";
+const OPEN_TIMEOUT_MS = 10_000;
 
 type FrameBytes = Uint8Array<ArrayBuffer>;
 
@@ -68,42 +67,35 @@ export async function reach(url: string, first: FrameBytes): Promise<Door | null
   ) {
     return null;
   }
-  const request = new AbortController();
-  const response = await fetch(target, {
-    method: "POST",
-    mode: "cors",
-    credentials: "omit",
-    redirect: "error",
-    cache: "no-store",
-    headers: { "content-type": BINARY },
-    body: first,
-    signal: request.signal,
-  }).catch(() => null);
-  if (response === null || !response.ok || response.body === null) {
-    request.abort();
+  if (typeof WebTransport === "undefined") return null;
+  const transport = await Promise.resolve()
+    .then(() => new WebTransport(target.href, { allowPooling: false }))
+    .catch(() => null);
+  if (transport === null) return null;
+  void transport.closed.catch(() => null);
+  const { promise: timeout, resolve: expired } = Promise.withResolvers<null>();
+  const timer = setTimeout(() => expired(null), OPEN_TIMEOUT_MS);
+  const stream = await Promise.race([
+    timeout,
+    transport.ready.then(() => transport.createBidirectionalStream()).catch(() => null),
+  ]).finally(() => clearTimeout(timer));
+  if (stream === null) {
+    transport.close();
     return null;
   }
-  const token = response.headers.get(PIPE_HEADER);
-  if (token === null) {
-    request.abort();
-    return null;
-  }
-  return connected(new URL("/remote/frame", target), token, response.body, request);
+  const door = connected(transport, stream);
+  door.send(first);
+  return door;
 }
 
-function connected(
-  url: URL,
-  token: string,
-  stream: ReadableStream<Uint8Array>,
-  request: AbortController,
-): Door {
+function connected(transport: WebTransport, stream: WebTransportBidirectionalStream): Door {
   const ready: FrameBytes[] = [];
   const waiting: ((frame: FrameBytes | null) => void)[] = [];
-  const reader = stream.getReader();
+  const reader = stream.readable.getReader();
+  const writer = stream.writable.getWriter();
   const packets = new Packets();
   let shut = false;
   let resumeReading: (() => void) | undefined;
-  let outbound: Promise<void> = Promise.resolve();
   const { promise: closed, resolve: settled } = Promise.withResolvers<string | null>();
 
   function resume() {
@@ -115,7 +107,8 @@ function connected(
   function stop(code: string | null) {
     if (shut) return;
     shut = true;
-    request.abort();
+    transport.close();
+    writer.releaseLock();
     resume();
     for (const wake of waiting.splice(0)) wake(null);
     settled(code);
@@ -151,22 +144,11 @@ function connected(
   void receive().finally(() => reader.releaseLock());
   return {
     send(bytes: FrameBytes) {
-      outbound = outbound
-        .then(async () => {
-          if (shut) return;
-          const answer = await fetch(url, {
-            method: "POST",
-            mode: "cors",
-            credentials: "omit",
-            redirect: "error",
-            cache: "no-store",
-            headers: { authorization: "Bearer " + token, "content-type": BINARY },
-            body: bytes,
-            signal: request.signal,
-          });
-          if (!answer.ok) stop("E_WIRE_MISMATCH");
-        })
-        .catch(() => stop("E_WIRE_MISMATCH"));
+      if (shut) return;
+      const packet = new Uint8Array(HEADER_BYTES + bytes.length);
+      new DataView(packet.buffer).setUint32(1, bytes.length);
+      packet.set(bytes, HEADER_BYTES);
+      void writer.write(packet).catch(() => stop("E_WIRE_MISMATCH"));
     },
     next() {
       const frame = ready.shift();

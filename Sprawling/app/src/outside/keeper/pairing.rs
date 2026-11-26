@@ -11,7 +11,6 @@ use remote_access::handshake::{
     self, CityFingerprint, CityPairing, Invitation, PairHello, PairReply,
 };
 use remote_access::pairing::{CODE_BYTES, PairingCode};
-use remote_access::route::Opened;
 
 use super::{Doorway, closed, drawn, nonce};
 
@@ -23,7 +22,6 @@ pub(crate) struct Inviting {
 
     pub(crate) shown: String,
     pub(crate) invitation: Invitation,
-    pub(crate) opened: Opened,
 }
 
 impl Doorway {
@@ -34,10 +32,10 @@ impl Doorway {
         (self.senses.entropy)(&mut entropy)?;
         let (code, shown) = PairingCode::mint(entropy);
         let mut kept = self.kept()?;
-        let opened = kept
+        let origin = kept
             .standing
             .as_ref()
-            .map(|standing| standing.opened.clone())
+            .map(|standing| &standing.origin)
             .ok_or_else(|| closed("pair a device"))?;
         if kept.door.devices().iter().any(|device| device.name == name) {
             return Err(AxError::failure(
@@ -49,22 +47,21 @@ impl Doorway {
         }
         let city = CityFingerprint::of(&kept.city()?.public());
         let expires = TimeMs::new(now.value().saturating_add(PAIRING_MS));
-        kept.door.expect_pairing(code, name, authority, expires)?;
         let invitation = Invitation {
             city,
             code: shown.chars().filter(|each| *each != '-').collect(),
         };
         let link = format!(
             "{}/#pair={}&city={}",
-            opened.url.as_str().trim_end_matches('/'),
+            origin.as_str().trim_end_matches('/'),
             invitation.code,
             invitation.city.text()
         );
+        kept.door.expect_pairing(code, name, authority, expires)?;
         Ok(Inviting {
             link,
             shown,
             invitation,
-            opened,
         })
     }
 

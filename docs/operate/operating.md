@@ -130,7 +130,7 @@ The watcher needs a paired key for the first city's loopback address. On the mac
 
 ## Reaching the city from another device
 
-The remote door lets a phone or a second computer reach a city that runs on this machine, through a route that makes a loopback port reachable from outside. The console drives all of it. Settings > Remote on the page can also open the door for a time you pick, close it, and replace the city key, but opening and replacing the key take a second step: the request prints a code on the terminal running `sprawling serve`, beside the verb it would perform (in the quiet host, as its one transient third line), and the city performs the verb only when that code is typed into the page within two minutes. The code never reaches a page or a frame, so a browser tool or a command that drives the page cannot open the door or replace the key; closing needs no code, because it only takes access away. A city started without a console refuses opening, replacing and confirming with `E_TOOL_UNAVAILABLE`; run `sprawling serve` in a terminal of its own. This is the same on Windows, macOS and Linux. Pairing and revoking a device stay at the console, because a pairing code shown on a page could be read by whatever drives that page. Where `exec` runs in the `copied_tree` arm, a command has your account's network and credential store, so the code protects the door from the browser tools and not from `exec`.
+The remote door lets a phone or a second computer reach a city that runs on this machine, through the city’s public HTTP/3 listener. The console drives all of it. Settings > Remote on the page can also open the door for a time you pick, close it, and replace the city key, but opening and replacing the key take a second step: the request prints a code on the terminal running `sprawling serve`, beside the verb it would perform (in the quiet host, as its one transient third line), and the city performs the verb only when that code is typed into the page within two minutes. The code never reaches a page or a frame, so a browser tool or a command that drives the page cannot open the door or replace the key; closing needs no code, because it only takes access away. A city started without a console refuses opening, replacing and confirming with `E_TOOL_UNAVAILABLE`; run `sprawling serve` in a terminal of its own. This is the same on Windows, macOS and Linux. Pairing and revoking a device stay at the console, because a pairing code shown on a page could be read by whatever drives that page. Where `exec` runs in the `copied_tree` arm, a command has your account's network and credential store, so the code protects the door from the browser tools and not from `exec`.
 
 | Typed at the console | What happens |
 |---|---|
@@ -143,7 +143,7 @@ The remote door lets a phone or a second computer reach a city that runs on this
 
 Nothing that widens access, reaches a credential, or changes the machine or the city's rules can be done from a device, whatever it was paired as: attaching an endpoint, choosing a model, writing rules or configuration, installing a tool, raising or removing a building. Those stay at the machine the city runs on. The full list is the `class` column of `Sprawling/wire/Spec.lean` §19-2.
 
-The door admits a request only when its `Host` is one of the three loopback names or the route's public name, whether the route passes the browser's `Host` on or rewrites it to the loopback address. A page loaded from the route sends that public name's `https://` address as its `Origin`; any other `Origin` is refused with 403 before the connection opens. A route that serves the page under a second public name is therefore refused until it uses the name the door printed.
+Use the HTTPS address printed by the city. HTTP/3 requests must carry the configured authority. An authority mismatch returns 421. A WebTransport connection must also carry that same HTTPS origin, and an origin mismatch returns 403.
 
 The history records `remote_opened`, `device_paired`, `remote_session_started`, `device_revoked` and `remote_closed`, without keys, pairing codes or session ids.
 
@@ -160,23 +160,24 @@ Any program that runs as your user account can read that account's credential st
 
 ### Choosing the route
 
-`/remote open` makes the door reachable through the route that the `[remote]` table in the city's own `.sprawling/CONFIG.toml` names. It reads the table each time the door opens, so an edit takes effect at the next `/remote open` without a restart. Only the city's file may hold the table: a building or a room that writes `[remote]` is refused, because the door opens onto the whole city. With no table, `/remote open` refuses and names the keys each route needs.
-
-The public route runs Caddy on the same machine as the city. It publishes the city's built-in WebUI and remote sessions over HTTP/3 on UDP. The gateway target is a loopback port, and the public route has no TCP fallback.
+The city reads its own `.sprawling/CONFIG.toml` each time you run `/remote open`. It serves its built-in WebUI over HTTP/3 and uses WebTransport for remote pairing and sessions. The public listener uses UDP only. Existing `route = "h3"` configurations keep the four settings below and drop `command`.
 
 ```toml
 [remote]
 route = "h3"
-command = "/absolute/path/to/caddy"
 url = "https://city.example.org"
 listen = "0.0.0.0:443"
 certificate = "/absolute/path/to/fullchain.pem"
 private_key = "/absolute/path/to/privkey.pem"
 ```
 
-Use a browser-trusted certificate for this host. Keep its key under the city's operating account and renew the files before reopening the door. Point the DNS address record at this machine, allow incoming UDP 443, and publish an HTTPS record `1 . alpn="h3"` so browsers can discover HTTP/3 on their first visit. The network and browser resolver need to support that discovery. Use a service manager that stops the whole process group if the city is terminated on Unix. A network that blocks UDP cannot reach the remote door.
+1. Point the DNS name at the city host and allow inbound UDP 443. If the host sits behind a router, forward UDP 443 to it.
+2. Configure a browser-trusted PEM certificate chain and matching key for that name. Keep the private key readable by the account that runs the city. Publish a DNS HTTPS record with `1 . alpn="h3"` so a browser can discover HTTP/3 on its first visit. The browser and its resolver need to support this record.
+3. In the city console, run `/remote open --for 1h`, then `/remote pair <name>`. Open the invitation in a WebTransport-capable browser on the device you want to pair. Keep using that browser profile and HTTPS origin for later visits.
+4. Run `/remote revoke <name>` to remove one device or `/remote close` to stop public access for everyone. Closing keeps paired devices enrolled for the next opening.
 
-`/remote open` starts the gateway. `/remote pair <name>` prints an invitation you can copy and open in the remote browser. Once paired, the browser signs new sessions with the key stored for that origin. `/remote revoke <name>` removes the device's authority. `/remote close` ends the gateway and the open sessions. The Cloudflare setting is recognized for migration and refused when opening the door. The command route accepts a loopback URL for on-machine integrations.
+If the address itself does not load, check DNS HTTPS discovery, UDP reachability, and whether the door is open. If the page loads but reports that the remote connection failed, check WebTransport support and the certificate shown for the configured origin. Networks that block QUIC cannot connect.
+
 
 ## Moving a city
 
@@ -240,7 +241,7 @@ Ctrl+C does not close the city: the terminal keeps it for copying, and the CLI o
 
 Every browser the page runs in holds a device key for this city: a key that browser generated in its own storage for the address it opened and cannot export, with the public half kept in the city's `.sprawling/`. Opening the address signs a challenge with that key, and the city answers with a session token that lives only in the page's memory. Nothing the browser attaches by itself, such as a cookie, admits anything. Restarting the city keeps every paired browser paired.
 
-The browser `/web` opens pairs without typing. To pair another browser, open the loopback address and press C in the quiet host. Copy the full code, paste it into the browser and submit within two minutes. A successful submission uses the code once. Press C to request another code after expiry. **settings** lists each paired browser with when it was paired and last seen, and forgets one: its key stops opening anything, every page it has open is closed at once, and that browser pairs again the next time. A browser that cannot make an Ed25519 device key cannot pair, and the page says so and names the browser versions that can.
+`/web` opens your default browser and pairs it when the browser can read the private redirect file. Press Enter in the quiet host to reopen it. WSL opens the plain address. For first use in WSL or in a different local browser, open the printed loopback address and press C in the quiet host to show a one-time code. Select and copy the full code, paste it into the WebUI pairing form, and submit within two minutes. A successful submission uses the code once. Press C to request another code after expiry. **settings** lists each paired browser with when it was paired and last seen, and forgets one: its key stops opening anything, every page it has open is closed at once, and that browser pairs again the next time. A browser that cannot make an Ed25519 device key cannot pair, and the page says so and names the browser versions that can.
 
 A script or another program on this machine reads the key file the city writes for its port in the per-user runtime directory — `$XDG_RUNTIME_DIR` on Linux, `%LOCALAPPDATA%` on Windows, `$TMPDIR` on macOS — created readable only by your account and deleted when the city closes in order; a city that was killed leaves it, and the next serve on that port replaces it. `sprawling call`, `dispatch`, `gauge` and `enrol` read it when no `--token` is given and `--at` is a loopback address or `localhost`, and exit with 2 for any other host until `--token` is given; an editor that posts to `/acp` sends the same key as `Authorization: Bearer`, or goes through `sprawling call`.
 

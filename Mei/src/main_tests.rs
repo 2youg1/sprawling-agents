@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use super::*;
-use mei::launch::{SYSTEM, initial_request, parse_extra, python_tool};
+use mei::launch::{SYSTEM, Task, initial_request, parse_extra, python_tool};
 
 fn environment() -> doctor::Environment {
     doctor::Environment::new(

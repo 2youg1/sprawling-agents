@@ -251,3 +251,36 @@ fn a_resumed_process_can_read_the_original_spilled_path() {
     second.join().unwrap();
     assert!(std::fs::read_to_string(path).unwrap().len() > 16384);
 }
+
+#[test]
+fn a_text_turn_finishes_without_starting_the_cached_interpreter() {
+    let directory = tempfile::tempdir().unwrap();
+    let executable = directory.path().join("unavailable.exe");
+    std::fs::write(&executable, []).unwrap();
+    let program = mei::doctor::Program::new("3.12.13", executable);
+    mei::doctor::write_cache(
+        directory.path(),
+        &mei::doctor::Environment::new(program.clone(), program),
+    )
+    .unwrap();
+    for (response, needs_python) in [
+        (
+            serde_json::json!({"stop_reason": "end_turn", "content": "done"}),
+            false,
+        ),
+        (call("print(42)"), true),
+    ] {
+        let (base, gateway) = serve(vec![response]);
+        let output = support::command(&base, "continue")
+            .env("MEI_DOCTOR_DIR", directory.path())
+            .output()
+            .unwrap();
+        assert_eq!(output.status.success(), !needs_python);
+        if needs_python {
+            assert!(String::from_utf8_lossy(&output.stderr).contains("E_MEI_PYTHON"));
+        } else {
+            assert_eq!(output.stdout, b"done");
+        }
+        assert_eq!(gateway.join().unwrap().len(), 1);
+    }
+}

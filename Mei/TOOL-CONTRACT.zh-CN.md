@@ -9,8 +9,8 @@
 | 部分 | UTF-8 字节 | Token（`o200k_base`） |
 |---|---:|---:|
 | `system` | 297 | 57 |
-| 完整紧凑 `tools[0]` JSON | 1489 | 332 |
-| 合计 | 1786 | 389 |
+| 完整紧凑 `tools[0]` JSON | 1653 | 365 |
+| 合计 | 1950 | 422 |
 
 Token 列用 OpenAI 的 `o200k_base` 分词器（GPT-4o/4.1/5 家族）对同一文本计数，不含聊天信封或 provider 追加内容；换成其他分词器数值会不同。以下 JSON 为便于阅读而格式化；字节数和 Token 数按紧凑线上格式计算。
 
@@ -29,7 +29,7 @@ Aligned with context, fulfill user intent thoroughly and resourcefully and stay 
 
 ```json
 {
-  "description": "<python version=\"3.12.13\" uv_version=\"0.12.3\">\nA persistent python interpreter. Variables, imports, and the working directory (cwd) persist across calls. An exception prints its traceback without ending the session, so you can recover and continue without rebuilding state. Expressions do not auto-echo, so explicitly print any values you need to inspect. If combined UTF-8 stdout/stderr is up to 16 KiB, the tool returns it inline. Larger or non-UTF-8 output returns a notice and the full path, or a Python expression that losslessly reconstructs a non-Unicode native path; filter that file, or re-run with narrower output, in the next python call. Run shell commands and CLIs through subprocess, capture their output, and check return codes. Start child interpreters with sys.executable, so they inherit the active environment. Call show_image(path) to attach a PNG, JPEG, GIF, or WebP picture as visual tool-result content; a picture is not text output. Attach at most 2 pictures per call and at most 5 MiB per picture, on the call's own thread; a picture from another thread or a later call is refused with how to read it. Because capabilities like web_search, web_fetch or sub-agent delegation are not exposed as built-in tools, python serves as your interface to invoke external APIs, CLIs, headless tools, and more directly via subprocess.\n</python>",
+  "description": "<python version=\"3.12.13\" uv_version=\"0.12.3\">\nA persistent python interpreter. Variables, imports, and the working directory (cwd) persist across calls. Send calls you can already specify together in one response. They run in order and each returns its own result. Wait for a result when it determines the next call. An exception prints its traceback without ending the session, so you can recover and continue without rebuilding state. Expressions do not auto-echo, so explicitly print any values you need to inspect. If combined UTF-8 stdout/stderr is up to 16 KiB, the tool returns it inline. Larger or non-UTF-8 output returns a notice and the full path, or a Python expression that losslessly reconstructs a non-Unicode native path; filter that file, or re-run with narrower output, in the next python call. Run shell commands and CLIs through subprocess, capture their output, and check return codes. Start child interpreters with sys.executable, so they inherit the active environment. Call show_image(path) to attach a PNG, JPEG, GIF, or WebP picture as visual tool-result content; a picture is not text output. Attach at most 2 pictures per call and at most 5 MiB per picture, on the call's own thread; a picture from another thread or a later call is refused with how to read it. Because capabilities like web_search, web_fetch or sub-agent delegation are not exposed as built-in tools, python serves as your interface to invoke external APIs, CLIs, headless tools, and more directly via subprocess.\n</python>",
   "input_schema": {
     "properties": {
       "code": {

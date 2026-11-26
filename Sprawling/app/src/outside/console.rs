@@ -8,7 +8,7 @@ use kernel::AxError;
 use kernel::event::record::RemoteClosing;
 use qrcodegen::{QrCode, QrCodeEcc};
 use remote_access::door::Authority;
-use remote_access::route::{Opened, Permanence};
+use reqwest::Url;
 
 use super::keeper::{Doorway, Inviting, Revoking};
 use super::listener::Reaching;
@@ -178,20 +178,13 @@ pub(crate) fn perform(
     }
 }
 
-fn opening(opened: &Opened, lasting: Lasting, keeps: Persistence) -> String {
+fn opening(origin: &Url, lasting: Lasting, keeps: Persistence) -> String {
     let minutes = lasting.ms().checked_div(MS_PER_MINUTE).unwrap_or_default();
-    let host = match opened.permanence {
-        Permanence::Fixed => "",
-        Permanence::PerStart => {
-            "\n  this route changes its address when it restarts, and a paired device keeps its \
-             key under the old one: it pairs again after every restart"
-        }
-    };
     format!(
-        "  the remote door is open for {}h {}m at {}{host}\n  {}",
+        "  the remote door is open for {}h {}m at {}\n  {}",
         minutes.checked_div(60).unwrap_or_default(),
         minutes.checked_rem(60).unwrap_or_default(),
-        opened.url.as_str(),
+        origin.as_str(),
         kept_for(keeps)
     )
 }

@@ -6,7 +6,7 @@
 import { claim, finish, pairHello, sessionHello, type Refused, type Session } from "./handshake";
 import type { Invitation } from "./invitation";
 import type { DeviceKey } from "./keys";
-import { reach } from "./pipe";
+import { reach } from "./transport";
 import { payloadBytes } from "./seal";
 
 export type Path = "/remote/pair" | "/remote/session";

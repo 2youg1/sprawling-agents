@@ -105,9 +105,8 @@ end Sprawling.Outside.Conduit
 ```rust
 // bin::outside::keeper：一把锁后面的一扇门
 pub(crate) struct Senses { pub(crate) clock: Clock, pub(crate) entropy: Entropy }   // 在 bin::assembly 造
-pub(crate) type Choosing = Box<dyn FnMut() -> Result<Box<dyn Route + Send>, AxError> + Send>;      // §8-151
 pub(crate) struct Keeping { pub(crate) devices: PathBuf, pub(crate) ledger: Box<dyn Ledger + Send>,
-                            pub(crate) choose: Choosing, pub(crate) senses: Senses, pub(crate) key: CityKey }
+                            pub(crate) senses: Senses, pub(crate) key: CityKey }
 // bin::outside::keeper::city_key：vault 里的城钥匙
 pub(crate) struct CityKey { /* Arc<Mutex<gateway::Custodian>> 与 SecretRef */ }
 impl CityKey {
@@ -121,8 +120,8 @@ pub(crate) enum Phase { Open, Closed }
 #[derive(Clone)] pub(crate) struct Doorway { /* Arc<Mutex<…>> 与 Senses */ }
 impl Doorway {
     pub(crate) fn keep(keeping: Keeping) -> Result<Doorway, AxError>;            // 读设备表，门关着
-    pub(crate) fn open(&self, local: SocketAddr, lasting: Lasting) -> Result<Opened, AxError>;
-    pub(crate) fn attend(&self, listening: Box<dyn Send>) -> Result<(), AxError>;
+    pub(crate) fn open<T>(&self, lasting: Lasting, prepare: impl FnOnce() -> Result<(Url, T), AxError>,
+                          start: impl FnOnce(T) -> Box<dyn Send>) -> Result<Url, AxError>;
     pub(crate) fn close(&self, why: RemoteClosing) -> Result<Phase, AxError>;
     pub(crate) fn tick(&self) -> Result<Phase, AxError>;
     pub(crate) fn invite(&self, name: &str, authority: Authority) -> Result<Inviting, AxError>;
@@ -144,10 +143,8 @@ pub(super) fn command_class(command: &wire::WireCommand) -> VerbClass;          
 pub(super) enum Step { Forward(String), Answer(Vec<u8>), Lock }
 impl Conduit { pub(super) fn judge(&mut self, sealed: &[u8]) -> Result<Step, AxError>;
                pub(super) fn seal_for_device(&mut self, text: &str) -> Result<Vec<u8>, AxError>; }
-// bin::outside::listener：回环上的远程监听
-pub(crate) const PAIR_PATH: &str = "/remote/pair";
-pub(crate) const SESSION_PATH: &str = "/remote/session";
-pub(crate) struct Reaching { pub(crate) runtime: Handle, pub(crate) city: SocketAddr, pub(crate) token: String }
+// bin::outside::listener：城进程的 UDP 入口
+pub(crate) struct Reaching { pub(crate) runtime: Handle, pub(crate) city_root: PathBuf, pub(crate) city: SocketAddr, pub(crate) token: String }
 // bin::outside::devices：设备表
 pub(super) fn read(path: &Path) -> Result<Vec<Device>, AxError>;
 pub(super) fn write(path: &Path, devices: &[Device]) -> Result<(), AxError>;
@@ -159,11 +156,11 @@ pub(super) struct Outdoors { city_root, relay, port, key }   // keep(self) -> Re
 - **五行经 worker 的 relay 写**（`Sprawling/kernel/Spec.lean` §8-81）：`RunWorker::relay()` 交出与驾驶线程同一种 `kernel::Ledger`，草稿过同一个队列到唯一的写者，城仍只有一个写者。`who` 是 `person`，门到时自己关上那一行是 `city`。一行写不进去时，门的那一步不算发生：开门时通路随即关上，配对时设备不留下。
 - **设备表**在 `CityLayout::devices`（保留子树下远程门自己的目录里，文件名是 `kernel::layout::DEVICES_FILE`），每台设备一个 `[[device]]`（`id`、`name`、`authority`、`key`，写法见 Sprawling/remote_access/Spec.lean §8-11）。整份写到旁边的新文件再改名盖过去，崩溃只留下改前或改后的一份。文件不存在是空表；读不成的表以 `E_STORAGE_FATAL` 拒并写出文件路径，不猜谁能进。配对与撤销各写一次；写失败时这次配对不算数。
 - **名字在门外判唯一**：`invite` 拒一个已配对设备用过的名字（`E_INVALID_ARGS`），门本身不看名字（Sprawling/remote_access/Spec.lean §11）。
-- **远程监听**：`/remote open` 在 `127.0.0.1` 上绑一个系统给的端口，先开门、再起接收的任务，任务的中止把手交给门（`attend`），门一关它就停。监听每秒问一次门到没到时；到了就以 `Expired` 关门，写一行。两条路径与上面的消息见 Sprawling/remote_access/Spec.lean §8-10。门开了才知道通路的公网地址，所以监听的名单在开门之后由 `ListenerOrigins::routed(本地端口, 公网地址)` 算一次，两条路径与页面都经 `wire::entered` 先过入口判定（`Sprawling/wire/spec/Reception/Entry.lean` §8-94，wire D56）：Host 或 Origin 不在名单上的请求在升级之前回 403。门的看守里写账、写盘的那几步放到阻塞线程池上做：relay 等的是唯一的写者，套接字任务陪它等会占住一个反应器线程。
-- **逐帧授权**：`Conduit::judge` 打开封装，`Lock` 交回给监听去关门；线协议帧读成 `ClientFrame`，`Hello` 换上城的令牌再发（`Sprawling/wire/Spec.lean` §8-66），`Ask { query: Privacy }` 由 `verbs::passage` 判为 `LocalOnly`，因为它答的是主机的设置与本应用改过它们的原值，不是城的状态，看与动手的设备都读不到（`Sprawling/wire/Spec.lean` §8-88），其余按 `verbs::passage` 判类、问 `Doorway::authority` 与 `permits`。放行的原文发给城的 `/ws`；拒绝的不到城，设备收到一帧封好的 `Refusal`（`E_GATE_DENIED`）；会话已不被门持有时返回错误，连接结束。中继以线协议客户端的身份连城自己的监听，绑在 `0.0.0.0` 的城从回环连。`Reaching.token` 总有值：城的每一面都要凭据（`Sprawling/wire/Spec.lean` §8-41），中继出示的是这次服务的native key，在进程内拿到，不读钥匙文件。
+公网监听直接由城绑定 UDP；证书、源和绑定成功且开门写账后，门持有端点与监听任务。显式关门或到期同时终止端点及全部公网连接。对外会话按 remote_access §8-10 验证，向内转发才使用城自己的端口。写账与配对落盘在阻塞线程池做。
+- **逐帧授权**：`Conduit::judge` 打开封装，`Lock` 交回给监听去关门；线协议帧读成 `ClientFrame`，`Hello` 换上城的令牌再发（`Sprawling/wire/Spec.lean` §8-66），`Ask { query: Privacy }` 由 `verbs::passage` 判为 `LocalOnly`，因为它答的是主机的设置与本应用改过它们的原值，不是城的状态，看与动手的设备都读不到（`Sprawling/wire/Spec.lean` §8-88），其余按 `verbs::passage` 判类、问 `Doorway::authority` 与 `permits`。放行的原文发给城的 `/ws`；拒绝的不到城，设备收到一帧封好的 `Refusal`（`E_GATE_DENIED`）；会话已不被门持有时返回错误，连接结束。会话结束时中继按 ID 从门中移除该会话。中继以线协议客户端的身份连城自己的监听，绑在 `0.0.0.0` 的城从回环连。`Reaching.token` 总有值：城的每一面都要凭据（`Sprawling/wire/Spec.lean` §8-41），中继出示的是这次服务的native key，在进程内拿到，不读钥匙文件。
 - **城的签名密钥由 vault 里的种子派生**（Sprawling/remote_access/Spec.lean D23）：引用是 `secret:remote/city-key.<创世链哈希的小写十六进制>`，由 `CityKey::of` 用 `SecretRef::new` 一处造出；创世 id 是 `Views::epoch`，账本还没有创世行时 `of` 以 `E_CONFIG_INVALID` 拒，门的看守取不起来。`Doorway::keep` 经 `CityKey::held` 取回种子、交给 `SigningKey::from_sealed`；vault 答 `E_CREDENTIAL_MISSING` 时才取 32 字节熵，经 `keys::written` 写进去，再从 vault 读回派生，所以第一次与以后每一次走同一条读路。vault 的其他拒绝原样交出。读不成的种子不让门的看守失败：它被记在看守里，邀请与会话握手都交出那句拒绝，`/remote replace-key` 仍能换一把。种子留多久就是 vault 在这个平台上留多久（`Sprawling/gateway/spec/Credential.lean` §8-4）：Windows 凭据管理器与 macOS 钥匙串跨重启；Linux 的内核 keyutils 到这次开机结束，用加密的 vault 文件时跨重启；退回进程内时到城重启为止。
 - **更换城钥匙**：`replace_key` 在门开着时以 `E_BUSY` 拒（开着的会话是旧钥匙握的手）；否则 `CityKey::replaced` 取新熵、写进同一个引用盖过旧种子并读回，看守换上新钥匙，再按 `Revoking::All` 撤销每一台设备，各写一行 `device_revoked`，设备表随之写空。vault 写不进去时什么都不变。
-- **通路在开门时选，随门开关**：`open` 先判门是否已开，再调一次 `Keeping.choose` 造出这一次的通路并打开它；开着的通路与它答的 `Opened`、监听的任务一起放在门的 standing 里，关门时先停监听，再关通路，再写账。生产装配里 `choose` 读城的 `[remote]`（§8-151）；`outside::tests` 给一条 `route::scripted::ScriptedRoute`。选不出通路（没配、配错）时 `open` 原样交出那句拒绝：门没开，账上没有一行。
+重复开门先按同一把锁拒绝。剩下的状态只保留源及其监听任务。配置或绑定错误不记录开门事件。
 - **门的看守取不起来时城照常服务**：设备表读不成、熵取不到，`/remote` 每一个子动词都打印那一句拒绝，其余控制台与页面不受影响。
 
 **测试**：`outside::tests` 用一台 Rust 写的设备、一条脚本化通路、计数的时钟与计数的熵走门：`the_door_writes_its_five_lines_in_the_order_they_happen`（开、配对、会话开始、撤销、关，五行按此次序入账）、`a_local_only_frame_is_refused_and_reaches_no_city`（`Act` 设备发 `Reveal`，答一帧 `E_GATE_DENIED` 的 `Refusal`，没有一个字节放行）、`a_watching_device_is_refused_a_verb_that_acts_and_may_still_ask`（`Watch` 设备的 `Cancel` 被拒、`Ask` 原文放行）、`the_device_table_survives_a_reopen`（两台设备，含一个中文名，重开后设备表相等）、`a_restarted_city_keeps_its_key`（同一个 vault 上两次 `keep`，邀请里的城指纹相同）、`replacing_the_key_unpairs_every_device`（换钥匙之后指纹变了、设备表空了、每台设备一行 `device_revoked`，门开着时拒绝）。

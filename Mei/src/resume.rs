@@ -29,6 +29,21 @@ fn offending_value(value: Option<&Value>) -> String {
 }
 
 pub fn read(path: &Path) -> Result<Vec<Value>> {
+    let mut messages = Vec::new();
+    replay(path, |message| {
+        messages.push(message);
+        Ok(())
+    })?;
+    Ok(messages)
+}
+
+pub fn history(path: &Path) -> Result<crate::request::History> {
+    let mut history = crate::request::History::default();
+    replay(path, |message| history.push(&message).map(|_| ()))?;
+    Ok(history)
+}
+
+fn replay(path: &Path, mut append: impl FnMut(Value) -> Result<()>) -> Result<()> {
     let file = std::fs::File::open(path).map_err(|err| {
         failure(
             "open the Mei resume log",
@@ -37,8 +52,7 @@ pub fn read(path: &Path) -> Result<Vec<Value>> {
         )
     })?;
     let mut reader = std::io::BufReader::new(file);
-    let mut messages = Vec::new();
-    let mut last_stop = None;
+    let mut last = None;
     let mut line = String::new();
     let mut line_number = 0_usize;
     loop {
@@ -102,7 +116,7 @@ pub fn read(path: &Path) -> Result<Vec<Value>> {
                 )
                 .with_value(offending_value(content_value))
             })?;
-        if messages.is_empty() && role != "user" {
+        if last.is_none() && role != "user" {
             return Err(failure(
                 "validate the initial Mei prompt",
                 "the first line must contain the initial user prompt",
@@ -111,28 +125,23 @@ pub fn read(path: &Path) -> Result<Vec<Value>> {
             .with_value(offending_value(role_value))
             .into());
         }
-        last_stop = object.remove("stop_reason");
+        last = Some((role == "assistant", object.remove("stop_reason")));
         object.retain(|key, _| matches!(key.as_str(), "role" | "content"));
-        messages.push(Value::Object(object));
+        append(Value::Object(object))?;
     }
-    let last_role = messages.last().and_then(|entry| entry.get("role"));
-    let assistant_last = last_role.and_then(Value::as_str) == Some("assistant");
-    let complete = assistant_last && last_stop.as_ref().and_then(Value::as_str) == Some("end_turn");
-    if !complete {
-        let offending = match last_role {
-            None => "<empty log>".to_owned(),
-            Some(_) if assistant_last => offending_value(last_stop.as_ref()),
-            value => offending_value(value),
-        };
-        return Err(failure(
-            "validate the complete Mei session",
-            "the log is empty or does not end with an assistant end_turn",
-            path.display().to_string(),
-        )
-        .with_value(offending)
-        .into());
-    }
-    Ok(messages)
+    let offending = match last {
+        Some((true, Some(Value::String(stop)))) if stop == "end_turn" => return Ok(()),
+        Some((true, stop)) => offending_value(stop.as_ref()),
+        Some((false, _)) => "\"user\"".to_owned(),
+        None => "<empty log>".to_owned(),
+    };
+    Err(failure(
+        "validate the complete Mei session",
+        "the log is empty or does not end with an assistant end_turn",
+        path.display().to_string(),
+    )
+    .with_value(offending)
+    .into())
 }
 
 #[cfg(test)]

@@ -496,16 +496,9 @@ settings-reason ModelSection.endpoint `[model] endpoint` 与 `name` 一起标识
 settings-control ModelSection.effort RefRain/src/views/settings/city_layer_view.tsx
 settings-reason ConfigFile.remote 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在它所在的机器上执行任意程序，所以只在城的 CONFIG.toml 里手写，楼与房间写它即拒。
 settings-reason RemoteRoute.H3.certificate 指定公网 TLS 证书的文件路径，证书与私钥由城的操作者配好，在城的 CONFIG.toml 里手写。
-settings-reason RemoteRoute.H3.command 指定城所在机器执行的网关程序，修改程序能在城上直接执行代码，在城的 CONFIG.toml 里手写。
 settings-reason RemoteRoute.H3.listen 指定对外监听的地址和端口，改变它会改变城的网络暴露面，在城的 CONFIG.toml 里手写。
 settings-reason RemoteRoute.H3.private_key 指定公网 TLS 私钥的文件路径，只让城的操作者在 CONFIG.toml 中选择该路径。
 settings-reason RemoteRoute.H3.url 固定浏览器持有配对身份的公网源，改变它需要重新配对，在城的 CONFIG.toml 里手写。
-settings-reason RemoteRoute.Cloudflare.command 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在它所在的机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
-settings-reason RemoteRoute.Cloudflare.tunnel 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在它所在的机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
-settings-reason RemoteRoute.Cloudflare.url 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在它所在的机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
-settings-reason RemoteRoute.Command.args 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在它所在的机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
-settings-reason RemoteRoute.Command.command 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在它所在的机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
-settings-reason RemoteRoute.Command.permanence 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在它所在的机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
 settings-reason ConfigFile.agent 一行 agent 点名这台电脑以人的身份运行的程序；它由 ACP 页的同意卡片经 `AddAgent` 写下，同意绑定启动命令的摘要，所以设置里没有逐字段编辑的控件，只在城的 CONFIG.toml 里写。
 settings-reason AgentSection.id 一行 agent 点名这台电脑以人的身份运行的程序；它由 ACP 页的同意卡片经 `AddAgent` 写下，同意绑定启动命令的摘要，所以设置里没有逐字段编辑的控件。
 settings-reason AgentSection.name 一行 agent 点名这台电脑以人的身份运行的程序；它由 ACP 页的同意卡片经 `AddAgent` 写下，同意绑定启动命令的摘要，所以设置里没有逐字段编辑的控件。
