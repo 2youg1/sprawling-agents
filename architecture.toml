@@ -1638,7 +1638,7 @@ duty = "space, identity, and the documents a building keeps"
 duty = "the process boundary"
 
 [family.remote_access]
-duty = "the remote door, and the routes that carry its bytes and decide nothing"
+duty = "the remote door’s pairing, device authentication and sealed sessions"
 
 [family.browser]
 duty = "a browser driven over WebDriver BiDi, and what a model may see of a page and do to it"

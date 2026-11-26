@@ -72,7 +72,7 @@ For release installation and first use, follow [Getting started](../docs/start/g
 | `Sprawling/documents` | `sprawling-documents` | `documents` | the rules of a document a person reads and edits through a page: its version, its characters, its windows, and what one save changes | `kernel` | `Sprawling/documents/Spec.lean` |
 | `Sprawling/gateway` | `sprawling-gateway` | `gateway` | everything between a decision to call a model and the bytes on the wire | `child`, `kernel` | `Sprawling/gateway/Spec.lean` |
 | `Sprawling/kernel` | `sprawling-kernel` | `kernel` | every decision in the city, and nothing that touches a disk | nothing | `Sprawling/kernel/Spec.lean` |
-| `Sprawling/remote_access` | `sprawling-remote-access` | `remote_access` | the remote door, and the routes that carry its bytes and decide nothing | `child`, `kernel` | `Sprawling/remote_access/Spec.lean` |
+| `Sprawling/remote_access` | `sprawling-remote-access` | `remote_access` | the remote door’s pairing, device authentication and sealed sessions | `kernel` | `Sprawling/remote_access/Spec.lean` |
 | `Sprawling/runtime` | `sprawling-runtime` | `runtime` | one run, from dispatch to freeze | `child`, `desktop_ffi`, `gateway`, `kernel`, `storage` | `Sprawling/runtime/Spec.lean` |
 | `Sprawling/storage` | `sprawling-storage` | `storage` | persistence, and every view derived from it | `child`, `kernel` | `Sprawling/storage/Spec.lean` |
 | `Sprawling/wire` | `sprawling-wire` | `wire` | the process boundary | `documents`, `kernel` | `Sprawling/wire/Spec.lean` |

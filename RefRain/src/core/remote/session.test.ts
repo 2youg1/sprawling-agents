@@ -99,7 +99,11 @@ describe("a line over a remote session", () => {
     const sent: number[][] = [];
     const bytes = new Uint8Array([
       ...frames.flatMap((value) => [0, 0, 0, 0, 1, value]),
-      1, 0, 0, 0, 0,
+      1,
+      0,
+      0,
+      0,
+      0,
     ]);
     class Loop {
       readonly ready = Promise.resolve();
@@ -131,7 +135,10 @@ describe("a line over a remote session", () => {
       for (const _frame of frames) received.push((await door?.next())?.[0]);
       expect(received).toEqual(frames);
       expect(await door?.closed).toBeNull();
-      expect(sent).toEqual([[0, 0, 0, 0, 1, 55], [0, 0, 0, 0, 2, 56, 57]]);
+      expect(sent).toEqual([
+        [0, 0, 0, 0, 1, 55],
+        [0, 0, 0, 0, 2, 56, 57],
+      ]);
     })().finally(() => {
       if (location === undefined) Reflect.deleteProperty(globalThis, "location");
       else Object.defineProperty(globalThis, "location", location);
