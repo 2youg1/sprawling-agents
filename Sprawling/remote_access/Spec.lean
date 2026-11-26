@@ -350,15 +350,7 @@ pub struct CommandRoute { /* 私有 */ }  // new(command: RouteCommand, permanen
 - **那一行的写法**：去掉首尾空白后，整行是只有 `url` 一个成员的 JSON 对象，值是不含反斜杠的字符串；`{` 之后、冒号两侧、`}` 之前允许空白。它是 JSON 的一个子集，所以本 crate 不为一行输出引入 JSON 解析器；地址里本不需要转义，写了转义的行被拒，恢复语给出写法。以 `{` 开头却不合这一写法的行被拒而不是跳过：那一行想给出地址却写错了，跳过它只会一直等到超时。
 - **读 stdout 的是一个线程**：管道上的阻塞读没有期限，线程把它换成一个能带期限等待的通道，与 `agent_protocols::mcp::stdio` 同一个理由。读到地址之后它继续读、丢弃，直到命令结束，免得管道写满后命令卡在写上；命令结束时管道关上，线程随之返回。
 - **失败**：起不来 → `E_TOOL_UNAVAILABLE`；在印出地址之前结束 → `E_TOOL_UNAVAILABLE`，恢复语让人手动跑这条命令看它为何停下；地址那一行写错、地址不合 `PublicUrl` → 结束命令，`E_CONFIG_INVALID`；到时仍未印出 → 结束命令，`E_TIMEOUT`。
-- **Tailscale 的写法**：用 Tailscale 的人让这条命令包一层 `tailscale serve`，tailnet 里的设备就能打开页面。一个 sh 示例：
-
-  ```sh
-  host=$(tailscale status --json | jq -r '.Self.DNSName | rtrimstr(".")')
-  echo "{\"url\": \"https://$host\"}"
-  exec tailscale serve --https=443 "http://$SPRAWLING_REMOTE_LOCAL"
-  ```
-
-  城那一层的 `[remote]` 写 `route = "command"`、`command = "sh"`、`args = ["<这份脚本的路径>"]`、`permanence = "fixed"`（`Sprawling/city/Spec.lean` §8-39）：MagicDNS 名字跟着这台电脑，不随重启变。`exec` 让通路关上时被结束的正是前台的 `tailscale serve`，它的配置随进程一起撤下。这一行地址印在 serve 生效之前片刻，设备扫码总在其后。
+- **装配边界**：命令通路交出回环 URL，用于同一机器内的集成。公网使用 `route = "h3"`，完整配置与证书、DNS 和 UDP 前提见 [Choosing the route](../../docs/operate/operating.md#choosing-the-route)。
 
 D22 本 crate 不读配置。通路的三个参数（选哪一个实现、隧道名与地址或命令、`permanence`）写在城那一层的 `[remote]` 表里，由 `city::config_layers` 读成字符串（`Sprawling/city/Spec.lean` §8-39），由装配层在每次 `/remote open` 时经 `TunnelName::parse`、`PublicUrl::parse` 造成这里的类型（`Sprawling/app/Spec.lean` §8-151）。配置的层次、缺键与错键的拒法、哪一层能写哪张表，在 city 有唯一的家；本 crate 若给 `Tunnel`、`RouteCommand` 加上 serde 的读法，就是第二个配置读者，梯子与拒法要再写一遍。落选的另一条路是 city 依赖本 crate、在解析点直接造出类型化的值：它让写错的地址在读文件时就被拒，代价是 city 的拓扑多一条边（city 今天只依赖 kernel）。city 被允许依赖本 crate 时，重新考虑这一条。
 
@@ -378,7 +370,7 @@ D22 本 crate 不读配置。通路的三个参数（选哪一个实现、隧道
 
 D27 公网入口在城所在机器上终止 TLS 和 HTTP/3。`[remote]` 的 `route = "h3"` 启动城所在机器 Caddy，配置仅启用 `h3`，关闭 0-RTT、管理接口和自动重定向，用配置好的 TLS 证书为同一个域名提供城自己内嵌的页面。代理只转发布端口到城为远程门分配的回环端口。启动失败关门，关门结束该代理。Windows 的 Job Object 在城市进程退出时一并结束代理。Cloudflare 的公网协议由边缘另行决定，通用命令只准交出回环 URL，公网部署走这一臂。外部域名的 DNS HTTPS 记录公告 h3，使首次导航无需先成功建立 TCP。协议判定在实际终止 TLS 的监听器上完成，客户端的头不能证明外部链路的 HTTP 版本。
 
-D26 公网浏览器在同源 HTTPS 中传远程门的原有二进制握手和封装。浏览器的普通 WebSocket 在先协商到 HTTP/3 的连接上仍可能另走 TCP。页面因此用 `POST /remote/pair` 或 `POST /remote/session` 交第一份 Hello；答复的 `X-Sprawling-Pipe` 携带 32 字节随机通道凭据，正文是持续的二进制流。发送端把后续帧逐个 `POST /remote/frame`，出示这个 Bearer 凭据，前帧得到响应后才发后帧。答复流的每条消息是一个类型字节、4 字节大端长度和正文，类型 0 携原有二进制消息，类型 1 携终止码或空正文。发送帧是 `application/octet-stream`，通道答复使用 `Cache-Control: no-store`。页面只向同源 HTTPS 地址发送请求并拒绝重定向。Fetch 使用 `cors` 模式，使 `Referrer-Policy: no-referrer` 下的浏览器仍发送自己的 `Origin`；城继续拒绝字符串 `null` 与外源的 `Origin`。城所在机器网关终止公网 HTTP/3，TLS 和浏览器查找线路在网关解决；后端只收回环连接，设备认证仍由 §8-4、§8-6 的配对与握手验证。连接断开或关门就删除通道凭据。无有效凭据的请求在读正文之前拒绝，跨源由入口规则拒绝。每通道先预约单个入站帧再读正文，读与预约总计限 10 秒，未认证通道每帧限 16 KiB。设备撤销后旧会话不能再转发双向帧。浏览器与集成测试使用同一组 POST 接口。
+D26 公网浏览器在同源 HTTPS 中传远程门的原有二进制握手和封装。浏览器的普通 WebSocket 在先协商到 HTTP/3 的连接上仍可能另走 TCP。页面因此用 `POST /remote/pair` 或 `POST /remote/session` 交第一份 Hello；答复的 `X-Sprawling-Pipe` 携带 32 字节随机通道凭据，正文是持续的二进制流。页面缓存八个收到的帧，满时等待消费者取帧再读。发送端把后续帧逐个 `POST /remote/frame`，出示这个 Bearer 凭据，前帧得到响应后才发后帧。答复流的每条消息是一个类型字节、4 字节大端长度和正文，类型 0 携原有二进制消息，类型 1 携终止码或空正文。发送帧是 `application/octet-stream`，通道答复使用 `Cache-Control: no-store`。页面只向同源 HTTPS 地址发送请求并拒绝重定向。Fetch 使用 `cors` 模式，使 `Referrer-Policy: no-referrer` 下的浏览器仍发送自己的 `Origin`；城继续拒绝字符串 `null` 与外源的 `Origin`。城所在机器网关终止公网 HTTP/3，TLS 和浏览器查找线路在网关解决；后端只收回环连接，设备认证仍由 §8-4、§8-6 的配对与握手验证。连接断开或关门就删除通道凭据。无有效凭据的请求在读正文之前拒绝，跨源由入口规则拒绝。每通道先预约单个入站帧再读正文，读与预约总计限 10 秒，未认证通道每帧限 16 KiB。配对认领和会话完成帧各等至多 10 秒。每个入口共用 64 个通道，满载时新的连接答 HTTP 503，待通道结束才重新接受连接。设备撤销后旧会话不能再转发双向帧。浏览器与集成测试使用同一组 POST 接口。
 - **连接结束时，关闭帧的原因只写一个稳定的错误码**（如 `E_GATE_DENIED`）：通路上的陌生人也读得到它，所以不写主题与恢复语；页面按码给人一句话。
 - **会话里每一帧都逐帧授权**：中继打开封装，按首字节分开线协议帧与锁门；线协议帧先按 `Sprawling/wire/Spec.lean` §19-2 的 `class` 列判类，再问 `Door::authority(会话, 此刻)` 与 `permits`。放行的帧原样发给城的 `/ws`；拒绝的帧不到城，设备收到一帧封好的 `Refusal`；会话已不被门持有（门关了、设备被撤销、到时）时连接结束，而不是一帧一帧地拒（`Sprawling/wire/Spec.lean` §8-66）。
 - **门的一次判定、它写的那一行与设备表的落盘在同一把锁下**，所以账本上的次序就是门里发生的次序（`Sprawling/app/Spec.lean` §8-139）。

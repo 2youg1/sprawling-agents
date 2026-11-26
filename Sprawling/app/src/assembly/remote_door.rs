@@ -111,6 +111,7 @@ impl Outdoors {
 }
 
 fn chosen(city_root: &Path) -> Result<Box<dyn Route + Send>, AxError> {
+    let config = kernel::layout::CityLayout::new(city_root).city_config();
     Ok(match city::remote_route(city_root)? {
         RemoteRoute::H3 {
             command,
@@ -119,7 +120,6 @@ fn chosen(city_root: &Path) -> Result<Box<dyn Route + Send>, AxError> {
             certificate,
             private_key,
         } => {
-            let config = kernel::layout::CityLayout::new(city_root).city_config();
             let storage = config.with_file_name("remote-gateway");
             Box::new(Caddy::new(
                 H3 {
@@ -135,6 +135,8 @@ fn chosen(city_root: &Path) -> Result<Box<dyn Route + Send>, AxError> {
         }
         RemoteRoute::Cloudflare { .. } => {
             return Err(public_gateway_required(
+                &config,
+                "route = \"cloudflare\"",
                 "the configured route terminates at Cloudflare",
             ));
         }
@@ -142,51 +144,70 @@ fn chosen(city_root: &Path) -> Result<Box<dyn Route + Send>, AxError> {
             command,
             args,
             permanence,
-        } => Box::new(LoopbackCommand(CommandRoute::new(
-            RouteCommand {
-                program: PathBuf::from(command),
-                args,
-            },
-            match permanence {
-                HostPermanence::Fixed => Permanence::Fixed,
-                HostPermanence::PerStart => Permanence::PerStart,
-            },
-            ROUTE_PATIENCE,
-        ))),
+        } => Box::new(LoopbackCommand {
+            route: CommandRoute::new(
+                RouteCommand {
+                    program: PathBuf::from(command),
+                    args,
+                },
+                match permanence {
+                    HostPermanence::Fixed => Permanence::Fixed,
+                    HostPermanence::PerStart => Permanence::PerStart,
+                },
+                ROUTE_PATIENCE,
+            ),
+            config,
+        }),
     })
 }
 
-struct LoopbackCommand(CommandRoute);
+struct LoopbackCommand {
+    route: CommandRoute,
+    config: PathBuf,
+}
 
 impl Route for LoopbackCommand {
     fn open(&mut self, local: SocketAddr) -> Result<Opened, AxError> {
-        let opened = self.0.open(local)?;
-        let url = reqwest::Url::parse(opened.url.as_str())
-            .map_err(|source| public_gateway_required(&source.to_string()))?;
-        let on_this_machine = url.host_str().is_some_and(|host| {
-            host.eq_ignore_ascii_case("localhost")
-                || host
-                    .trim_matches(['[', ']'])
-                    .parse::<IpAddr>()
-                    .is_ok_and(|ip| ip.is_loopback())
+        let opened = self.route.open(local)?;
+        let url = reqwest::Url::parse(opened.url.as_str());
+        let on_this_machine = url.as_ref().is_ok_and(|url| {
+            url.host_str().is_some_and(|host| {
+                host.eq_ignore_ascii_case("localhost")
+                    || host
+                        .trim_matches(['[', ']'])
+                        .parse::<IpAddr>()
+                        .is_ok_and(|ip| ip.is_loopback())
+            })
         });
         if on_this_machine {
             return Ok(opened);
         }
-        self.0.close()?;
+        self.route.close()?;
+        let reason = match url {
+            Ok(_) => "the command returned an origin outside loopback".to_owned(),
+            Err(source) => format!("the command returned an invalid origin: {source}"),
+        };
         Err(public_gateway_required(
-            "the command returned a public origin",
+            &self.config,
+            opened.url.as_str(),
+            &reason,
         ))
     }
 
     fn close(&mut self) -> Result<(), AxError> {
-        self.0.close()
+        self.route.close()
     }
 }
 
-fn public_gateway_required(subject: &str) -> AxError {
-    AxError::failure(AxCode::ConfigInvalid, "open the remote door", subject.to_owned())
-        .with_recovery("configure [remote] with route = \"h3\" on this host, supplying Caddy and its TLS certificate")
+fn public_gateway_required(config: &Path, value: &str, reason: &str) -> AxError {
+    AxError::failure(
+        AxCode::ConfigInvalid,
+        "open the remote door",
+        format!("{}: [remote] value {value}: {reason}", config.display()),
+    )
+    .with_recovery(
+        "in that [remote] table use route = \"h3\" for public access and set command (absolute Caddy path), url (HTTPS origin), listen (IP and UDP port), certificate (absolute PEM path), and private_key (absolute PEM path); see docs/operate/operating.md#choosing-the-route",
+    )
 }
 
 #[cfg(test)]

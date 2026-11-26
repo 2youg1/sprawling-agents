@@ -61,7 +61,11 @@ class Packets {
 
 export async function reach(url: string, first: FrameBytes): Promise<Door | null> {
   const target = URL.parse(url);
-  if (target === null || target.protocol !== "https:" || target.origin !== window.location.origin) {
+  if (
+    target === null ||
+    target.protocol !== "https:" ||
+    target.origin !== globalThis.location.origin
+  ) {
     return null;
   }
   const request = new AbortController();
@@ -98,13 +102,21 @@ function connected(
   const reader = stream.getReader();
   const packets = new Packets();
   let shut = false;
+  let resumeReading: (() => void) | undefined;
   let outbound: Promise<void> = Promise.resolve();
   const { promise: closed, resolve: settled } = Promise.withResolvers<string | null>();
+
+  function resume() {
+    const wake = resumeReading;
+    resumeReading = undefined;
+    wake?.();
+  }
 
   function stop(code: string | null) {
     if (shut) return;
     shut = true;
     request.abort();
+    resume();
     for (const wake of waiting.splice(0)) wake(null);
     settled(code);
   }
@@ -122,13 +134,15 @@ function connected(
           stop(new TextDecoder().decode(packet.body) || null);
           return;
         }
-        const wake = waiting.shift();
-        if (wake !== undefined) wake(packet.body);
-        else if (ready.length < MAX_READY_FRAMES) ready.push(packet.body);
-        else {
-          stop("E_WIRE_MISMATCH");
-          return;
+        if (ready.length >= MAX_READY_FRAMES) {
+          await new Promise<void>((wake) => {
+            resumeReading = wake;
+          });
+          if (shut) return;
         }
+        const wake = waiting.shift();
+        if (wake === undefined) ready.push(packet.body);
+        else wake(packet.body);
       }
     }
     stop("E_WIRE_MISMATCH");
@@ -156,7 +170,10 @@ function connected(
     },
     next() {
       const frame = ready.shift();
-      if (frame !== undefined) return Promise.resolve(frame);
+      if (frame !== undefined) {
+        resume();
+        return Promise.resolve(frame);
+      }
       if (shut) return Promise.resolve(null);
       return new Promise((wake) => waiting.push(wake));
     },

@@ -321,7 +321,14 @@ impl CityHost for Bridge {
                     Ok(code) => self.push(HostEventKind::Pairing, code.into_bytes()),
                     Err(err) => self.push(
                         HostEventKind::Notice,
-                        format!("  {}: {}", err.action(), err.recovery()).into_bytes(),
+                        format!(
+                            "```toml\ncode = {:?}\naction = {:?}\nsubject = {:?}\nrecovery = {:?}\n```",
+                            err.code().as_str(),
+                            err.action(),
+                            err.subject(),
+                            err.recovery(),
+                        )
+                        .into_bytes(),
                     ),
                 }
                 return;

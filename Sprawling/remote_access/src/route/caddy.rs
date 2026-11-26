@@ -61,16 +61,27 @@ impl Caddy {
                 settings.url.as_str()
             )));
         }
-        if [
-            &settings.program,
-            &settings.certificate,
-            &settings.private_key,
-            &settings.storage,
+        if let Some((field, path)) = [
+            ("command", &settings.program),
+            ("certificate", &settings.certificate),
+            ("private_key", &settings.private_key),
         ]
         .into_iter()
-        .any(|path| !path.is_absolute())
+        .find(|(_, path)| !path.is_absolute())
         {
-            return Err(refused("Caddy paths must be absolute"));
+            return Err(
+                refused(format!("{field} = {:?}: a relative path", path.display()))
+                    .rewrite_recovery(format!(
+                        "set [remote] {field} to the full absolute path in the city's CONFIG.toml"
+                    )),
+            );
+        }
+        if !settings.storage.is_absolute() {
+            return Err(refused(format!(
+                "{}: the city storage path is relative",
+                settings.storage.display()
+            ))
+            .rewrite_recovery("open the city from its full absolute workspace path"));
         }
         let host = host.to_owned();
         Ok(Self {

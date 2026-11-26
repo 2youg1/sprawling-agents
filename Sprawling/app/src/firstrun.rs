@@ -94,7 +94,7 @@ pub(crate) fn open_paired(url: &str, door: &wire::LocalDoor) -> Result<(), kerne
             "open the WebUI in a browser",
             source.to_string(),
         )
-        .with_recovery("open the address in a local browser, press C in the quiet host, then copy and paste the code")
+        .with_recovery("with a quiet host, press C and paste the code in a local browser; with a line console, use /web; if there is no console, restart with sprawling serve --console and use /web")
     };
     if std::env::var_os("WSL_DISTRO_NAME").is_some() {
         return open_in_browser(url, unhandled);

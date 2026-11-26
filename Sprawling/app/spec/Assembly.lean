@@ -210,7 +210,7 @@ const ROUTE_PATIENCE: TimeoutMs = TimeoutMs(30_000);     // 一次 open 最长�
 fn chosen(city_root: &Path) -> Result<Box<dyn Route + Send>, AxError>;
 ```
 
-- **一处选择**：`chosen` 读 `city::remote_route`（`Sprawling/city/Spec.lean` §8-39）。`H3` 构造城所在机器 `Caddy` 网关，接到城的回环远程监听。`Cloudflare` 答迁移拒绝，`Command` 只接受输出回环地址。`Outdoors::keep` 把一个读城根的闭包交给 `Keeping.choose`，门在每次 `open` 时调它（§8-139）。
+- **一处选择**：`chosen` 读 `city::remote_route`（`Sprawling/city/Spec.lean` §8-39）。`H3` 构造城所在机器 `Caddy` 网关，接到城的回环远程监听。`Cloudflare` 答迁移拒绝，`Command` 只接受输出回环地址；两种拒绝都点名城的配置文件与失败值。`Outdoors::keep` 把一个读城根的闭包交给 `Keeping.choose`，门在每次 `open` 时调它（§8-139）。
 - **拒绝**：没配 `[remote]`、公网配置错误或网关未就绪均在开门之前拒绝，账本没有开门记录。一次启动等待最多 30 秒。
 - **绑定之后的地址**：`Outdoors` 与另外三个读者——`bin::main::city` 印的横幅、控制台 `/serving` 印的地址、打开浏览器探的地址——读的都是绑定之后的地址：`wire::Bound::local_addr`（`Sprawling/wire/Spec.lean` §8-46，wire D16）在绑定时读一次，`assembly::listening` 经 `Listening::local_addr` 把它交给 `Outdoors::new` 与这三个读者。城在 `:0` 上服务时，中继连的是系统分到的那个端口，端到端测试因此在 `127.0.0.1:0` 上起城。**被否**：`listening` 先在 `:0` 上试绑一次拿到端口、放掉，再把具体端口交给 `wire::bind`（试绑与真绑之间别的进程可以把端口拿走，`Sprawling/wire/Spec.lean` §8-46 已否这一做法）。
 
