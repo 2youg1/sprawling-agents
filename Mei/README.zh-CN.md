@@ -2,11 +2,22 @@
 
 [English](README.md) · [简体中文](README.zh-CN.md)
 
-Archetype:Mei 是极简 Agent Harness：模型接收任务，通过唯一持久的 **python** 工具行动，看到每个小结果，再循环到最终答复。大输出或非 UTF-8 输出完整落盘，只返回提示和完整路径，或能无损还原非 Unicode 原生路径的 Python 表达式。本包是**无头**核心，Mei 本身不含终端壳。
+**一个工具，一个持久的 Python 解释器，其余由你决定。** Mei 适合想把 Agent Harness 压到极简、自己掌握工具和运行环境的人，也适合当一个专做小任务的子代理。可以用 [Calyx](../Calyx/README.zh-CN.md) 交互，从脚本调用，或用 `mei --acp` 接到支持 ACP 的主 Agent。要用哪个 Python 库、CLI 或 API，由你明确选择。
 
-交互面是 [Calyx](../Calyx/)。`@sprawling/mei` 同时携带无头 `mei` 与 `calyx`；TTY 且无 `-p` 时进入 Calyx，`-p` 或管道仍走无头路径。脚本只使用无头路径。`mei --acp` 以 [Agent Client Protocol](https://agentclientprotocol.com/) version 1 的 agent 角色在 stdio 上应答，城 harness 或其他 ACP client 可像调用其它 ACP agent 一样调用 Mei；见 [integrations](../docs/integrate/integrations.md)。
+Rust 写的无头核心通过 Magpie 接入兼容 Anthropic Messages 的模型路由，一次运行只走一条串行的 Python 工具循环。会话用 JSONL 保存，可以续接。Zig 实现的 Calyx 独立提供终端界面。
 
 > **安全优先：** Mei 没有沙箱、权限提示或撤销。生成的 Python 可以读写文件、访问网络，并以当前账户权限运行命令。只用于一次性项目副本和单独、可撤销且有限额的 API key。不要提供私密数据、重要凭证或项目唯一副本。
+
+## 快速上手
+
+先打开 [Magpie](https://usemagpie.ai) 并选好模型路由。在一次性目录中试跑：
+
+```sh
+bun install --global @sprawling/mei@latest
+mei -p "Print hello using Python, without changing files."
+```
+
+用 `mei` 进入交互界面，或把 `mei --acp` 配为 [ACP 子代理](../docs/integrate/integrations.md)。
 
 ## 安装
 
@@ -200,50 +211,7 @@ Calyx 通过 Program Status Protocol（OSC 7501）报告 `working`、`done`、`e
 
 ## Prompt 与工具合同
 
-[Agent SPEC](spec/Agent.lean) 定义调用参数与验证规则。[`src/launch.rs`](src/launch.rs) 中的 `python_tool` 构造 JSON `input_schema`。下方的固定样例记录了一次请求的内容。
-
-`Mei/src/MEI.md` 在构建时进入 `system`；唯一的 python 定义位于 `tools[0]`。下表使用 Python `3.12.13`、uv `0.12.3` 的固定文档夹具；实际版本属性来自 doctor。字节数不含消息信封和 provider 自行添加的内容。
-
-| 部分 | UTF-8 字节 | Token（`o200k_base`） |
-|---|---:|---:|
-| `system` | 297 | 57 |
-| 完整紧凑 `tools[0]` JSON | 1489 | 332 |
-| 合计 | 1786 | 389 |
-
-Token 列用 OpenAI 的 `o200k_base` 分词器（GPT-4o/4.1/5 家族）对同一文本计数，不含聊天信封或 provider 追加内容；换成其他分词器数值会不同。以下 JSON 为便于阅读而格式化；字节数和 Token 数按紧凑线上格式计算。
-
-### `system`
-
-```text
-<agent-harness>
-You are operating inside Mei.
-No additional documents or environment capabilities are injected or exposed; fetch what you need.
-Workflow: Sense → Act → Verify → Adapt…
-Aligned with context, fulfill user intent thoroughly and resourcefully and stay scoped.
-</agent-harness>
-```
-
-### `tools[0]`
-
-```json
-{
-  "description": "<python version=\"3.12.13\" uv_version=\"0.12.3\">\nA persistent python interpreter. Variables, imports, and the working directory (cwd) persist across calls. An exception prints its traceback without ending the session, so you can recover and continue without rebuilding state. Expressions do not auto-echo, so explicitly print any values you need to inspect. If combined UTF-8 stdout/stderr is up to 16 KiB, the tool returns it inline. Larger or non-UTF-8 output returns a notice and the full path, or a Python expression that losslessly reconstructs a non-Unicode native path; filter that file, or re-run with narrower output, in the next python call. Run shell commands and CLIs through subprocess, capture their output, and check return codes. Start child interpreters with sys.executable, so they inherit the active environment. Call show_image(path) to attach a PNG, JPEG, GIF, or WebP picture as visual tool-result content; a picture is not text output. Attach at most 2 pictures per call and at most 5 MiB per picture, on the call's own thread; a picture from another thread or a later call is refused with how to read it. Because capabilities like web_search, web_fetch or sub-agent delegation are not exposed as built-in tools, python serves as your interface to invoke external APIs, CLIs, headless tools, and more directly via subprocess.\n</python>",
-  "input_schema": {
-    "properties": {
-      "code": {
-        "type": "string"
-      }
-    },
-    "required": [
-      "code"
-    ],
-    "type": "object"
-  },
-  "name": "python"
-}
-```
-
-Mei 只保留一个 provider-neutral schema，并在 agent loop 中校验每一波工具调用；不声明 provider 专有的 `strict` 模式。
+[查看 system prompt 和 Python 工具 schema](TOOL-CONTRACT.zh-CN.md)。
 
 ## 边界
 

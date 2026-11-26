@@ -2,13 +2,20 @@
 
 [English](README.md)
 
-RefRain 是 Sprawling 的浏览器工作区。文件和对话共用同一个工作区，可在阅读、编辑和查看 Session 之间切换。浏览器保存版式、阅读位置、外观和草稿。项目登记、文件身份、版本、写入确认和城市运行由 Rust 主机负责。原生终端控制台由 [Calyx](../Calyx/README.zh-CN.md) 提供。
+**自己读、自己写，也能随时接手 Agent 的工作。** RefRain 一边是文档工作区，一边是 Sprawling Agent Harness 的 WebUI。读写文件不用先配置模型；要 Agent 帮忙时，再回到具体会话。
+
+- **文档创作和阅读。** 登记本地文件夹，编辑 Markdown，自动保存不清空撤销历史。PDF 支持缩放、翻页预览和续读；需要 Agent 看某一段时，可附上选区或原始像素区域。
+- **以会话和 Git 管理 Agent 工作。** 看对话和工具调用，续接指定历史会话，或显式分支。在项目里查看 Git 提交和差异、从已有提交取回文件，也能从城市提交追到产生它的运行。
+- **文件和工作过程放在一处。** 一侧读 Agent 写出的文件，另一侧看它怎么做到。文件版本、确认写入和城市状态由 Rust 主机负责；浏览器记住版式、阅读位置和草稿。
 
 <p align="center">
   <a href="../docs/images/refrain-workspace.webp"><img alt="左侧是 Atlas 的任务对话与工具调用，右侧打开 Agent 创建的 README.md 文件" src="../docs/images/refrain-workspace.webp" width="100%"></a>
 </p>
 
 同一工作区打开了演示项目的对话和文件，可对照工具调用、答复与文件内容。
+
+## 快速上手
+在已安装的 Sprawling 中运行 `sprawling up ./cities/first`。没有打开页面时，在 CLI 输入 `/web`。试文档工作区：跳过模型设置，登记一个本地文件夹，打开 Markdown 或 PDF。试 Agent 工作区：接入模型后打开一个 Session，再对照对话和项目改动。
 
 ## 运行本地客户端
 
@@ -33,6 +40,8 @@ bun run test
 bun run build
 ```
 
-Solid 细分各工作区视图，Vite 将资源打包供 Rust 嵌入。视图在 [`src/views/`](src/views/)，浏览器状态在 [`src/core/`](src/core/)，界面文案来自 [`src/lang.json`](src/lang.json)。[`src/wire/`](src/wire/) 的解码器由 `cargo xtask wire-ts` 生成，供浏览器读取[城市 wire](../docs/wire.md)。
+## 技术栈与文档
 
-[RefRain SPEC](Spec.lean) 定义界面、键盘和无障碍合同。[前端方法](../docs/maintain/frontend-method.md) 记录设计与验收流程，[英文 README](README.md) 列出更完整的源码地图。
+Solid 2 和 TypeScript 构建响应式视图；Bun 管理依赖并运行检查；Vite 8 把前端打包供 Rust 主机嵌入。原生 CSS 提供网格、主题和层叠，Effect 负责解码通信数据。视图在 [`src/views/`](src/views/)，浏览器状态在 [`src/core/`](src/core/)，界面文案来自 [`src/lang.json`](src/lang.json)。[`src/wire/`](src/wire/) 的解码器由 `cargo xtask wire-ts` 生成，供浏览器读取[城市 wire](../docs/wire.md)。
+
+[RefRain SPEC](Spec.lean) 定义界面、键盘和无障碍合同。[前端方法](../docs/maintain/frontend-method.md) 记录设计与验收流程；[界面设计方法](../docs/maintain/ui-design.md)解释网格与图层，[英文源码地图](README.md#where-code-goes)按目录标出维护入口。

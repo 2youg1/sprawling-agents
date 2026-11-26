@@ -1,16 +1,27 @@
 # Calyx
 
-面向 [sprawling](https://github.com/2youg1/sprawling-agents) 与 [Mei](../Mei/) 的生产终端壳。人在这里键入与阅读；harness 核保持无头。
+[English](README.md)
 
-英文：[`README.md`](README.md)。
+**读完长输出，手还在键盘上。** Calyx 是原生 Agent 控制台。 它是 [Sprawling](../Sprawling/README.zh-CN.md) 和 [Mei](../Mei/README.zh-CN.md) 的交互界面，不是通用终端模拟器。
 
-## 它是什么
+- **读长输出，不丢位置。** 在 Mei 界面里，输入框始终贴底，转写向上滚动；改变窗口宽度时重新折行，保留阅读位置。推理和 Python 输出可以折叠，也能看 Markdown 表格、公式、图表和图片预览。
+- **键盘就能操作。** 城市控制台输入斜杠命令的前缀后按 Tab 补全。Mei 中用 `/e` 选择下一轮的思考强度，Esc 能停下当前运行，不退出 Calyx。
+- **界面归界面，执行归执行。** Zig 接管输入、编辑和绘制，渲染器接收场景、返回一帧；窄 Rust 接口连接城市。Mei 仍是单独的无头进程，脚本或 ACP 不必打开界面。
 
-Calyx 是城控制台与 Mei 进程 Face 的交互面。它拥有原始终端模式、按键与粘贴、行编辑器、斜杠菜单、面生命周期、屏面编排（含 OSC 7501 程序状态），以及无头 `mei` 的启动。帧渲染器是纯 Zig 叶：一份 scene 进，一帧终端字节出。
+## 快速上手
 
-WebUI（[RefRain](../RefRain/README.zh-CN.md)）是另一消费者。Calyx 不实现模型环、不声明工具、不注入 AGENTS。
+先打开 [Magpie](https://usemagpie.ai) 并配好模型路由。已有 Bun 时，装好 Mei 后在新终端启动：
 
-## 布局
+```sh
+bun install --global @sprawling/mei@latest
+calyx
+```
+
+请在一次性工作区试用：[Mei 生成的 Python 以当前账户权限运行](../Mei/README.zh-CN.md)。用发布包或源码构建时，也直接运行 `calyx`；crates.io 的 Mei 只装无头核心。若已有 Sprawling 城市，在主机终端按 Esc，再输入 `/w` 并按 Tab，就能试试命令补全；选 `/web` 可回到同一座城的 RefRain。
+
+<a name="布局"></a>
+
+## 技术栈、目录与文档
 
 | 路径 | 责任 |
 |---|---|
@@ -20,7 +31,7 @@ WebUI（[RefRain](../RefRain/README.zh-CN.md)）是另一消费者。Calyx 不�
 | `src/` | 仅 Rust 城/线/核宿主，经窄 ABI 进入 Zig 壳 |
 | `Spec.lean` | 壳合同与决定 |
 
-包名仍为 `sprawling-calyx` 与 `sprawling-console-ffi`。唯一的 `calyx` 二进制是 `build.zig` 产出的 Zig 面；`Calyx/build.rs` 把它装进 cargo 目标目录以便 sibling/`CALYX_BIN` 解析。与 `mei` 一并放入 `@sprawling/mei`（npm shim：TTY 且无 `-p`/`--resume` 时 exec `calyx` 并设置 `MEI_BIN`；否则走无头核）。
+包名仍为 `sprawling-calyx` 与 `sprawling-console-ffi`。唯一的 `calyx` 二进制是 `build.zig` 产出的 Zig 面；`Calyx/build.rs` 把它装进 cargo 目标目录以便 sibling/`CALYX_BIN` 解析。与 `mei` 一并放入 `@sprawling/mei`（npm shim：TTY 且没有 `-p`、`--acp` 或 `--resume` 时 exec `calyx` 并设置 `MEI_BIN`；否则走无头核）。
 
 ## 所有权
 

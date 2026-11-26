@@ -40,16 +40,16 @@ sprawling up ./cities/first
 
 打开页面后，连接一个模型 provider，为 `main` 选择模型，再把第一项任务交给 Mayor。终端启动后显示安静宿主。先按 Esc 进入 CLI，再输入 `/web` 重新打开页面并返回安静宿主，或输入 `/quit` 停止城市。[安装指南](docs/start/getting-started.zh-CN.md#1-安装)列出独立安装脚本、预编译包和版本验证方式。
 
-<a name="项目地图"></a>
+## 项目地图
 
-## 你想做什么？
-
-- **带一队 Agent 做事。** [Sprawling](Sprawling/README.zh-CN.md) 让项目成员分工、交接，也让你从提交追到任务和验收。
-- **只要一个由你控制的子代理。** [Mei](Mei/README.zh-CN.md) 提供一个持久的 Python 工具，可以直接运行或接到 ACP。
-- **边读写，边接手 Agent 工作。** [RefRain](RefRain/README.zh-CN.md) 把 Markdown、PDF、会话和 Git 变更放在同一个浏览器工作区。
-- **留在终端里。** [Calyx](Calyx/README.zh-CN.md) 让长输出可滚动、输入框留在底部，不必离开键盘。
-
-维护与测量见 [Tools](Tools/README.zh-CN.md)。[Kasanagi](Kasanagi/README.zh-CN.md) 是尚未迁入的远程协作项目。
+| 项目 | 你可以做什么 |
+|---|---|
+| [Sprawling](Sprawling/README.zh-CN.md) | 带一队 Agent 分工和交接，再从 Git 提交追到运行和验收。 |
+| [RefRain](RefRain/README.zh-CN.md) | 在浏览器里写 Markdown、读 PDF，也能接续 Agent 会话并查看 Git 变更。 |
+| [Calyx](Calyx/README.zh-CN.md) | 留在终端里读长输出，输入框一直在手边。 |
+| [Mei](Mei/README.zh-CN.md) | 只用一个持久的 Python 工具；自己掌控工具，也能接成 ACP 子代理。 |
+| [Kasanagi](Kasanagi/README.zh-CN.md) | 规划中的跨机器协作组件，尚未迁入。 |
+| [Tools](Tools/README.zh-CN.md) | 检查、重放、测量和打包；这些工具不随产品发布。 |
 
 ## 文档
 

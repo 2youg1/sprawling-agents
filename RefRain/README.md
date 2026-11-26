@@ -8,16 +8,20 @@ Copyright (c) 2026 2youg1 and the sprawling contributors
 
 [简体中文](README.zh-CN.md)
 
-The Rust binary serves this client and its offline assets. The file and Session views
-share a workspace and conversation target. The registered directory, file identities,
-revisions and accepted changes belong to the host. The browser remembers layout,
-reading anchors, appearance and drafts.
+**Read the source, write the draft, and keep the agent's work in view.** RefRain is both a document workspace and the browser face of the Sprawling agent harness. You can read and write without asking a model, then pick up a session when you want help.
+
+- **A workspace for your own writing.** Register a local folder, edit Markdown with autosave and undo, and return to the same reading position. Read PDFs with zoom and page previews; when you do involve an agent, attach a selection or an original-pixel region from the page.
+- **A workspace for running agents.** Follow a conversation and its tool calls, resume a selected session or branch it explicitly. Review Git commits and project diffs, restore a file from a recorded commit, and trace city commits back to the runs that made them.
+- **One workspace, two jobs.** Open the file a run produced next to the conversation that produced it. The Rust host owns file versions, accepted writes and persistent city state; the browser remembers layout, reading positions and drafts.
 
 <p align="center">
   <a href="../docs/images/refrain-workspace.webp"><img alt="The Atlas conversation and tool calls on the left, with the generated README.md open on the right" src="../docs/images/refrain-workspace.webp" width="100%"></a>
 </p>
 
 In the demo workspace, the conversation shows a run and its tool calls beside the file the run wrote.
+
+## Quick start
+Start an installed Sprawling host with `sprawling up ./cities/first`. If the page is closed, enter `/web` in the CLI. To try the reader and editor, skip model setup, register a local folder and open Markdown or PDF. To try agent work, connect a model, open a Session and inspect its conversation and project changes.
 
 ## Run against a city
 
@@ -73,3 +77,8 @@ See the [frontend method](../docs/maintain/frontend-method.md) for how a screen 
 
 The interfaces, the keyboard table and the accessibility contracts are
 in [`RefRain/Spec.lean`](../RefRain/Spec.lean).
+
+## Documentation
+
+- [Keyboard and accessibility contracts](Spec.lean) · [Frontend method](../docs/maintain/frontend-method.md) · [UI design](../docs/maintain/ui-design.md)
+- [First city and pairing](../docs/start/getting-started.md) · [Operating the host](../docs/operate/operating.md)
