@@ -67,6 +67,28 @@ fn a_found_browser_is_reported_by_the_brand_it_is() {
 }
 
 #[test]
+fn helium_and_google_chrome_can_share_an_executable_name() {
+    for (path, name) in [
+        (
+            r"C:\Program Files\imput\Helium\Application\chrome.exe",
+            "helium",
+        ),
+        (
+            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            "chrome",
+        ),
+        ("/Applications/Helium.app/Contents/MacOS/Helium", "helium"),
+        ("/usr/bin/helium", "helium"),
+    ] {
+        assert_eq!(
+            member_at(Family::Chromium, std::path::Path::new(path)).map(|member| member.name),
+            Some(name),
+            "{path} should be reported by its brand"
+        );
+    }
+}
+
+#[test]
 fn no_browser_is_started_to_learn_its_version() {
     let looking = include_str!("../family.rs");
     for spelling in ["ask_version", "Command::new"] {
