@@ -111,7 +111,7 @@ import Sprawling.wire.spec.Slash
 - `spec/Reception.lean`：`decide_bind` 恰在没有钥匙时拒绝（`decideBind_refuses_exactly_without_a_key`），给出的面索要的恰是给它的那把（`a_served_face_demands_the_given_key`）；`Lagged` 的区间恰好补上断口（`a_lagged_range_fills_the_gap`、`consecutive_records_owe_nothing`），还没发过记录或还没被欢迎的会话不欠区间。
 - `spec/Reception/Admission.lean`：空手的来者不论面在回环还是暴露都不能转写、录凭证或落文件（`no_door_acts_unpaired`）；`/acp` 从不拒绝（`the_acp_door_never_refuses`）。
 - `spec/Reception/Entry.lean`：Host 不在名单的请求从不进门（`a_foreign_host_never_enters`），Origin 不在名单的、跨站的与预检除了取页面都不进门（`a_foreign_origin_never_enters`、`a_cross_site_fetch_never_enters`、`a_preflight_never_enters`），配对的路只进浏览器（`pairing_admits_only_a_browser`）。
-- `spec/Reception/Pairing.lean`：任何一条猜测序列里，被判的猜测彼此隔一秒（`judged_guesses_are_a_second_apart`），每次都对着上一次换上的码（`each_code_is_judged_once`），只有猜中当时的码才配对（`only_the_current_code_pairs`）。
+- `spec/Reception/Pairing.lean`：开页码单次兑换、未知或过期码不会改变凭据状态（`open_code_redeems_once`、`unknown_code_preserves_invitations`、`expired_code_is_refused`）；新挑战不会影响在途挑战，已兑换挑战不可再兑换（`offers_preserve_challenges`、`challenge_redeems_at_most_once`）。
 - `spec/Server/Sessions.lean`：忘掉一台设备之后，只要它没有重新配对，它就没有一个会话（`a_forgotten_device_keeps_no_session`）；一个令牌不认了就不再被认（`an_expired_token_never_admits_again`）；被 socket 占着的令牌不过期（`a_seated_token_outlasts_its_idle_time`）。
 - `spec/Command.lean`：`WireCommand` 拼不出 `PutSecret`，从线上来的命令进城后也不是它（`a_socket_cannot_spell_put_secret`、`nothing_from_the_wire_enrols_a_secret`）。
 - `spec/Command/Kind.lean`：没有一个 Command 属 `Read`（`no_command_is_a_read`）；class 为 `Act` 的动词 reach 都是 `client`（`what_a_device_may_do_a_person_may_draw`）；不由人点的动词都 `LocalOnly`（`a_verb_no_person_draws_stays_local`）；只有 `PutSecret` 是 `sealed`（`only_put_secret_is_sealed`）。
@@ -159,7 +159,7 @@ Lean 里的名字与 Rust 的对应（门比的是同一个拼写，Tools/xtask/
 - `Wire.Reception.BindFace`／`BindVerdict`／`decideBind` ↔ `BindFace`／`BindVerdict`／`decide_bind`；`Address` 是模型对 `SocketAddr` 只取「是不是回环」的那一位；`decideLag`／`Stream` ↔ `decide_lag`／`reception::Stream`。
 - `Wire.Reception.Admission.Door`／`Pairing`／`Admission`／`decideAdmission` ↔ 同名的 Rust 类型与 `decide_admission`；`judge` ↔ `Keys::pairing`。
 - `Wire.Reception.Entry.Arrival`／`Caller`／`Entry`／`Refusal`／`decideEntry` ↔ `Arrival`／`Caller`／`Entry`／`EntryRefusal`／`decide_entry`；`OriginSeen` 与 `FetchSite` 是模型对 Origin 与 `Sec-Fetch-Site` 只取「相对名单是哪一种」的那几位。
-- `Wire.Reception.Pairing.guess`／`Guess` ↔ `BrowserDoor::guess`／`Guess`；码在模型里是一个抽象的值。
+- `Wire.Reception.Pairing.redeem` ↔ `BrowserDoor::open_code`、`BrowserDoor::spend_open_code`；码在模型里是抽象值。
 - `Wire.Server.Sessions.holds`／`Step` ↔ `Sessions::holds` 与 `BrowserDoor::open_session`、`seat`、`unseat`、`forget`；令牌在模型里是一个抽象的值，容量淘汰不在模型里。
 - `Wire.Control.Intervention`／`ControlVerdict`／`classify` ↔ `control` 的同名类型与函数。
 - `Wire.Command.Step.Refusal` 的三个构造子 ↔ `E_OUTSIDE_WRITE_DOMAIN`、`E_VERSION_CONFLICT`、`E_INVALID_ARGS`；`putRange` ↔ 城对 `Command::PutRange` 的判定（`accounting::worker::commanding::saving`）。
@@ -346,7 +346,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 
 - **`E_WIRE_MISMATCH`**：不可——它是装载期六码之一（封闭白名单），且它的存在理由就是「浏览器缓存旧前端」这一 WebUI 特有错配。类型无法定义掉跨版本的字节。握手之后解不出的帧同归此码、两侧的处置见 §8-37。
 - **`E_CONFIG_INVALID`**：不可——没有钥匙的绑定必须在**启动时**拒绝，这是配置判定不是请求判定。
-- **`E_PAIRING_REFUSED`**（kernel 的码）：配对码或开页码不对、用过或太早，§8-95。
+- **`E_PAIRING_REFUSED`**（kernel 的码）：开页码不对、用过或过期，§8-95。
 - **没有 signal-unknown 码**：握手的 schema 哈希保证同一连接的两端共享同一份词汇，一个本版本不认的 Signal 种类只能来自更新的二进制写的 Ledger，而那已由版本方向门拒在外面（`Sprawling/collab/Spec.lean` §8 的 `collab::inbox` 一条）。
 
 失败之后什么保持不变是各接口的一部分：绑定判定在套接字存在之前拒绝（§8-2、§8-46）；握手失败即断连（§10「两个设计」），握手之后读不出的帧答一次带计数的拒绝而不关连接（§8-37）；一次保存或一次提案的决定被拒时盘上不动（§8-72、§8-73，`spec/Command/Step.lean`）；`Committed::new` 拼不出帧时那条记录不推，下一条到达时会话发出 `Lagged`（§8-47）。
@@ -409,6 +409,8 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | D60 | 提示层：一问答下一个 run 的每份提示文档从哪一层来，一条命令做整份动作，默认文本是一版 | `Sprawling/wire/spec/Frames.lean` |
 | D61 | 能力：一问答一栋楼每件工具的档位、来源与使用证据，两张 `[catalog]` 表各走已有的配置帧 | `Sprawling/wire/spec/Frames.lean` |
 | D65 | 模型高级设置复用 AttachEndpoint 的 tuning，不新增模型设置命令 | `Sprawling/wire/spec/Command/Tuning.lean` |
+| D66 | 本地浏览器从可信终端取得短时、单用的开页码，且只从回环兑换 | `Sprawling/wire/spec/Reception/Pairing.lean` |
+| D67 | 会话挑战用 HMAC 签发，签名通过后单次兑换 | `Sprawling/wire/spec/Reception/Pairing.lean` |
 -/
 
 /-! ## 13 依赖选型
@@ -455,7 +457,7 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 - 绑定面与丢帧区间：`tests/wire_contract/main.rs` 的 `the_binding_face_has_exactly_one_refusing_cell`；`reception::tests` 里 `decide_lag` 与 `Stream` 的测试。
 - HTTP 门：`reception::admission` 旁的测试与 `tests/enrolment.rs`。
 - 入口判定：`reception::entry` 旁的穷尽表测试 `every_entry_property_holds_over_every_input`，逐格对照 `spec/Reception/Entry.lean` 的五条性质；`tests/entry.rs` 的回归。
-- 配对：`reception::pairing` 旁的 proptest `every_trace_judges_each_code_once_and_a_second_apart`，生成器覆盖 `spec/Reception/Pairing.lean` 的猜测序列（到达时刻、猜对或猜错、每步的熵）。
+- 配对与会话：`cargo test -p sprawling-wire --lib --test entry` 运行一次性登记、回环对端、过期、篡改、并发兑换与挑战隔离的检查。
 - 按帧写出：`server::socket::framing::tests` 的 proptest `framing_tells_every_record_once_in_order`，生成器覆盖 `spec/Server/Socket.lean` 的到达序列与切帧方式。
 - 会话令牌的寿命：`reception::sessions::tests` 的 proptest `forgotten_and_lapsed_tokens_stay_ended_and_seated_ones_stay_good`，生成器覆盖 `spec/Server/Sessions.lean` 的步骤，只是从不把表填满。
 - `PutSecret`：`tests/trybuild.rs` 的两个反例与 `put_secret_has_no_byte_form_in_either_direction`。

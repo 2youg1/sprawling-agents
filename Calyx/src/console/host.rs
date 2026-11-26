@@ -86,7 +86,6 @@ struct Bridge {
     queue: Mutex<VecDeque<Queued>>,
     watching: Mutex<tokio::sync::broadcast::Receiver<wire::Committed>>,
     face: Mutex<tokio::sync::watch::Receiver<Face>>,
-    pairing: Mutex<tokio::sync::watch::Receiver<String>>,
     shown: Mutex<Face>,
     notice_tx: std::sync::mpsc::SyncSender<String>,
 }
@@ -109,8 +108,6 @@ pub(super) fn start(
         Err(std::sync::mpsc::TrySendError::Full(_)) => {}
         Err(std::sync::mpsc::TrySendError::Disconnected(_)) => {}
     });
-    let mut pairing = inside.door.pairing_code();
-    pairing.mark_changed();
     let session = match Session::begin() {
         Ok(session) => Some(session),
         Err(err) => {
@@ -126,7 +123,6 @@ pub(super) fn start(
         queue: Mutex::new(VecDeque::new()),
         watching: Mutex::new(watching),
         face: Mutex::new(face),
-        pairing: Mutex::new(pairing),
         shown: Mutex::new(Face::Opening),
         notice_tx,
     });
@@ -190,12 +186,6 @@ impl Bridge {
                 *shown = now;
                 self.push(HostEventKind::Face, face_bytes(now));
             }
-        }
-        if let Ok(mut pairing) = self.pairing.lock()
-            && matches!(pairing.has_changed(), Ok(true))
-        {
-            let code = pairing.borrow_and_update().clone();
-            self.push(HostEventKind::Pairing, code.into_bytes());
         }
         loop {
             let committed = {
@@ -326,6 +316,23 @@ impl CityHost for Bridge {
             2 => Event::Quit(Asker::Console, CloseMode::Drain),
             3 => Event::Quit(Asker::Console, CloseMode::Interrupt),
             4 => Event::TerminalLost,
+            5 => {
+                match self.inside.door.issue_display_code() {
+                    Ok(code) => self.push(HostEventKind::Pairing, code.into_bytes()),
+                    Err(err) => self.push(
+                        HostEventKind::Notice,
+                        format!(
+                            "```toml\ncode = {:?}\naction = {:?}\nsubject = {:?}\nrecovery = {:?}\n```",
+                            err.code().as_str(),
+                            err.action(),
+                            err.subject(),
+                            err.recovery(),
+                        )
+                        .into_bytes(),
+                    ),
+                }
+                return;
+            }
             _ => return,
         };
         self.inside.tell(mapped);

@@ -39,6 +39,7 @@ pub const LifecycleEvent = enum(u32) {
     quit_drain = 2,
     quit_interrupt = 3,
     terminal_lost = 4,
+    pair_code = 5,
 };
 
 pub const HostEventKind = enum(u32) {

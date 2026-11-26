@@ -164,7 +164,7 @@ mod tests {
         fn forgotten_and_lapsed_tokens_stay_ended_and_seated_ones_stay_good(
             moves in proptest::collection::vec(a_move(), 0..48),
         ) {
-            let mut door = BrowserDoor::new(Vec::new(), [0; 32]);
+            let mut door = BrowserDoor::new(Vec::new());
             let mut now = 0u64;
             let mut minted: Vec<Minted> = Vec::new();
             let mut devices: BTreeMap<u8, DeviceId> = BTreeMap::new();

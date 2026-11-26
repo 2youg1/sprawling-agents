@@ -42,6 +42,7 @@ impl Conduit {
     }
 
     pub(super) fn judge(&mut self, sealed: &[u8]) -> Result<Step, AxError> {
+        let authority = self.doorway.authority(self.session)?.ok_or_else(ended)?;
         let text = match Payload::from_bytes(&self.opener.open(sealed)?)? {
             Payload::Lock => return Ok(Step::Lock),
             Payload::Frame(text) => text,
@@ -61,7 +62,6 @@ impl Conduit {
         match passage(frame) {
             Passage::Greeting(said) => self.greeting(said),
             Passage::Judged(class) => {
-                let authority = self.doorway.authority(self.session)?.ok_or_else(ended)?;
                 if permits(authority, class) {
                     Ok(Step::Forward(text))
                 } else {
@@ -72,6 +72,7 @@ impl Conduit {
     }
 
     pub(super) fn seal_for_device(&mut self, text: &str) -> Result<Vec<u8>, AxError> {
+        self.doorway.authority(self.session)?.ok_or_else(ended)?;
         self.sealer
             .seal(&Payload::Frame(text.to_owned()).to_bytes())
     }

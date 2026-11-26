@@ -5,37 +5,82 @@
 
 use std::collections::BTreeMap;
 
+use aws_lc_rs::hmac;
 use kernel::{B3Hash, TimeMs};
 
 use super::sessions::Sessions;
 use crate::answer::{DeviceId, DeviceLine, DevicesAnswer};
-use crate::auth;
-
-pub const GUESS_INTERVAL_MS: u64 = 1_000;
-
 pub const OPEN_CODE_LIFETIME_MS: u64 = 120_000;
 
 pub const OPEN_CODES_MAX: usize = 4;
 
 pub const NONCE_LIFETIME_MS: u64 = 60_000;
 
-pub const NONCES_MAX: usize = 16;
+const CHALLENGES_PER_BROWSER: usize = 64;
+
+const CHALLENGE_LABEL: &[u8; 28] = b"sprawling local challenge v1";
+
+const CHALLENGE_BYTES: usize = 8 + 32 + 32;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct Challenge {
+    expires: u64,
+    nonce: [u8; 32],
+}
+
+impl Challenge {
+    pub(crate) fn issue(key: &hmac::Key, nonce: [u8; 32], now: u64) -> String {
+        let challenge = Self {
+            expires: now.saturating_add(NONCE_LIFETIME_MS),
+            nonce,
+        };
+        let tag = hmac::sign(key, &challenge.signed());
+        encode_hex(
+            &[
+                challenge.expires.to_be_bytes().as_slice(),
+                &challenge.nonce,
+                tag.as_ref(),
+            ]
+            .concat(),
+        )
+    }
+
+    pub(crate) fn read(key: &hmac::Key, encoded: &str, now: u64) -> Option<Self> {
+        if encoded.len() != CHALLENGE_BYTES * 2
+            || encoded.bytes().any(|byte| byte.is_ascii_uppercase())
+        {
+            return None;
+        }
+        let bytes = decode_hex::<CHALLENGE_BYTES>(encoded)?;
+        let (expires, rest) = bytes.split_first_chunk::<8>()?;
+        let (nonce, tag) = rest.split_first_chunk::<32>()?;
+        let challenge = Self {
+            expires: u64::from_be_bytes(*expires),
+            nonce: *nonce,
+        };
+        if now >= challenge.expires {
+            return None;
+        }
+        match hmac::verify(key, &challenge.signed(), tag) {
+            Ok(()) => Some(challenge),
+            Err(_) => None,
+        }
+    }
+
+    fn signed(self) -> [u8; 28 + 8 + 32] {
+        let mut signed = [0; 28 + 8 + 32];
+        let (label, rest) = signed.split_at_mut(CHALLENGE_LABEL.len());
+        let (expires, nonce) = rest.split_at_mut(size_of::<u64>());
+        label.copy_from_slice(CHALLENGE_LABEL);
+        expires.copy_from_slice(&self.expires.to_be_bytes());
+        nonce.copy_from_slice(&self.nonce);
+        signed
+    }
+}
 
 pub const LABEL_MAX: usize = 64;
 
-const CODE_GROUP_LEN: usize = 4;
-const CODE_GROUPS: usize = 2;
-
 const DEVICE_ID_LEN: usize = 16;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Guess {
-    Paired,
-
-    Wrong,
-
-    TooSoon,
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DeviceKey([u8; 32]);
@@ -87,22 +132,18 @@ impl PairedBrowser {
 
 #[derive(Debug, Clone)]
 pub struct BrowserDoor {
-    code: String,
-    next_guess: TimeMs,
-    open: BTreeMap<B3Hash, TimeMs>,
-    nonces: BTreeMap<String, TimeMs>,
+    open: BTreeMap<B3Hash, u64>,
+    spent: BTreeMap<Challenge, DeviceId>,
     browsers: BTreeMap<DeviceId, PairedBrowser>,
     sessions: Sessions,
 }
 
 impl BrowserDoor {
     #[must_use]
-    pub fn new(browsers: Vec<PairedBrowser>, entropy: [u8; 32]) -> Self {
+    pub fn new(browsers: Vec<PairedBrowser>) -> Self {
         Self {
-            code: code_of(&entropy),
-            next_guess: TimeMs::new(0),
             open: BTreeMap::new(),
-            nonces: BTreeMap::new(),
+            spent: BTreeMap::new(),
             browsers: browsers
                 .into_iter()
                 .map(|browser| (browser.id.clone(), browser))
@@ -111,34 +152,35 @@ impl BrowserDoor {
         }
     }
 
-    #[must_use]
-    pub fn pairing_code(&self) -> &str {
-        &self.code
-    }
-
-    pub fn guess(&mut self, word: &str, now: TimeMs, entropy: [u8; 32]) -> Guess {
-        if now < self.next_guess {
-            return Guess::TooSoon;
-        }
-        let paired = auth::verify(Some(word.trim()), &B3Hash::digest(self.code.as_bytes()));
-        self.code = code_of(&entropy);
-        self.next_guess = TimeMs::new(now.value().saturating_add(GUESS_INTERVAL_MS));
-        if paired { Guess::Paired } else { Guess::Wrong }
-    }
-
-    pub fn issue_open_code(&mut self, entropy: [u8; 16], now: TimeMs) -> String {
+    pub fn issue_open_code(&mut self, entropy: [u8; 16], now: u64) -> (String, B3Hash) {
         self.open.retain(|_, expires| *expires > now);
-        evict_oldest(&mut self.open, OPEN_CODES_MAX);
+        if self.open.len() >= OPEN_CODES_MAX
+            && let Some(oldest) = self
+                .open
+                .iter()
+                .min_by_key(|(_, expires)| **expires)
+                .map(|(digest, _)| *digest)
+        {
+            self.spend_open_code(&oldest);
+        }
         let code = encode_hex(&entropy);
-        let expires = TimeMs::new(now.value().saturating_add(OPEN_CODE_LIFETIME_MS));
-        self.open.insert(B3Hash::digest(code.as_bytes()), expires);
-        code
+        let digest = B3Hash::digest(&entropy);
+        let expires = now.saturating_add(OPEN_CODE_LIFETIME_MS);
+        self.open.insert(digest, expires);
+        (code, digest)
     }
 
-    pub fn redeem_open_code(&mut self, code: &str, now: TimeMs) -> Option<B3Hash> {
-        let digest = B3Hash::digest(code.trim().as_bytes());
-        let expires = self.open.remove(&digest)?;
-        (expires > now).then_some(digest)
+    pub fn open_code(&self, code: &str, now: u64) -> Option<B3Hash> {
+        let digest = B3Hash::digest(&decode_hex::<16>(code)?);
+        self.has_open_code(&digest, now).then_some(digest)
+    }
+
+    pub fn has_open_code(&self, digest: &B3Hash, now: u64) -> bool {
+        self.open.get(digest).is_some_and(|expires| *expires > now)
+    }
+
+    pub fn spend_open_code(&mut self, digest: &B3Hash) {
+        self.open.remove(digest);
     }
 
     pub fn pair(&mut self, line: PairedBrowser) -> DeviceId {
@@ -147,19 +189,27 @@ impl BrowserDoor {
         id
     }
 
-    pub fn challenge(&mut self, entropy: [u8; 32], now: TimeMs) -> String {
-        self.nonces.retain(|_, expires| *expires > now);
-        evict_oldest(&mut self.nonces, NONCES_MAX);
-        let nonce = encode_hex(&entropy);
-        let expires = TimeMs::new(now.value().saturating_add(NONCE_LIFETIME_MS));
-        self.nonces.insert(nonce.clone(), expires);
-        nonce
-    }
-
-    pub fn take_nonce(&mut self, nonce: &str, now: TimeMs) -> bool {
-        self.nonces
-            .remove(nonce)
-            .is_some_and(|expires| expires > now)
+    pub(crate) fn redeem_challenge(
+        &mut self,
+        challenge: Challenge,
+        device: &DeviceId,
+        now: u64,
+    ) -> bool {
+        while self
+            .spent
+            .first_key_value()
+            .is_some_and(|(ticket, _)| ticket.expires <= now)
+        {
+            drop(self.spent.pop_first());
+        }
+        if challenge.expires <= now || self.spent.contains_key(&challenge) {
+            return false;
+        }
+        if self.spent.values().filter(|owner| *owner == device).count() >= CHALLENGES_PER_BROWSER {
+            return false;
+        }
+        self.spent.insert(challenge, device.clone());
+        true
     }
 
     #[must_use]
@@ -216,23 +266,6 @@ impl BrowserDoor {
     }
 }
 
-fn code_of(entropy: &[u8; 32]) -> String {
-    auth::spell(entropy, CODE_GROUP_LEN, CODE_GROUPS)
-}
-
-fn evict_oldest<K: Ord + Clone>(entries: &mut BTreeMap<K, TimeMs>, max: usize) {
-    while entries.len() >= max {
-        let Some(first) = entries
-            .iter()
-            .min_by_key(|(_, expires)| **expires)
-            .map(|(key, _)| key.clone())
-        else {
-            return;
-        };
-        entries.remove(&first);
-    }
-}
-
 #[must_use]
 pub fn encode_hex(bytes: &[u8]) -> String {
     const DIGITS: &[u8; 16] = b"0123456789abcdef";
@@ -280,70 +313,17 @@ pub fn decode_hex<const N: usize>(text: &str) -> Option<[u8; N]> {
 )]
 mod tests {
     use super::*;
-    use proptest::prelude::*;
-
-    #[derive(Debug, Clone)]
-    struct Attempt {
-        after_ms: u64,
-        right: bool,
-        entropy: [u8; 32],
-    }
-
-    fn attempt() -> impl Strategy<Value = Attempt> {
-        (0u64..2_500, any::<bool>(), any::<[u8; 32]>()).prop_map(|(after_ms, right, entropy)| {
-            Attempt {
-                after_ms,
-                right,
-                entropy,
-            }
-        })
-    }
-
-    proptest! {
-
-        #[test]
-        fn every_trace_judges_each_code_once_and_a_second_apart(
-            first in any::<[u8; 32]>(),
-            attempts in proptest::collection::vec(attempt(), 0..40),
-        ) {
-            let mut door = BrowserDoor::new(Vec::new(), first);
-            let mut now = 0u64;
-            let mut last_judged: Option<u64> = None;
-            let mut expected_code = code_of(&first);
-            for step in attempts {
-                now += step.after_ms;
-                let shown = door.pairing_code().to_owned();
-                prop_assert_eq!(&shown, &expected_code);
-                let word = if step.right { shown.clone() } else { format!("{shown}x") };
-                let verdict = door.guess(&word, TimeMs::new(now), step.entropy);
-                let early = last_judged.is_some_and(|at| now < at + GUESS_INTERVAL_MS);
-                if early {
-                    prop_assert_eq!(verdict, Guess::TooSoon);
-                    prop_assert_eq!(door.pairing_code(), shown.as_str());
-                    continue;
-                }
-                prop_assert_eq!(verdict, if step.right { Guess::Paired } else { Guess::Wrong });
-                if let Some(at) = last_judged {
-                    prop_assert!(now >= at + GUESS_INTERVAL_MS);
-                }
-                last_judged = Some(now);
-                expected_code = code_of(&step.entropy);
-                prop_assert_eq!(door.pairing_code(), expected_code.as_str());
-            }
-        }
-    }
 
     #[test]
     fn an_open_code_is_redeemed_once_and_not_after_it_expires() {
-        let mut door = BrowserDoor::new(Vec::new(), [1; 32]);
-        let code = door.issue_open_code([2; 16], TimeMs::new(0));
-        assert!(door.redeem_open_code(&code, TimeMs::new(10)).is_some());
-        assert!(door.redeem_open_code(&code, TimeMs::new(11)).is_none());
-        let late = door.issue_open_code([3; 16], TimeMs::new(0));
-        assert!(
-            door.redeem_open_code(&late, TimeMs::new(OPEN_CODE_LIFETIME_MS))
-                .is_none()
-        );
+        let mut door = BrowserDoor::new(Vec::new());
+        let (code, digest) = door.issue_open_code([2; 16], 0);
+        assert!(door.open_code(&encode_hex(&[3; 16]), 9).is_none());
+        assert_eq!(door.open_code(&code, 10), Some(digest));
+        door.spend_open_code(&digest);
+        assert!(door.open_code(&code, 11).is_none());
+        let (late, _) = door.issue_open_code([3; 16], 0);
+        assert!(door.open_code(&late, OPEN_CODE_LIFETIME_MS).is_none());
     }
 
     #[test]

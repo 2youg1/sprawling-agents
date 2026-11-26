@@ -3,6 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
+use std::net::SocketAddr;
 use std::path::Path;
 
 use kernel::layout::CityLayout;
@@ -22,6 +23,14 @@ const ROUTES: [(&str, [&str; 2]); 2] = [
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(tag = "route", rename_all = "snake_case", deny_unknown_fields)]
 pub enum RemoteRoute {
+    H3 {
+        command: String,
+        url: String,
+        listen: SocketAddr,
+        certificate: String,
+        private_key: String,
+    },
+
     Cloudflare {
         tunnel: String,
 
@@ -58,7 +67,9 @@ pub fn remote_route(city_root: &Path) -> Result<RemoteRoute, AxError> {
 pub(super) fn stated(route: RemoteRoute) -> Result<RemoteRoute, AxError> {
     let program = match &route {
         RemoteRoute::Cloudflare { command, .. } => command.as_deref(),
-        RemoteRoute::Command { command, .. } => Some(command.as_str()),
+        RemoteRoute::Command { command, .. } | RemoteRoute::H3 { command, .. } => {
+            Some(command.as_str())
+        }
     };
     if program.is_some_and(|program| program.trim().is_empty()) {
         return Err(refuse_with(
@@ -85,7 +96,7 @@ fn unchosen(file: &Path) -> AxError {
         ),
     )
     .with_recovery(format!(
-        "write a `{REMOTE_KEY}` table there with {}; docs/operating.md shows both",
+        "write a `{REMOTE_KEY}` table there with `route = \"h3\"` for public HTTP/3; compatibility shapes are {}; docs/operate/operating.md shows the gateway settings",
         routes.join(", or ")
     ))
 }

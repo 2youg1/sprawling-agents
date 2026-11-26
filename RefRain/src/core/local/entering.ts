@@ -6,7 +6,7 @@
 import { forget, keep, keepPairing, kept, makeKey, pendingPairing } from "./device";
 import type { LocalDevice, MadeKey } from "./device";
 import { doorHere, pair, recoverSession, session } from "./door";
-import type { DoorPhase, DoorProblem, Knock, PairProof, Unreachable } from "./door";
+import type { DoorPhase, DoorProblem, Knock, Unreachable } from "./door";
 
 export interface Credential {
   readonly current: () => string | null;
@@ -73,7 +73,7 @@ export function mayHaveDoor(protocol: string): boolean {
 
 export async function enter(origin: string, open: string | null, label: string): Promise<Entry> {
   if (open !== null) {
-    return arrival(await pairWith(origin, { open }, label));
+    return arrival(await pairWith(origin, open, label));
   }
   const device = await kept();
   if (device !== null) return arrival(await resume(origin, device));
@@ -90,11 +90,11 @@ export async function enter(origin: string, open: string | null, label: string):
   return { kind: "pair", why: (await makeKey()) === null ? "keyless" : "first" };
 }
 
-export async function pairWith(origin: string, proof: PairProof, label: string): Promise<Paired> {
+export async function pairWith(origin: string, open: string, label: string): Promise<Paired> {
   const made = await makeKey();
   if (made === null) return { kind: "keyless" };
   await keepPairing(made);
-  const answer = await pair(origin, proof, made.public, label);
+  const answer = await pair(origin, open, made.public, label);
   switch (answer.kind) {
     case "answered": {
       const device: LocalDevice = { id: answer.value, key: made.key };

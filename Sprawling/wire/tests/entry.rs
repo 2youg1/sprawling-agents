@@ -64,6 +64,7 @@ fn config() -> ServeConfig {
             Vec::new(),
             wire::DoorSenses {
                 clock: Arc::new(|| Ok(kernel::TimeMs::new(0))),
+                monotonic: Arc::new(|| tokio::time::Instant::now().into_std()),
                 entropy: Arc::new(|bytes: &mut [u8]| {
                     bytes.fill(7);
                     Ok(())
@@ -199,4 +200,66 @@ async fn a_workspace_browser_must_hold_a_key_and_reach_the_loopback_listener() {
             .unwrap();
         assert_eq!(response.status().as_u16(), expected);
     }
+}
+
+#[tokio::test]
+async fn an_invitation_enrolls_one_browser_on_loopback_only() {
+    let at: SocketAddr = AT.parse().unwrap();
+    let remote: SocketAddr = "192.0.2.48:32768".parse().unwrap();
+    let key = kernel::B3Hash::digest(b"native-key");
+    let face = wire::BindFace::Loopback { key };
+    let config = config();
+    let invitation = config.door.issue_display_code().unwrap();
+    let app = wire::router(&config, face, &wire::ListenerOrigins::of(at)).unwrap();
+    let post = |field: &str, value: &str| {
+        Request::builder()
+            .method("POST")
+            .uri("/pair")
+            .header("host", AT)
+            .header("origin", format!("http://{AT}"))
+            .header("content-type", "application/json")
+            .body(Body::from(
+                serde_json::json!({field: value, "public_key": "01".repeat(32), "label": "browser"})
+                    .to_string(),
+            ))
+            .unwrap()
+    };
+    let local = app.clone().layer(MockConnectInfo(at));
+    let elsewhere = app.layer(MockConnectInfo(remote));
+    assert_eq!(
+        elsewhere
+            .oneshot(post("open", &invitation))
+            .await
+            .unwrap()
+            .status(),
+        403
+    );
+    assert_eq!(
+        local
+            .clone()
+            .oneshot(post("code", &invitation))
+            .await
+            .unwrap()
+            .status(),
+        422
+    );
+    assert_eq!(
+        local
+            .clone()
+            .oneshot(post("open", "wrong"))
+            .await
+            .unwrap()
+            .status(),
+        403
+    );
+    let (left, right) = tokio::join!(
+        local.clone().oneshot(post("open", &invitation)),
+        local.oneshot(post("open", &invitation))
+    );
+    let mut outcomes = [
+        left.unwrap().status().as_u16(),
+        right.unwrap().status().as_u16(),
+    ];
+    outcomes.sort_unstable();
+    assert_eq!(outcomes, [200, 403]);
 }

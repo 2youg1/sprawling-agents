@@ -3,21 +3,19 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use std::net::{Ipv4Addr, SocketAddr};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use city::{HostPermanence, RemoteRoute};
 use kernel::{AxCode, AxError, TimeoutMs};
-use remote_access::route::cloudflare::{NamedTunnel, Tunnel, TunnelName};
+use remote_access::route::caddy::{Caddy, H3};
 use remote_access::route::command::{CommandRoute, RouteCommand};
-use remote_access::route::{Permanence, PublicUrl, Route};
+use remote_access::route::{Opened, Permanence, PublicUrl, Route};
 
 use crate::outside::console::Remote;
 use crate::outside::keeper::{CityKey, Doorway, Keeping, Senses};
 use crate::outside::listener::Reaching;
-
-const CLOUDFLARED: &str = "cloudflared";
 
 const ROUTE_PATIENCE: TimeoutMs = TimeoutMs(30_000);
 
@@ -113,35 +111,103 @@ impl Outdoors {
 }
 
 fn chosen(city_root: &Path) -> Result<Box<dyn Route + Send>, AxError> {
+    let config = kernel::layout::CityLayout::new(city_root).city_config();
     Ok(match city::remote_route(city_root)? {
-        RemoteRoute::Cloudflare {
-            tunnel,
-            url,
+        RemoteRoute::H3 {
             command,
-        } => Box::new(NamedTunnel::new(
-            Tunnel {
-                program: PathBuf::from(command.as_deref().unwrap_or(CLOUDFLARED)),
-                name: TunnelName::parse(&tunnel)?,
-                url: PublicUrl::parse(&url)?,
-            },
-            ROUTE_PATIENCE,
-        )),
+            url,
+            listen,
+            certificate,
+            private_key,
+        } => {
+            let storage = config.with_file_name("remote-gateway");
+            Box::new(Caddy::new(
+                H3 {
+                    program: PathBuf::from(command),
+                    url: PublicUrl::parse(&url)?,
+                    listen,
+                    certificate: PathBuf::from(certificate),
+                    private_key: PathBuf::from(private_key),
+                    storage,
+                },
+                ROUTE_PATIENCE,
+            )?)
+        }
+        RemoteRoute::Cloudflare { .. } => {
+            return Err(public_gateway_required(
+                &config,
+                "route = \"cloudflare\"",
+                "the configured route terminates at Cloudflare",
+            ));
+        }
         RemoteRoute::Command {
             command,
             args,
             permanence,
-        } => Box::new(CommandRoute::new(
-            RouteCommand {
-                program: PathBuf::from(command),
-                args,
-            },
-            match permanence {
-                HostPermanence::Fixed => Permanence::Fixed,
-                HostPermanence::PerStart => Permanence::PerStart,
-            },
-            ROUTE_PATIENCE,
-        )),
+        } => Box::new(LoopbackCommand {
+            route: CommandRoute::new(
+                RouteCommand {
+                    program: PathBuf::from(command),
+                    args,
+                },
+                match permanence {
+                    HostPermanence::Fixed => Permanence::Fixed,
+                    HostPermanence::PerStart => Permanence::PerStart,
+                },
+                ROUTE_PATIENCE,
+            ),
+            config,
+        }),
     })
+}
+
+struct LoopbackCommand {
+    route: CommandRoute,
+    config: PathBuf,
+}
+
+impl Route for LoopbackCommand {
+    fn open(&mut self, local: SocketAddr) -> Result<Opened, AxError> {
+        let opened = self.route.open(local)?;
+        let url = reqwest::Url::parse(opened.url.as_str());
+        let on_this_machine = url.as_ref().is_ok_and(|url| {
+            url.host_str().is_some_and(|host| {
+                host.eq_ignore_ascii_case("localhost")
+                    || host
+                        .trim_matches(['[', ']'])
+                        .parse::<IpAddr>()
+                        .is_ok_and(|ip| ip.is_loopback())
+            })
+        });
+        if on_this_machine {
+            return Ok(opened);
+        }
+        self.route.close()?;
+        let reason = match url {
+            Ok(_) => "the command returned an origin outside loopback".to_owned(),
+            Err(source) => format!("the command returned an invalid origin: {source}"),
+        };
+        Err(public_gateway_required(
+            &self.config,
+            opened.url.as_str(),
+            &reason,
+        ))
+    }
+
+    fn close(&mut self) -> Result<(), AxError> {
+        self.route.close()
+    }
+}
+
+fn public_gateway_required(config: &Path, value: &str, reason: &str) -> AxError {
+    AxError::failure(
+        AxCode::ConfigInvalid,
+        "open the remote door",
+        format!("{}: [remote] value {value}: {reason}", config.display()),
+    )
+    .with_recovery(
+        "in that [remote] table use route = \"h3\" for public access and set command (absolute Caddy path), url (HTTPS origin), listen (IP and UDP port), certificate (absolute PEM path), and private_key (absolute PEM path); see docs/operate/operating.md#choosing-the-route",
+    )
 }
 
 #[cfg(test)]
@@ -172,7 +238,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let (code, subject, recovery) = opening(dir.path());
         let named = [
-            "route = \"cloudflare\"",
+            "route = \"h3\"",
             "route = \"command\"",
             "`tunnel`",
             "`url`",
@@ -202,32 +268,10 @@ mod tests {
              url = \"https://city.example.org\"\ncommand = \"sprawling-absent-cloudflared\"\n",
         );
         let cloudflare = opening(dir.path());
-        city_layer(
-            dir.path(),
-            "[remote]\nroute = \"cloudflare\"\ntunnel = \"my-city\"\n\
-             url = \"http://city.example.org\"\n",
-        );
-        let plain = opening(dir.path());
-        assert_eq!(
-            [
-                (
-                    command.0,
-                    command.1.contains("sprawling-absent-route"),
-                    command.2.contains("route command")
-                ),
-                (
-                    cloudflare.0,
-                    cloudflare.1.contains("sprawling-absent-cloudflared"),
-                    cloudflare.2.contains("install cloudflared")
-                ),
-                (plain.0, plain.1.contains("not https"), true),
-            ],
-            [
-                (AxCode::ToolUnavailable, true, true),
-                (AxCode::ToolUnavailable, true, true),
-                (AxCode::ConfigInvalid, true, true),
-            ],
-            "{command:?}\n{cloudflare:?}\n{plain:?}"
-        );
+        assert_eq!(command.0, AxCode::ToolUnavailable);
+        assert!(command.1.contains("sprawling-absent-route"), "{command:?}");
+        assert_eq!(cloudflare.0, AxCode::ConfigInvalid);
+        assert!(cloudflare.1.contains("Cloudflare"), "{cloudflare:?}");
+        assert!(cloudflare.2.contains("route = \"h3\""), "{cloudflare:?}");
     }
 }

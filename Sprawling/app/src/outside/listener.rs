@@ -8,26 +8,30 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use axum::Router;
-use axum::extract::State;
-use axum::extract::ws::{CloseFrame, Message, WebSocket, WebSocketUpgrade, close_code};
-use axum::response::Response;
-use axum::routing::get;
+use axum::body::{Body, Bytes};
+use axum::extract::{DefaultBodyLimit, State};
+use axum::http::{HeaderMap, StatusCode, header};
+use axum::response::{IntoResponse, Response};
+use axum::routing::post;
 use futures_util::{SinkExt, StreamExt};
 use kernel::event::record::RemoteClosing;
 use kernel::{AxCode, AxError};
-use remote_access::handshake::{Finish, Hello, PairHello};
+use remote_access::handshake::{Finish, HELLO_BYTES, Hello, PAIR_HELLO_BYTES, PairHello};
 use remote_access::route::Opened;
 use tokio_tungstenite::tungstenite::Message as CityMessage;
 
 use super::conduit::{Conduit, Step};
 use super::console::Lasting;
 use super::keeper::{Doorway, Phase};
+use super::pipe::{self, Pipe, Pipes};
 
 pub(crate) const PAIR_PATH: &str = "/remote/pair";
 
 pub(crate) const SESSION_PATH: &str = "/remote/session";
 
 const TICK: Duration = Duration::from_secs(1);
+
+const HANDSHAKE_PATIENCE: Duration = Duration::from_secs(10);
 
 #[derive(Clone)]
 pub(crate) struct Reaching {
@@ -89,6 +93,13 @@ impl Drop for Answering {
 struct Serving {
     doorway: Doorway,
     reaching: Reaching,
+    pipes: Pipes,
+}
+
+#[derive(Clone, Copy)]
+enum Run {
+    Pair,
+    Session,
 }
 
 async fn answer(
@@ -111,13 +122,22 @@ async fn answer(
         }
     };
     let sockets = Router::new()
-        .route(PAIR_PATH, get(pair_upgrade))
-        .route(SESSION_PATH, get(session_upgrade));
+        .route(
+            PAIR_PATH,
+            post(pair_http).layer(DefaultBodyLimit::max(PAIR_HELLO_BYTES)),
+        )
+        .route(
+            SESSION_PATH,
+            post(session_http).layer(DefaultBodyLimit::max(HELLO_BYTES)),
+        )
+        .route(pipe::OUTBOUND, post(frame_http));
+    let (pipes, _lifetime) = Pipes::listening();
     let routes = wire::entered(sockets, wire::Arrival::Socket, &origins)
         .merge(page)
         .with_state(Serving {
             doorway: doorway.clone(),
             reaching,
+            pipes,
         });
     tokio::select! {
         served = axum::serve(listener, routes) => {
@@ -147,52 +167,86 @@ async fn keep_time(doorway: Doorway) {
     }
 }
 
-async fn pair_upgrade(State(serving): State<Serving>, upgrade: WebSocketUpgrade) -> Response {
-    upgrade.on_upgrade(move |mut device| async move {
-        let ended = pairing(&mut device, &serving.doorway).await;
-        close(device, ended).await;
-    })
+async fn pair_http(State(serving): State<Serving>, first: Bytes) -> Response {
+    begin_http(serving, first, PAIR_HELLO_BYTES, Run::Pair)
 }
 
-async fn session_upgrade(State(serving): State<Serving>, upgrade: WebSocketUpgrade) -> Response {
-    upgrade.on_upgrade(move |mut device| async move {
-        let ended = session(&mut device, &serving.doorway, &serving.reaching).await;
-        close(device, ended).await;
-    })
+async fn session_http(State(serving): State<Serving>, first: Bytes) -> Response {
+    begin_http(serving, first, HELLO_BYTES, Run::Session)
 }
 
-async fn close(mut device: WebSocket, ended: Result<(), AxError>) {
-    let reason = ended
-        .err()
-        .map_or_else(String::new, |refused| refused.code().as_str().to_owned());
-    let frame = CloseFrame {
-        code: close_code::NORMAL,
-        reason: reason.into(),
+fn begin_http(serving: Serving, first: Bytes, size: usize, run: Run) -> Response {
+    if first.len() != size {
+        return (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            [(header::CACHE_CONTROL, "no-store")],
+        )
+            .into_response();
+    }
+    let (pipe, response) = match serving.pipes.start(first) {
+        Ok(opened) => opened,
+        Err(status) => return (status, [(header::CACHE_CONTROL, "no-store")]).into_response(),
     };
-    drop(device.send(Message::Close(Some(frame))).await);
+    let runtime = serving.reaching.runtime.clone();
+    drop(runtime.spawn(carry(pipe, serving, run)));
+    response
 }
 
-async fn pairing(device: &mut WebSocket, doorway: &Doorway) -> Result<(), AxError> {
-    let hello = PairHello::from_bytes(&next_binary(device).await?)?;
+async fn frame_http(State(serving): State<Serving>, headers: HeaderMap, body: Body) -> Response {
+    (
+        serving.pipes.deliver(&headers, body).await,
+        [(header::CACHE_CONTROL, "no-store")],
+    )
+        .into_response()
+}
+
+async fn carry(mut device: Pipe, serving: Serving, run: Run) {
+    let ended = match run {
+        Run::Pair => pairing(&mut device, &serving.doorway).await,
+        Run::Session => session(&mut device, &serving.doorway, &serving.reaching).await,
+    };
+    let code = ended
+        .as_ref()
+        .err()
+        .map_or("", |refused| refused.code().as_str());
+    device.close(code).await;
+}
+
+async fn handshake(device: &mut Pipe) -> Result<Bytes, AxError> {
+    match tokio::time::timeout(HANDSHAKE_PATIENCE, device.recv()).await {
+        Ok(Some(bytes)) => Ok(bytes),
+        Ok(None) | Err(_) => Err(lost(
+            &"the device left or did not finish its remote handshake",
+        )),
+    }
+}
+
+async fn send(device: &Pipe, bytes: &[u8]) -> Result<(), AxError> {
+    if device.send(bytes).await {
+        Ok(())
+    } else {
+        Err(lost(&"the browser stopped reading the remote stream"))
+    }
+}
+
+async fn pairing(device: &mut Pipe, doorway: &Doorway) -> Result<(), AxError> {
+    let hello = PairHello::from_bytes(&handshake(device).await?)?;
     let (reply, waiting) = doorway.pair_reply(&hello)?;
-    send(device, reply.as_bytes().to_vec()).await?;
-    let sealed = next_binary(device).await?;
+    send(device, reply.as_bytes()).await?;
+    let sealed = handshake(device).await?;
     let door = doorway.clone();
     let answer = blocking(move || door.claim(waiting, &sealed)).await?;
-    send(device, answer).await
+    send(device, &answer).await
 }
 
-async fn session(
-    device: &mut WebSocket,
-    doorway: &Doorway,
-    reaching: &Reaching,
-) -> Result<(), AxError> {
-    let hello = Hello::from_bytes(&next_binary(device).await?)?;
+async fn session(device: &mut Pipe, doorway: &Doorway, reaching: &Reaching) -> Result<(), AxError> {
+    let hello = Hello::from_bytes(&handshake(device).await?)?;
     let (reply, waiting) = doorway.session_reply(&hello)?;
-    send(device, reply.as_bytes().to_vec()).await?;
-    let finish = Finish::from_bytes(&next_binary(device).await?)?;
+    send(device, reply.as_bytes()).await?;
+    let finish = Finish::from_bytes(&handshake(device).await?)?;
     let door = doorway.clone();
     let admitted = blocking(move || door.admit(waiting, &finish)).await?;
+    device.authenticated();
     let (mut city, _) = tokio_tungstenite::connect_async(format!("ws://{}/ws", reaching.city))
         .await
         .map_err(|source| {
@@ -207,51 +261,24 @@ async fn session(
     loop {
         tokio::select! {
             from_device = device.recv() => match from_device {
-                Some(Ok(Message::Binary(sealed))) => match conduit.judge(&sealed)? {
+                Some(sealed) => match conduit.judge(&sealed)? {
                     Step::Forward(text) => city.send(CityMessage::Text(text.into())).await.map_err(|source| lost(&source))?,
-                    Step::Answer(sealed) => send(device, sealed).await?,
+                    Step::Answer(sealed) => send(device, &sealed).await?,
                     Step::Lock => {
                         let door = doorway.clone();
                         blocking(move || door.close(RemoteClosing::Locked)).await?;
                         return Ok(());
                     }
                 },
-                Some(Ok(Message::Ping(_) | Message::Pong(_))) => {}
-                Some(Ok(Message::Text(_))) => return Err(binary_only()),
-                Some(Ok(Message::Close(_)) | Err(_)) | None => return Ok(()),
+                None => return Ok(()),
             },
             from_city = city.next() => match from_city {
-                Some(Ok(CityMessage::Text(text))) => send(device, conduit.seal_for_device(text.as_str())?).await?,
+                Some(Ok(CityMessage::Text(text))) => send(device, &conduit.seal_for_device(text.as_str())?).await?,
                 Some(Ok(CityMessage::Binary(_) | CityMessage::Ping(_) | CityMessage::Pong(_) | CityMessage::Frame(_))) => {}
                 Some(Ok(CityMessage::Close(_)) | Err(_)) | None => return Ok(()),
             },
         }
     }
-}
-
-async fn next_binary(device: &mut WebSocket) -> Result<Vec<u8>, AxError> {
-    loop {
-        match device.recv().await {
-            Some(Ok(Message::Binary(bytes))) => return Ok(bytes.to_vec()),
-            Some(Ok(Message::Ping(_) | Message::Pong(_))) => {}
-            Some(Ok(Message::Text(_))) => return Err(binary_only()),
-            Some(Ok(Message::Close(_)) | Err(_)) | None => {
-                return Err(AxError::failure(
-                    AxCode::WireMismatch,
-                    "hear a remote device",
-                    "the device left before the handshake ended",
-                )
-                .with_recovery("connect again"));
-            }
-        }
-    }
-}
-
-async fn send(device: &mut WebSocket, bytes: Vec<u8>) -> Result<(), AxError> {
-    device
-        .send(Message::Binary(bytes.into()))
-        .await
-        .map_err(|source| lost(&source))
 }
 
 async fn blocking<T: Send + 'static>(
@@ -265,15 +292,6 @@ async fn blocking<T: Send + 'static>(
         )
         .with_recovery("restart the city: the door starts closed")
     })?
-}
-
-fn binary_only() -> AxError {
-    AxError::failure(
-        AxCode::WireMismatch,
-        "hear a remote device",
-        "a text message where only sealed bytes travel",
-    )
-    .with_recovery("reload the page: it speaks another version of the remote door")
 }
 
 fn lost(source: &dyn std::fmt::Display) -> AxError {

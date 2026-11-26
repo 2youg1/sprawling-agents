@@ -25,7 +25,6 @@ export default function R3() {
 
   const FINGERPRINT = new Uint8Array(32).map((_, at) => (at * 37 + 11) % 256);
   const ID = new Uint8Array(16).map((_, at) => (at * 53 + 7) % 256);
-  const SEED = "q7mf2xkd4pyw6tnb3hvc5jrsgaez7uoi2lw4dfm6xnkp3qbtyc5a";
   const AT = Date.UTC(2026, 9, 2, 6, 41, 9, 312);
 
   function device(ed25519: CryptoKey): Device {
@@ -54,7 +53,10 @@ export default function R3() {
           busy: false,
         },
       ],
-      ["the seed, once", { kind: "seed", seed: SEED, device: device(ed25519), persisted: false }],
+      [
+        "paired · storage persistence declined",
+        { kind: "paired", device: device(ed25519), told: { kind: "unpersisted" }, busy: false },
+      ],
       [
         "paired · the door locked",
         { kind: "paired", device: device(ed25519), told: { kind: "locked" }, busy: false },
@@ -94,7 +96,6 @@ export default function R3() {
                     standing={standing}
                     keeps={KEEPS[index()] ?? null}
                     onPair={() => undefined}
-                    onSeen={() => undefined}
                     onLock={() => undefined}
                     onForget={() => undefined}
                   />

@@ -3,11 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The quiet host on the alternate screen: the address and the pairing
-// code, and the key minted for a serve beyond this machine beside the
-// code when there is one, as one block in the middle of the window, with
-// at most one transient line two rows under it. Nothing else is drawn.
-
 const std = @import("std");
 const scene = @import("scene.zig");
 const paint = @import("paint.zig");
@@ -22,12 +17,17 @@ pub fn quiet(out: *std.Io.Writer, r: *scene.Reader) Error!void {
     const code = try r.text();
     const key = try r.text();
     const transient = try r.text();
-    const label = "pairing code   ";
+    const label = "pairing code";
+    const label_room = label.len + 3;
+    const code_room = text.width(code);
     const key_label = "   key  ";
-    const second = label.len + text.width(code) + if (key.len > 0) key_label.len + text.width(key) else 0;
+    const hint = "C: show a pairing code";
+    const second = (if (code.len == 0) hint.len else label_room + code_room) + if (key.len > 0) key_label.len + text.width(key) else 0;
     const block = @max(@max(text.width(url), second), text.width(transient));
     const left = (@as(usize, columns) -| block) / 2;
-    const top = (@as(usize, rows) -| 2) / 2;
+    const stacked = code.len > 0 and columns >= code_room and columns < label_room + code_room and rows > 2;
+    const lines: usize = if (stacked) 3 else 2;
+    const top = (@as(usize, rows) -| lines) / 2;
     try out.writeAll("\x1b[?2026h\x1b[H\x1b[2J");
     var p = paint.Painter.init(out, columns);
     try place(out, top, left);
@@ -36,25 +36,58 @@ pub fn quiet(out: *std.Io.Writer, r: *scene.Reader) Error!void {
     try p.close();
     try place(out, top + 1, left);
     p.column = left;
-    try p.fit(.faint, label, label.len);
-    try p.fit(.bold, code, p.room());
+    if (code.len == 0) {
+        try p.fit(.faint, hint, p.room());
+    } else if (code_room > p.room()) {
+        try p.fit(.faint, "widen for pairing code", p.room());
+    } else {
+        if (stacked) {
+            try p.cut(.faint, label, label.len);
+            try place(out, top + 2, left);
+            p.column = left;
+        } else if (label_room + code_room <= p.room()) {
+            try p.cut(.faint, label, label.len);
+            try p.to(p.column + 3);
+        }
+        try p.cut(.bold, code, code_room);
+    }
     if (key.len > 0) {
         try p.fit(.faint, key_label, key_label.len);
         try p.fit(.bold, key, p.room());
     }
-    // The transient goes two rows under the block, and only when that row
-    // is inside the window: a terminal would otherwise put it on the last
-    // row it has, over the pairing code.
-    if (transient.len > 0 and top + 3 < rows) {
-        try place(out, top + 3, left);
-        p.column = left;
-        try p.fit(.faint, transient, p.room());
+    if (transient.len > 0) {
+        var row = top + lines + 1;
+        var notices = std.mem.splitScalar(u8, transient, '\n');
+        while (notices.next()) |notice| : (row += 1) {
+            if (row >= rows) break;
+            try place(out, row, left);
+            p.column = left;
+            try p.fit(.faint, notice, p.room());
+        }
     }
     try p.close();
     try out.writeAll("\x1b[?2026l");
 }
 
-/// Moves the cursor to a row and column counted from zero.
 fn place(out: *std.Io.Writer, row: usize, column: usize) paint.Error!void {
     try out.print("\x1b[{d};{d}H", .{ row + 1, column + 1 });
+}
+
+test "a forty-column quiet host shows the whole pairing code" {
+    const write = @import("write.zig");
+    const gpa = std.testing.allocator;
+    const code = "0123456789abcdef0123456789abcdef";
+    var frame = try write.Scene.quietFrame(gpa, .{
+        .columns = 40,
+        .rows = 12,
+        .url = "http://127.0.0.1:3425/",
+        .code = code,
+    });
+    defer frame.deinit(gpa);
+    var input: scene.Reader = .{ .bytes = frame.bytes.items };
+    _ = try input.tag();
+    var bytes: [1024]u8 = undefined;
+    var output: std.Io.Writer = .fixed(&bytes);
+    try quiet(&output, &input);
+    try std.testing.expect(std.mem.indexOf(u8, output.buffered(), code) != null);
 }
