@@ -1,5 +1,9 @@
 # Tools
 
+[简体中文](README.zh-CN.md) · [Project home](../README.md)
+
+A maintainer’s workbench: list the gates CI uses, replay a deterministic scenario, read benchmark evidence, or package a release without shipping the development tools themselves.
+
 These directories under `Tools/` hold what checks, simulates, fuzzes, attacks and analyzes the product. None of it enters a release build: no tool is a dependency of the `sprawling` binary, and the release archive carries only the entries the table `ARCHIVE` in `Tools/xtask/src/package/contents.rs` names. The `artifact` gate holds the first half, by refusing test scaffolding inside the binary.
 
 A tool useful across tasks lives in the crate that owns the operation, with the tests and documentation of that crate; a one-off experiment stays out of the shipped tree, and no crate exists only to share a helper.
@@ -13,7 +17,7 @@ A tool useful across tasks lives in the crate that owns the operation, with the 
 | [`Tools/adversary/`](./adversary/) | A black-box checker in Lean that starts the built binary and attacks it through the wire from outside; it is never a gate. What a Rust module must hold is specified under its crate's `spec/` and proved by `just models`. The checker is two targets of the Lean package at the repository root, whose `lean-toolchain` the product binary also embeds, which is why the pin lives at the repository root. |
 | [`Tools/fixtures/`](./fixtures/) | Data whose bytes are the assertion: `address.jsonl`, the address spellings with their verdicts, read by the kernel's tests and the client's; `golden-p0` and `golden-s1`, ledgers that citysim rebuilds byte for byte; `ledger-ahead`, a ledger from a newer version that storage must refuse; `remote-handshake`, the vectors and the one-way fixture the browser's remote door must reproduce, written by the `remote_access` tests and read by them and the client's (section 8-12 of `Sprawling/remote_access/Spec.lean`). Regenerate a golden ledger by running its citysim test with `GOLDEN_WRITE=1`, and `remote-handshake` by running the `remote_access` tests named `vector` or `fixture` the same way, not by editing either. |
 
-## Run and check
+## Quick start
 
 From the repository root:
 

@@ -1,8 +1,44 @@
 # Sprawling
 
-Sprawling is the city host. Its crates own project and resident identity, model dispatch, permissions, process boundaries, the Ledger and the CLI. The [app crate](app/README.md) assembles them and serves [RefRain](../RefRain/README.md). [Calyx](../Calyx/README.md) owns terminal rendering and interaction, [Mei](../Mei/README.md) is a standalone harness, and [Tools](../Tools/README.md) holds development machinery.
+[简体中文](README.zh-CN.md) · [Project home](../README.md)
 
-## Run and check a local build
+**Run a team of agents without becoming its full-time dispatcher.** A city is a workspace, buildings are projects, and rooms are where agents work. You set the boundaries in files you own. When a run finishes, you can inspect what it saw, what it changed, and who approved the change.
+
+## Why Sprawling
+
+- **A workflow you can open in an editor.** Markdown holds the project specification, task list and handoff; TOML sets where a building may write and which capabilities it gets. Residents can divide work and pass it on without you copying messages between chats.
+- **See the run, not just its last answer.** Inspect prompt layers, tool results, diffs and review evidence. City Git commits carry run attribution, and the hash-chained Ledger can be verified and replayed offline without rerunning tools or calling a model.
+- **Keep the host on your machine.** The Rust host serves RefRain and owns the city state, with no external database or queue to deploy. Local hosting does not make every call local: configured model providers and external tools have their own boundaries.
+
+## Quick start
+
+With Bun installed:
+
+```sh
+bun install --global sprawling@latest
+```
+
+Open a new terminal. If `sprawling` is not found, run `bun pm bin --global` and add the reported directory to `PATH`. Then run:
+
+```sh
+sprawling up ./cities/first
+```
+
+In the browser, connect a provider, select a `main` model, and give the Mayor one result to deliver. Press Esc in the host terminal for the CLI; `/web` reopens the page and `/quit` stops the city. The [installation guide](../docs/start/getting-started.md#1-install) covers npm, standalone installers, release archives and verification.
+
+Give the Mayor a small, checkable task: split a project into two pieces and say how each will be judged. Follow the handoffs in the project building. Once the work lands as a city Git commit, follow it back to the run, its tool history and review.
+
+## Technology and entry points
+
+Rust runs dispatch, policy, process boundaries and accounting. Markdown and TOML describe the workflow, Git connects changes to runs, and Lean specifications record the crate contracts. [RefRain](../RefRain/README.md) is the browser workspace; [Calyx](../Calyx/README.md) is the native terminal console.
+
+- [First city](../docs/start/getting-started.md) · [Operating guide](../docs/operate/operating.md) · [ACP, MCP and scripts](../docs/integrate/integrations.md)
+- [CLI and wire](../docs/wire.md) · [Architecture](../docs/ARCHITECTURE.md) · [Security boundaries](../docs/threat-model.md)
+- [Why Sprawling was built](background.md)
+
+<a name="run-and-check-a-local-build"></a>
+
+## Build from source
 
 From the repository root, use the toolchain pins and prerequisites in the [contribution guide](../docs/CONTRIBUTING.md#0-development-tools).
 

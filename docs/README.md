@@ -1,6 +1,10 @@
 # Sprawling documentation
 
-[Project home](../README.md) · [简体中文项目主页](README.zh-CN.md)
+[Project home](../README.md) · [简体中文项目主页](../README.zh-CN.md)
+
+## Find a project
+
+Start at the project itself for features, a quick start, its stack and links to exact references: [Sprawling](../Sprawling/README.md), [RefRain](../RefRain/README.md), [Calyx](../Calyx/README.md), [Mei](../Mei/README.md), [Kasanagi](../Kasanagi/README.md) and [Tools](../Tools/README.md). This directory holds shared workflow, architecture, methods and longer references rather than a second set of product introductions.
 
 ## Start
 
@@ -52,7 +56,7 @@
 | Document | What it answers |
 |---|---|
 | [`catalog.md`](reference/catalog.md) | Every built-in tool and namespace a resident can be given, what admits each one, and the sentence a model reads about it first. |
-| [Project background](reference/background.md) ([简体中文](reference/background.zh-CN.md)) | The goals and design rationale behind the project. |
+| [Project background](../Sprawling/background.md) ([简体中文](../Sprawling/background.zh-CN.md)) | The goals and design rationale behind the project. |
 | [`glossary.md`](glossary.md) | What each word means; the `lexicon` gate holds the code and the documents to these words. |
 | [`third-party.md`](third-party.md) | Whose work this stands on, and the licence obligations. |
 | [`SECURITY.md`](SECURITY.md) | The private route for reporting a vulnerability, and what is in scope. |

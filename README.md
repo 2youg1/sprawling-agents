@@ -2,7 +2,7 @@
 
 **Let agents live like citizens in the city of sprawling, where nothing is hidden: prompts are plain files you own, and every context is a line in a hash-chained, offline-verifiable Ledger you can replay.**
 
-<p><a href="README.md">English</a> · <a href="docs/README.zh-CN.md">简体中文</a></p>
+<p><a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a></p>
 
 <p>
   <a href="https://crates.io/crates/sprawling"><img src="https://img.shields.io/crates/v/sprawling?color=9f5f37&amp;labelColor=3d444d&amp;style=flat-square" alt="crates.io"></a>
@@ -16,9 +16,13 @@
 
 <a name="what-it-does"></a>
 
-Sprawling runs a team of collaborating agents on your computer. A workspace is a city, projects are buildings, and agents in rooms can divide work, collaborate, and report back to you. One Rust executable serves the browser workspace and terminal console and records runs in a Ledger you can verify offline.
+Give a team a place to work. In Sprawling, a workspace is a city: projects live in buildings, agents work in rooms, and a handoff is a file you can open. Drop in to see what changed, rather than staying in the chat to keep work moving.
 
-Start with [your first city](docs/start/getting-started.md) for models, write boundaries and review rules. This source tree is at <!-- xtask:begin workspace_version -->0.18.2<!-- xtask:end -->.
+- **Set the rules in your own files.** Own the prompts, write boundaries and review rules. Choose where an agent can work before the run starts.
+- **Follow the work all the way back.** Look from a Git commit to the run, its prompt, tool results and evidence. Verify and replay the Ledger offline without calling the model again.
+- **Keep the workspace on your machine.** Start with the Rust host and its embedded WebUI. Use the terminal when you want it, or run just Mei when a whole city is too much.
+
+This source tree is at <!-- xtask:begin workspace_version -->0.18.2<!-- xtask:end -->.
 
 <p align="center">
   <a href="docs/images/city-overview.webp"><img alt="A demo city overview with City Hall, two project buildings and completed runs" src="docs/images/city-overview.webp" width="100%"></a>
@@ -31,21 +35,28 @@ With Bun installed, run:
 
 ```sh
 bun install --global sprawling@latest
+```
+
+Open a new terminal. If `sprawling` is not found, run `bun pm bin --global` and add the reported directory to `PATH`. Then run:
+
+```sh
 sprawling up ./cities/first
 ```
 
 In the browser, connect a model provider, select a model for `main`, and give the Mayor a first task. The terminal starts as the quiet host. Press Esc to enter the CLI, then type `/web` to reopen the page and return to the quiet host, or `/quit` to stop the city. The [installation guide](docs/start/getting-started.md#1-install) also covers standalone installers, prebuilt archives and release verification.
 
-## Projects
+<a name="projects"></a>
 
-| Project | Owns |
+## Project map
+
+| Project | What you can do |
 |---|---|
-| [Sprawling](Sprawling/README.md) | The city host, command line and product Rust crates. |
-| [RefRain](RefRain/README.md) | The browser workspace for files and conversations. |
-| [Calyx](Calyx/README.md) | The native terminal shell shared by Sprawling and Mei. |
-| [Mei](Mei/README.md) | A standalone agent harness with terminal and ACP entry points. |
-| [Kasanagi](Kasanagi/README.md) | A planned remote collaboration project. |
-| [Tools](Tools/README.md) | Development checks, simulation, testing and packaging tools. |
+| [Sprawling](Sprawling/README.md) | Run a team of agents, then trace a Git commit back to the run and its review. |
+| [RefRain](RefRain/README.md) | Write Markdown, read PDFs, and take over an agent session or inspect Git changes in the same browser workspace. |
+| [Calyx](Calyx/README.md) | Stay in the terminal: read long output with the input still in reach. |
+| [Mei](Mei/README.md) | Use one persistent Python tool, bring your own tooling, or run Mei as an ACP worker. |
+| [Kasanagi](Kasanagi/README.md) | Planned cross-machine collaboration, not yet shipped in this repository. |
+| [Tools](Tools/README.md) | Check, replay, measure and package the projects without shipping the development tools. |
 
 ## Documentation
 
@@ -53,5 +64,5 @@ In the browser, connect a model provider, select a model for `main`, and give th
 - [Operating a city](docs/operate/operating.md), [integrating tools and agents](docs/integrate/integrations.md), and [architecture](docs/ARCHITECTURE.md).
 - [Contribution guide](docs/CONTRIBUTING.md), [agent instructions](AGENTS.md), and [reading guide for models](LLM.md).
 - <a name="sources-and-credits"></a> [Release history](docs/CHANGELOG.md), [security reporting](docs/SECURITY.md), and [credits and licences](docs/third-party.md).
-- <a name="why-i-built-this"></a> [Project background](docs/reference/background.md)
+- <a name="why-i-built-this"></a> [Project background](Sprawling/background.md)
 - <a name="code-signing-policy"></a> [Release verification and code signing](docs/start/getting-started.md#select-and-verify-a-version)

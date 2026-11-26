@@ -67,19 +67,19 @@ fn resumed_messages_precede_the_new_prompt() {
 }
 
 #[test]
-fn readmes_match_the_documented_request_fixture() {
+fn tool_contracts_match_the_documented_request_fixture() {
     let tool = python_tool(&environment());
     let pretty = serde_json::to_string_pretty(&tool).unwrap();
     let tool_bytes = serde_json::to_vec(&tool).unwrap().len();
     let total = SYSTEM.len().checked_add(tool_bytes).unwrap();
-    for readme in [
-        include_str!("../README.md"),
-        include_str!("../README.zh-CN.md"),
+    for contract in [
+        include_str!("../TOOL-CONTRACT.md"),
+        include_str!("../TOOL-CONTRACT.zh-CN.md"),
     ] {
-        assert!(readme.contains(SYSTEM));
-        assert!(readme.contains(&pretty));
+        assert!(contract.contains(SYSTEM));
+        assert!(contract.contains(&pretty));
         for bytes in [SYSTEM.len(), tool_bytes, total] {
-            assert!(readme.contains(&format!("| {bytes} |")));
+            assert!(contract.contains(&format!("| {bytes} |")));
         }
     }
 }
