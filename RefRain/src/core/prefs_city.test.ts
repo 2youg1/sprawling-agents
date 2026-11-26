@@ -21,6 +21,7 @@ describe("the preferences the city keeps", () => {
       proxying: "always",
       appearance: {
         lighting: "light",
+        neutral_palette: true,
         sans: "system",
         mono: "custom",
         sans_stack: "Iosevka",
@@ -47,6 +48,7 @@ describe("the preferences the city keeps", () => {
       proxying: "always",
       appearance: {
         lighting: "light",
+        neutralPalette: true,
         sans: "system",
         mono: "custom",
         sansStack: "Iosevka",
@@ -109,7 +111,12 @@ describe("the preferences the city keeps", () => {
     const door = loadPreferences(memory(), "en");
     const told: PreferencePatch[] = [];
     door.tell((patch) => told.push(patch));
-    const appearance = { ...get(door.held).appearance, body: 15 };
+    const appearance = {
+      ...get(door.held).appearance,
+      body: 15,
+      lighting: "dark" as const,
+      neutralPalette: true,
+    };
     door.setLang("zh");
     door.setWelcomed(true);
     door.setPanel(false);
@@ -126,6 +133,7 @@ describe("the preferences the city keeps", () => {
       {
         appearance: {
           lighting: appearance.lighting,
+          neutral_palette: true,
           sans: appearance.sans,
           mono: appearance.mono,
           sans_stack: appearance.sansStack,

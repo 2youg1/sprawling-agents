@@ -19,12 +19,14 @@ export interface ResetWire {
 export interface TokenLook {
   readonly name: string;
   readonly well: WellWire;
+  readonly codes: readonly string[];
   readonly reset: { readonly word: string; readonly wire: ResetWire } | undefined;
 }
 
 export interface TokenProps {
   readonly name: string;
   readonly drawn: string | undefined;
+  readonly codes?: readonly string[];
   readonly reset: { readonly word: string; readonly label: string } | undefined;
 }
 
@@ -37,6 +39,7 @@ export function tokenOf(props: TokenProps, hands: TokenHands): TokenLook {
   const { name, reset } = props;
   return {
     name,
+    codes: props.codes ?? [],
     well: {
       type: "color",
       "aria-label": name,

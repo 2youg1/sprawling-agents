@@ -13,7 +13,7 @@ import { BUILT_IN_THEME } from "../../core/theme_override";
 import { memory } from "../../core/rows";
 import {
   colourTokens,
-  shortfalls,
+  readLegibility,
   textClaims,
   wearKeptTheme,
   wearTheme,
@@ -130,32 +130,41 @@ describe("legibility", () => {
     expect(apcaLc([0, 0, 0], [0xff, 0xff, 0xff])).toBeCloseTo(106.04, 1);
   });
 
-  test("a text token claims the tier its --tier- twin states, and one that falls short on the surface ceiling is warned about", () => {
+  test("the card reports signed APCA readings against its drawn surface and marks shortfalls", () => {
     const declared: Record<string, string> = {
       "--tier-text": "90",
       "--tier-text-quiet": "75",
-      "--surface-ceiling": "g2",
+      "--tier-text-faint": "60",
       "--tier-slack": "0.05",
     };
     const claims = textClaims(
-      ["--color-g2", "--color-text", "--color-text-quiet", "--color-accent"],
+      [
+        "--color-raised",
+        "--color-text",
+        "--color-text-quiet",
+        "--color-text-faint",
+        "--color-accent",
+      ],
       (name) => declared[name] ?? "",
     );
     expect(claims).toEqual({
-      surface: "--color-g2",
+      surface: "--color-raised",
       slack: 0.05,
       claims: [
         { token: "--color-text", tier: 90 },
         { token: "--color-text-quiet", tier: 75 },
+        { token: "--color-text-faint", tier: 60 },
       ],
     });
     const drawn: Record<string, Rgba> = {
-      "--color-g2": [0x22, 0x26, 0x2c, 1],
+      "--color-raised": [0x22, 0x26, 0x2c, 1],
       "--color-text": [0xf0, 0xf2, 0xf5, 1],
       "--color-text-quiet": [0x55, 0x58, 0x5c, 1],
     };
-    expect(shortfalls(claims, (token) => drawn[token] ?? null).map((each) => each.token)).toEqual([
-      "--color-text-quiet",
-    ]);
+    const [text, quiet, faint] = readLegibility(claims, (token) => drawn[token] ?? null);
+    expect(text).toMatchObject({ kind: "measured", meetsTier: true });
+    expect(quiet).toMatchObject({ kind: "measured", meetsTier: false });
+    expect(faint).toMatchObject({ kind: "unmeasured", tier: 60 });
+    expect(text?.kind === "measured" ? text.reached : null).toBeCloseTo(-96.18, 2);
   });
 });

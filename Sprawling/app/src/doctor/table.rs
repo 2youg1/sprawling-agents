@@ -104,7 +104,7 @@ pub(crate) const REQUIREMENTS: &[Requirement] = &[
         name: CHROMEDRIVER,
         tier: Tier::Use,
         need: Need::OneOf(super::Group::BrowserEngine),
-        enables: "the browser tool against Chrome, Brave, Chromium or Vivaldi",
+        enables: "the browser tool through ChromeDriver for Chromium-family browsers",
         detect: Detection::Program {
             program: "chromedriver",
             version_arg: "--version",

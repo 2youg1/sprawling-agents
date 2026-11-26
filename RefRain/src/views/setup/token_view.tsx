@@ -9,7 +9,7 @@ import type { TokenLook } from "./token";
 
 export default function TokenView(props: TokenLook) {
   return (
-    <li class="flex items-center gap-tight">
+    <li class="flex items-start gap-snug">
       <input
         type={props.well.type}
         aria-label={props.well["aria-label"]}
@@ -17,7 +17,12 @@ export default function TokenView(props: TokenLook) {
         onChange={(event) => props.well.onchange(event)}
         class="h-control w-control shrink-0 rounded-control border border-edge-input bg-raised"
       />
-      <span class="min-w-0 flex-1 truncate font-mono text-note text-text-quiet">{props.name}</span>
+      <div class="flex min-w-0 flex-1 flex-col gap-hair font-mono text-note">
+        <code class="wrap-anywhere text-text">{props.name}</code>
+        <For each={props.codes}>
+          {(code) => <code class="wrap-anywhere text-text-quiet">{code}</code>}
+        </For>
+      </div>
       <Show when={props.reset}>
         {(reset) => (
           <button

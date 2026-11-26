@@ -5,7 +5,7 @@
 
 use std::collections::BTreeSet;
 
-use crate::doctor::family::{Confidence, Family, member_at};
+use crate::doctor::family::{Confidence, Family, LOCAL_APP_DATA_PREFIX, member_at};
 use crate::doctor::{Detection, Platform, REQUIREMENTS, Tier};
 
 #[test]
@@ -34,7 +34,10 @@ fn every_family_is_a_row_and_every_member_says_where_it_is_installed() {
             for platform in Platform::ALL {
                 for place in member.places.at(platform).iter() {
                     assert!(
-                        place.starts_with('/') || place.contains(":\\"),
+                        place.starts_with('/')
+                            || place.contains(":\\")
+                            || (platform == Platform::Windows
+                                && place.starts_with(LOCAL_APP_DATA_PREFIX)),
                         "{} names {place}, which is not a place",
                         member.name
                     );
@@ -64,6 +67,28 @@ fn a_found_browser_is_reported_by_the_brand_it_is() {
         Some("vivaldi"),
         "a brand installed where this table does not look is still that brand"
     );
+}
+
+#[test]
+fn helium_and_google_chrome_can_share_an_executable_name() {
+    for (path, name) in [
+        (
+            r"C:\Program Files\imput\Helium\Application\chrome.exe",
+            "helium",
+        ),
+        (
+            r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+            "chrome",
+        ),
+        ("/Applications/Helium.app/Contents/MacOS/Helium", "helium"),
+        ("/usr/bin/helium", "helium"),
+    ] {
+        assert_eq!(
+            member_at(Family::Chromium, std::path::Path::new(path)).map(|member| member.name),
+            Some(name),
+            "{path} should be reported by its brand"
+        );
+    }
 }
 
 #[test]

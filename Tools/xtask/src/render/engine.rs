@@ -40,10 +40,20 @@ pub(crate) fn browser() -> Option<PathBuf> {
     }
     chromium_members().find_map(|(program, places)| {
         places
-            .map(PathBuf::from)
+            .filter_map(installation_path)
             .find(|path| path.is_file())
             .or_else(|| on_path(program))
     })
+}
+
+fn installation_path(place: &str) -> Option<PathBuf> {
+    let path = PathBuf::from(place);
+    if path.is_absolute() {
+        return Some(path);
+    }
+    let relative = place.strip_prefix(r"%LOCALAPPDATA%\")?;
+    let user = PathBuf::from(std::env::var_os("LOCALAPPDATA")?);
+    user.is_absolute().then(|| user.join(relative))
 }
 
 fn chromium_members() -> impl Iterator<Item = (&'static str, std::str::Split<'static, char>)> {

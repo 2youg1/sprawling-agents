@@ -45,6 +45,8 @@ export type GlyphName =
   | "door"
   | "key"
   | "mic"
+  | "sun"
+  | "moon"
   | "pdf-crop"
   | "pdf-magnify"
   | "pdf-original"

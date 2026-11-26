@@ -36,6 +36,7 @@ import LocateFixed from "@lucide/solid/icons/locate-fixed";
 import MessageSquare from "@lucide/solid/icons/message-square";
 import MessagesSquare from "@lucide/solid/icons/messages-square";
 import Mic from "@lucide/solid/icons/mic";
+import Moon from "@lucide/solid/icons/moon";
 import Pause from "@lucide/solid/icons/pause";
 import Pin from "@lucide/solid/icons/pin";
 import Plus from "@lucide/solid/icons/plus";
@@ -95,6 +96,8 @@ const DRAWN = {
   door: DoorOpen,
   key: KeyRound,
   mic: Mic,
+  sun: Sun,
+  moon: Moon,
   "pdf-crop": Crop,
   "pdf-magnify": ZoomIn,
   "pdf-original": Eye,

@@ -63,6 +63,23 @@ fn appearance(fields: serde_json::Value) -> serde_json::Value {
 }
 
 #[test]
+fn the_graphite_palette_round_trips_with_the_lighting_and_defaults_to_blue() {
+    let earlier: PreferencesAnswer =
+        serde_json::from_value(appearance(serde_json::json!({}))).unwrap();
+    assert!(!earlier.appearance.neutral_palette);
+
+    let selected: PreferencesAnswer = serde_json::from_value(appearance(
+        serde_json::json!({ "lighting": "light", "neutral_palette": true }),
+    ))
+    .unwrap();
+    let patch = PreferencePatch::Appearance(selected.appearance.clone());
+    let written = serde_json::to_string(&patch).unwrap();
+    let mut applied = earlier;
+    applied.apply(serde_json::from_str(&written).unwrap());
+    assert_eq!(applied.appearance, selected.appearance);
+}
+
+#[test]
 fn the_shipped_face_is_paper_and_no_old_name_reads() {
     let held = serde_json::to_value(PreferencesAnswer::default())
         .unwrap()

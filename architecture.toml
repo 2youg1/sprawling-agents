@@ -1607,6 +1607,7 @@ module = [
   { name = "refrain::pdf_raster_cache", file = "RefRain/src/views/editor/formats/pdf_raster_cache.ts", owns = "the byte-bounded cache of detached PDF page rasters", shape = "adapter", since = "CS27", status = "built", spec = "RefRain.Spec" },
   { name = "refrain::pdf_document", file = "RefRain/src/views/editor/formats/pdf_document.ts", owns = "opening PDF documents, decoder resources and preview and full-detail worker lifetimes", shape = "adapter", since = "CS27", status = "built", spec = "RefRain.Spec" },
   { name = "refrain::pdf_window", file = "RefRain/src/views/editor/formats/pdf_window.ts", owns = "the PDF viewport window and directional preview admission", shape = "decision", since = "CS27", status = "built", spec = "RefRain.Spec" },
+  { name = "refrain::theme_preview", file = "RefRain/src/views/parts/theme_preview.look.solid.tsx", owns = "the rendered theme preset cell and its selection mark", shape = "projection", since = "CS27", status = "built", spec = "RefRain.Spec" },
 ]
 
 # What each family of modules is for. Keyed by the prefix its module

@@ -45,6 +45,7 @@ const ROWS = {
 
   panel: "sprawling.talk.panel",
   lighting: "sprawling.appearance.lighting",
+  neutralPalette: "sprawling.appearance.neutral_palette",
   sans: "sprawling.appearance.sans",
   mono: "sprawling.appearance.mono",
   sansStack: "sprawling.appearance.sans_stack",
@@ -148,6 +149,7 @@ export interface PreferenceDoor {
 function readAppearance(rows: Rows): Appearance {
   return {
     lighting: readOne(LIGHTINGS, rows.getItem(ROWS.lighting), "system"),
+    neutralPalette: rows.getItem(ROWS.neutralPalette) === YES,
     sans: readOne(FACES, rows.getItem(ROWS.sans), "paper"),
     mono: readOne(FACES, rows.getItem(ROWS.mono), "paper"),
     sansStack: readStack(rows.getItem(ROWS.sansStack)),
@@ -173,6 +175,7 @@ function readAppearance(rows: Rows): Appearance {
 
 function writeAppearance(rows: Rows, next: Appearance): void {
   rows.setItem(ROWS.lighting, next.lighting);
+  rows.setItem(ROWS.neutralPalette, next.neutralPalette ? YES : NO);
   rows.setItem(ROWS.sans, next.sans);
   rows.setItem(ROWS.mono, next.mono);
   rows.setItem(ROWS.sansStack, next.sansStack);

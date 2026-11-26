@@ -12,9 +12,9 @@ import type { Theme } from "../../core/theme_override";
 const TOKEN_PREFIX = "--color-";
 
 const TIER_PREFIX = "--tier-";
-const CEILING = "--surface-ceiling";
 const SLACK = "--tier-slack";
 const TEXT_TOKEN = `${TOKEN_PREFIX}text`;
+const SURFACE = `${TOKEN_PREFIX}raised`;
 
 const SHEET_ID = "sprawling-theme-override";
 
@@ -40,12 +40,6 @@ export interface Claims {
 
   readonly slack: number;
   readonly claims: readonly Claim[];
-}
-
-export interface Shortfall {
-  readonly token: string;
-  readonly claimed: number;
-  readonly reached: number;
 }
 
 export function colourTokens(declared: Iterable<string>): string[] {
@@ -105,8 +99,6 @@ export function documentStage(document: Document): Stage {
 }
 
 export function textClaims(tokens: readonly string[], read: (name: string) => string): Claims {
-  const rung = read(CEILING).trim();
-  const surface = `${TOKEN_PREFIX}${rung}`;
   const claims = tokens.flatMap((token): Claim[] => {
     if (!token.startsWith(TEXT_TOKEN)) return [];
     const tier = Number(read(`${TIER_PREFIX}${token.slice(TOKEN_PREFIX.length)}`).trim());
@@ -114,17 +106,19 @@ export function textClaims(tokens: readonly string[], read: (name: string) => st
   });
   const slack = Number(read(SLACK).trim());
   return {
-    surface: rung !== "" && tokens.includes(surface) ? surface : null,
+    surface: tokens.includes(SURFACE) ? SURFACE : null,
     slack: Number.isFinite(slack) && slack > 0 ? slack : 0,
     claims,
   };
 }
 
-export type Reading =
-  | { readonly kind: "unmeasured"; readonly token: string }
-  | ({ readonly kind: "shortfall" } & Shortfall);
+export type Reading = Claim &
+  (
+    | { readonly kind: "unmeasured" }
+    | { readonly kind: "measured"; readonly reached: number; readonly meetsTier: boolean }
+  );
 
-export function shortfalls(judged: Claims, resolve: (token: string) => Rgba | null): Reading[] {
+export function readLegibility(judged: Claims, resolve: (token: string) => Rgba | null): Reading[] {
   const surface = judged.surface === null ? null : resolve(judged.surface);
   const page = resolve("--color-page");
   const backdrop: Rgb | null = page?.[3] === 1 ? [page[0], page[1], page[2]] : null;
@@ -136,35 +130,55 @@ export function shortfalls(judged: Claims, resolve: (token: string) => Rgba | nu
         : backdrop === null
           ? null
           : over(surface, backdrop);
-  return judged.claims.flatMap((claim): Reading[] => {
+  return judged.claims.map((claim): Reading => {
     const text = resolve(claim.token);
     if (text === null || background === null) {
-      return [{ kind: "unmeasured", token: claim.token }];
+      return { ...claim, kind: "unmeasured" };
     }
     const reached = apcaLc(over(text, background), background);
-    return Math.abs(reached) + judged.slack < claim.tier
-      ? [{ kind: "shortfall", token: claim.token, claimed: claim.tier, reached }]
-      : [];
+    const meetsTier = Math.abs(reached) + judged.slack >= claim.tier;
+    return { ...claim, kind: "measured", reached, meetsTier };
   });
 }
 
-export function drawnRgb(root: HTMLElement): (token: string) => Rgba | null {
-  const pen = root.ownerDocument
-    .createElement("canvas")
-    .getContext("2d", { colorSpace: "srgb", willReadFrequently: true });
-  const computed = window.getComputedStyle(root);
-  return (token) => {
+export interface DrawnColour {
+  readonly codes: readonly string[];
+  readonly hex: string;
+  readonly rgba: Rgba;
+}
+
+export function drawnColours(
+  root: HTMLElement,
+  tokens: readonly string[],
+  computed: CSSStyleDeclaration,
+): ReadonlyMap<string, DrawnColour> {
+  const canvas = root.ownerDocument.createElement("canvas");
+  canvas.width = 1;
+  canvas.height = 1;
+  const pen = canvas.getContext("2d", { colorSpace: "srgb", willReadFrequently: true });
+  const colours = new Map<string, DrawnColour>();
+  if (pen === null) return colours;
+  for (const token of tokens) {
     const value = computed.getPropertyValue(token).trim();
-    if (pen === null || value === "" || !CSS.supports("color", value)) return null;
+    if (value === "" || !CSS.supports("color", value)) continue;
     pen.clearRect(0, 0, 1, 1);
     pen.fillStyle = "transparent";
     pen.fillStyle = cssOklch(value);
+    const resolved: string = pen.fillStyle;
     pen.fillRect(0, 0, 1, 1);
     const [red, green, blue, alpha] = pen.getImageData(0, 0, 1, 1).data;
-    return red === undefined || green === undefined || blue === undefined || alpha === undefined
-      ? null
-      : [red, green, blue, alpha / 255];
-  };
+    if (red === undefined || green === undefined || blue === undefined || alpha === undefined)
+      continue;
+    const channels = [red, green, blue];
+    const opacity = alpha === 255 ? "" : ` / ${(alpha / 255).toFixed(3)}`;
+    const rgb = `rgb(${channels.join(" ")}${opacity})`;
+    colours.set(token, {
+      codes: resolved.startsWith("oklch(") ? [resolved, rgb] : [rgb],
+      hex: `#${channels.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`,
+      rgba: [red, green, blue, alpha / 255],
+    });
+  }
+  return colours;
 }
 
 function cssOklch(value: string): string {

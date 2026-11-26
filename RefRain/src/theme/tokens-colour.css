@@ -5,7 +5,8 @@
 
 @layer theme {
   :root,
-  :host {
+  :host,
+  [data-theme-preview] {
     --color-g0: oklch(0.145 0.014 250);
     --color-g1: oklch(0.172 0.014 250);
     --color-g2: oklch(0.215 0.014 250);

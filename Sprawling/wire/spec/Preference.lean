@@ -186,6 +186,14 @@ none、soft、soft_shares、pinned；配置读者与客户端 schema 共用此�
 新字段及补丁改变线形，WIRE_V 升一并重生 wire.ts。
 -/
 
+/-! D127 内置配色的石墨选项随明暗一起保存
+
+`Appearance.neutral_palette: bool` 可缺席，缺席为 `false`。`true` 选择石墨色板；
+`lighting` 仍决定亮、暗或跟随系统。两项通过同一份 `Appearance` 补丁写入 `[ui]`，
+所以改主题不会在两次写入之间落下混合状态。配色覆盖仍由 `ThemeOverride` 持有。
+把预设存成颜色覆盖会把随包调色和用户编辑混在一起。线形按 D1 进位并重生。
+-/
+
 /-! 设置覆盖：记录的是声明字段；TOML 拼写仍由 serde 类型决定。
 settings-control PreferencesAnswer.lang RefRain/src/views/setup_view.tsx
 settings-control PreferencesAnswer.core RefRain/src/views/settings/performance_view.tsx
@@ -202,7 +210,8 @@ settings-control ThemeOverride.tokens RefRain/src/views/setup/colours_view.tsx
 settings-control ThemeOverride.css RefRain/src/views/setup/colours_view.tsx
 settings-control Chord.action RefRain/src/views/setup/keys_view.tsx
 settings-control Chord.spelled RefRain/src/views/setup/keys_view.tsx
-settings-control Appearance.lighting RefRain/src/views/setup/appearance_view.tsx
+settings-control Appearance.lighting RefRain/src/views/setup/colours_view.tsx
+settings-control Appearance.neutral_palette RefRain/src/views/setup/colours_view.tsx
 settings-control Appearance.sans RefRain/src/views/setup/appearance_type_view.tsx
 settings-control Appearance.mono RefRain/src/views/setup/appearance_type_view.tsx
 settings-control Appearance.sans_stack RefRain/src/views/setup/appearance_type_view.tsx

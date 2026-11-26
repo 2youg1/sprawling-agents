@@ -10,7 +10,6 @@ import {
   CHROMAS,
   DENSITIES,
   GLASSES,
-  LIGHTINGS,
   MOTIONS,
   blendOf,
   type Appearance,
@@ -22,13 +21,11 @@ import { ui } from "../../ui";
 import Segmented from "../parts/segmented.solid";
 import Showing from "../shared/showing.solid";
 import {
-  applyAppearance,
   cellsOf,
   CHROMA_WORDS,
   DENSITY_WORDS,
   drawnBlend,
   GLASS_WORDS,
-  LIGHTING_WORDS,
   MOTION_WORDS,
   saveReceipt,
   type Setting,
@@ -56,12 +53,10 @@ export default function AppearanceSection() {
 
   function write(next: Appearance, name: Setting): void {
     u.prefs.setAppearance(next);
-    applyAppearance(root, next);
     landing.landed(name);
   }
 
   onSettled(() => {
-    applyAppearance(root, look());
     setBlend(look().blend ?? drawnBlend(root));
   });
 
@@ -109,15 +104,6 @@ export default function AppearanceSection() {
   return (
     <div class="contents">
       <Wallpaper lang={lang()} />
-      <Choice
-        title={said("appearance_lighting")}
-        note={said("appearance_lighting_note")}
-        setting="lighting"
-        value={look().lighting}
-        values={LIGHTINGS}
-        words={LIGHTING_WORDS}
-        change={(lighting) => ({ ...look(), lighting })}
-      />
       <AppearanceType look={look()} write={write} receipt={typeReceipt()} />
       <Choice
         title={said("appearance_density")}

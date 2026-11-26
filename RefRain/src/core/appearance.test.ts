@@ -76,6 +76,7 @@ describe("the city's answer", () => {
       ...before,
       appearance: {
         ...before.appearance,
+        neutralPalette: true,
         reading: "libron" as const,
         glass: "off" as const,
         blend: 40,
@@ -96,6 +97,7 @@ describe("the city's answer", () => {
     };
     expect(adopted(held, answer).appearance).toEqual({
       lighting: "light",
+      neutralPalette: false,
       sans: "system",
       mono: "maple",
       sansStack: "",

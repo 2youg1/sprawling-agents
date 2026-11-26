@@ -5,7 +5,7 @@
 
 import { createEffect, createMemo, createSignal, For, onCleanup, onSettled, Show } from "solid-js";
 
-import type { Rgba } from "../../core/apca";
+import type { Appearance } from "../../core/appearance";
 import { fill, say, type Key } from "../../core/lang";
 import { storeValue } from "../../core/solid_store";
 import { BUILT_IN_THEME } from "../../core/theme_override";
@@ -14,13 +14,109 @@ import EditorHost from "../editor/editor_host";
 import type { Editing } from "../editor/editing";
 import { phrasesIn } from "../editor/reading";
 import Button from "../parts/button.solid";
+import Glyph from "../parts/glyph.solid";
+import type { Choice } from "../parts/segmented";
+import { useSegmented } from "../parts/segmented.solid";
+import ThemePreview from "../parts/theme_preview.look.solid";
 import Card from "./card_view";
-import { colourTokens, declaredNames, drawnRgb, shortfalls, textClaims } from "./colours";
+import { colourTokens, declaredNames, drawnColours, readLegibility, textClaims } from "./colours";
+import type { DrawnColour, Reading } from "./colours";
 import { tokenOf } from "./token";
 import { TokenList } from "./token_view";
 
-function hexOf([red, green, blue]: Rgba): string {
-  return `#${[red, green, blue].map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
+const PRESETS = [
+  {
+    value: "mist",
+    label: "colours_preset_mist",
+    appearance: { lighting: "light", neutralPalette: false },
+  },
+  {
+    value: "ash",
+    label: "colours_preset_ash",
+    appearance: { lighting: "light", neutralPalette: true },
+  },
+  {
+    value: "midnight",
+    label: "colours_preset_midnight",
+    appearance: { lighting: "dark", neutralPalette: false },
+  },
+  {
+    value: "graphite",
+    label: "colours_preset_graphite",
+    appearance: { lighting: "dark", neutralPalette: true },
+  },
+] as const satisfies readonly {
+  readonly value: string;
+  readonly label: Key;
+  readonly appearance: Pick<Appearance, "lighting" | "neutralPalette">;
+}[];
+
+type Preset = (typeof PRESETS)[number]["value"];
+
+function drawnPreset(root: HTMLElement): Preset | null {
+  const lighting = root.dataset.theme;
+  const neutralPalette = root.dataset.palette === "graphite";
+  return (
+    PRESETS.find(
+      ({ appearance }) =>
+        appearance.lighting === lighting && appearance.neutralPalette === neutralPalette,
+    )?.value ?? null
+  );
+}
+
+function presetChoices(word: (key: Key) => string): readonly Choice<Preset>[] {
+  const groups = {
+    light: { label: word("colours_presets_light"), tone: "plain" },
+    dark: { label: word("colours_presets_dark"), tone: "plain" },
+  } as const;
+  return PRESETS.map(({ value, label, appearance }) => ({
+    value,
+    label: word(label),
+    group: groups[appearance.lighting],
+  }));
+}
+
+function ThemePreviews(props: {
+  readonly word: (key: Key) => string;
+  readonly held: Preset | null;
+  readonly pick: (value: Preset) => void;
+}) {
+  const look = useSegmented<Preset>({
+    get label() {
+      return props.word("colours_presets");
+    },
+    get options() {
+      return presetChoices(props.word);
+    },
+    get held() {
+      return props.held;
+    },
+    onPick: (value) => props.pick(value),
+  });
+  return (
+    <div {...look().group} class="theme-previews max-w-full gap-snug">
+      <For each={look().bands} keyed={(band) => band.key}>
+        {(band, index) => (
+          <div role="group" aria-label={band().heading} class="theme-preview-row">
+            <Glyph name={index() === 0 ? "sun" : "moon"} class="text-text-quiet" />
+            <For each={band().cells} keyed={(cell) => cell.key}>
+              {(cell) => {
+                const sample = () =>
+                  PRESETS.find((preset) => preset.value === cell().key)?.appearance;
+                return (
+                  <ThemePreview
+                    cell={cell()}
+                    lighting={sample()?.lighting}
+                    palette={sample()?.neutralPalette ? "graphite" : "blue"}
+                  />
+                );
+              }}
+            </For>
+          </div>
+        )}
+      </For>
+    </div>
+  );
 }
 
 export default function ColoursSection() {
@@ -30,9 +126,16 @@ export default function ColoursSection() {
   const themeUnkept = storeValue(u.prefs.themeUnkept);
   const theme = () => held().theme;
   const word = (key: Key) => say(lang(), key);
+  const root = document.documentElement;
+  const [painted, setPainted] = createSignal(drawnPreset(root), { equals: false });
+  const observer = new MutationObserver(() => setPainted(drawnPreset(root)));
   const [tokens, setTokens] = createSignal<readonly string[]>([]);
-  const [drawn, setDrawn] = createSignal<Readonly<Record<string, string>>>({});
-  const [warnings, setWarnings] = createSignal<readonly string[]>([]);
+  const [observed, setObserved] = createSignal<{
+    readonly colours: ReadonlyMap<string, DrawnColour>;
+    readonly surface: string | null;
+    readonly readings: readonly Reading[];
+    readonly warnings: readonly string[];
+  }>({ colours: new Map(), surface: null, readings: [], warnings: [] });
   let host: HTMLDivElement | undefined;
   let editing: Editing | undefined;
 
@@ -54,47 +157,44 @@ export default function ColoursSection() {
 
   onSettled(() => {
     setTokens(colourTokens(declaredNames(document)));
+    observer.observe(root, { attributeFilter: ["data-theme", "data-palette", "data-chroma"] });
+    setPainted(drawnPreset(root));
   });
 
   onCleanup(() => {
+    observer.disconnect();
     host = undefined;
     editing?.destroy();
     editing = undefined;
   });
 
   createEffect(
-    () => ({ tokens: tokens(), theme: theme(), lang: lang() }),
+    () => ({ tokens: tokens(), theme: theme(), lang: lang(), painted: painted() }),
     ({ tokens, theme, lang }) => {
-      const resolve = drawnRgb(document.documentElement);
-      setDrawn(
-        Object.fromEntries(
-          tokens.flatMap((token) => {
-            const rgb = resolve(token);
-            return rgb === null ? [] : [[token, hexOf(rgb)]];
-          }),
-        ),
-      );
-      const computed = window.getComputedStyle(document.documentElement);
+      const computed = window.getComputedStyle(root);
+      const colours = drawnColours(root, tokens, computed);
       const judged = textClaims(tokens, (name) => computed.getPropertyValue(name));
-      setWarnings([
+      const warnings = [
         ...Object.keys(theme.tokens)
           .filter((token) => !tokens.includes(token))
           .map((token) => fill(say(lang, "colours_foreign"), { token })),
         ...Object.entries(theme.tokens)
           .filter(([, value]) => !CSS.supports("color", value))
           .map(([token, value]) => fill(say(lang, "colours_unreadable"), { token, value })),
-        ...shortfalls(judged, resolve).map((short) =>
-          short.kind === "unmeasured"
-            ? fill(say(lang, "colours_unmeasured"), { token: short.token })
-            : fill(say(lang, "colours_short"), {
-                token: short.token,
-                reached: short.reached.toFixed(1),
-                claimed: String(short.claimed),
-              }),
-        ),
-      ]);
+      ];
+      setObserved({
+        colours,
+        surface: judged.surface,
+        readings: readLegibility(judged, (token) => colours.get(token)?.rgba ?? null),
+        warnings,
+      });
     },
   );
+
+  function pickPreset(value: Preset): void {
+    const next = PRESETS.find((preset) => preset.value === value);
+    if (next !== undefined) u.prefs.setAppearance({ ...held().appearance, ...next.appearance });
+  }
 
   function pick(token: string, value: string): void {
     const before = theme();
@@ -121,11 +221,13 @@ export default function ColoursSection() {
   }
 
   const wells = createMemo(() =>
-    tokens().map((token) =>
-      tokenOf(
+    tokens().map((token) => {
+      const colour = observed().colours.get(token);
+      return tokenOf(
         {
           name: token,
-          drawn: drawn()[token],
+          drawn: colour?.hex,
+          codes: colour?.codes ?? [],
           reset:
             token in theme().tokens
               ? {
@@ -135,29 +237,48 @@ export default function ColoursSection() {
               : undefined,
         },
         { pick, unpick },
-      ),
-    ),
+      );
+    }),
   );
 
   return (
     <div class="grid grid-fit items-start gap-base">
+      <div class="colours-presets">
+        <Card title={word("colours_presets")}>
+          <ThemePreviews word={word} held={painted()} pick={pickPreset} />
+        </Card>
+      </div>
       <Card title={word("colours_tokens")} note={word("colours_tokens_note")}>
         <TokenList tokens={wells()} />
       </Card>
       <div class="flex flex-col gap-base">
         <Card title={word("colours_legibility")}>
-          <div role="status">
-            <Show
-              when={warnings().length > 0}
-              fallback={<p class="text-note text-text-faint">{word("colours_fine")}</p>}
-            >
-              <ul class="flex flex-col gap-tight">
-                <For each={warnings()}>
-                  {(warning) => <li class="text-note text-alert">{warning}</li>}
-                </For>
-              </ul>
-            </Show>
-          </div>
+          <Show when={observed().surface}>
+            {(name) => (
+              <p class="text-note text-text-faint">
+                {fill(word("colours_apca_note"), { surface: name() })}
+              </p>
+            )}
+          </Show>
+          <ul class="flex flex-col gap-snug">
+            <For each={observed().readings} keyed={(reading) => reading.token}>
+              {(reading) => (
+                <li class="grid gap-hair text-note">
+                  <code class="wrap-anywhere">{reading().token}</code>
+                  <span class={["tabular-nums", { "text-alert": !meetsTier(reading()) }]}>
+                    {contrastLabel(reading(), word)}
+                  </span>
+                </li>
+              )}
+            </For>
+          </ul>
+          <Show when={observed().warnings.length > 0}>
+            <ul role="status" class="flex flex-col gap-tight">
+              <For each={observed().warnings}>
+                {(warning) => <li class="text-note text-alert">{warning}</li>}
+              </For>
+            </ul>
+          </Show>
         </Card>
         <Show when={themeUnkept()}>
           <p role="status" class="text-note text-alert">
@@ -180,4 +301,17 @@ export default function ColoursSection() {
       </div>
     </div>
   );
+}
+
+function meetsTier(reading: Reading): boolean {
+  return reading.kind === "measured" && reading.meetsTier;
+}
+
+function contrastLabel(reading: Reading, word: (key: Key) => string): string {
+  const target = String(reading.tier);
+  if (reading.kind === "unmeasured") return fill(word("colours_apca_unmeasured"), { target });
+  return fill(word(reading.meetsTier ? "colours_apca_value" : "colours_apca_short"), {
+    value: reading.reached.toFixed(1),
+    target,
+  });
 }

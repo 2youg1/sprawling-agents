@@ -18,6 +18,7 @@ const STATED: Preferences = {
   tier: "panorama",
   appearance: {
     lighting: "light",
+    neutralPalette: true,
     sans: "system",
     mono: "custom",
     sansStack: "Iosevka",

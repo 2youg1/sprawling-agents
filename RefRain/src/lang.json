@@ -187,10 +187,6 @@
     "en": "Restore file access",
     "zh": "恢复文件访问"
   },
-  "colours_unmeasured": {
-    "en": "{token} could not be measured against the surface. Check that the colors resolve and the backdrop is known.",
-    "zh": "无法测量 {token} 在该表面上的对比度。请检查颜色是否可解析、背景是否已知。"
-  },
   "appearance_lighting": {
     "en": "lighting",
     "zh": "明暗"
@@ -5668,8 +5664,8 @@
     "zh": "just test，这里每道检查都调用的测试运行器"
   },
   "machine_enables_chromedriver": {
-    "en": "the browser tool against Chrome, Brave, Chromium or Vivaldi",
-    "zh": "对 Chrome、Brave、Chromium 或 Vivaldi 使用浏览器工具"
+    "en": "the browser tool through ChromeDriver for Chromium-family browsers",
+    "zh": "通过 ChromeDriver 在 Chromium 系浏览器上使用浏览器工具"
   },
   "machine_enables_chromium": {
     "en": "the browser tool through chromedriver or msedgedriver, whose major version must match the browser found here",
@@ -9843,10 +9839,6 @@
     "en": "who answers what this city puts in front of the User",
     "zh": "这座城市递给 User 决定的事由谁答复"
   },
-  "appearance_lighting_note": {
-    "en": "which palette carries the page",
-    "zh": "页面用明暗哪一套"
-  },
   "appearance_face_note": {
     "en": "the face controls, labels and figures are set in, and reading text unless you choose another below",
     "zh": "按钮、标签与数字用哪个字体；阅读正文也用它，除非在下面另选"
@@ -11504,16 +11496,44 @@
     "zh": "配色"
   },
   "setup_group_hint_colours": {
-    "en": "Your own colours laid over the built-in theme. They are kept in your preferences, so every browser that opens this city draws them.",
-    "zh": "在内置主题之上换用你自己的颜色。它们存在你的偏好里，打开这座城市的每个浏览器都会用上。"
+    "en": "Choose a theme and customise its colours. Your choices are saved in your preferences.",
+    "zh": "选择主题，并按需调整颜色。你的选择会保存在偏好里。"
+  },
+  "colours_presets": {
+    "en": "Theme",
+    "zh": "主题"
+  },
+  "colours_presets_light": {
+    "en": "Light",
+    "zh": "亮色"
+  },
+  "colours_presets_dark": {
+    "en": "Dark",
+    "zh": "暗色"
+  },
+  "colours_preset_mist": {
+    "en": "Mist blue",
+    "zh": "雾蓝"
+  },
+  "colours_preset_ash": {
+    "en": "Ash",
+    "zh": "烟灰"
+  },
+  "colours_preset_midnight": {
+    "en": "Midnight blue",
+    "zh": "墨蓝"
+  },
+  "colours_preset_graphite": {
+    "en": "Graphite",
+    "zh": "石墨"
   },
   "colours_tokens": {
     "en": "theme colours",
     "zh": "主题颜色"
   },
   "colours_tokens_note": {
-    "en": "Every colour token the page is drawn with. A change takes effect at once.",
-    "zh": "页面所用的每个颜色 token。改动立即生效。"
+    "en": "The current theme’s colour values in OKLCH and sRGB.",
+    "zh": "当前主题的 OKLCH 和 sRGB 色值。"
   },
   "colours_token_default": {
     "en": "default",
@@ -11540,8 +11560,8 @@
     "zh": "应用"
   },
   "colours_restore": {
-    "en": "restore default",
-    "zh": "恢复默认"
+    "en": "clear custom colours",
+    "zh": "清除自定义配色"
   },
   "colours_restore_note": {
     "en": "Removes every colour and the stylesheet you laid over the theme.",
@@ -11551,9 +11571,21 @@
     "en": "legibility",
     "zh": "易读性"
   },
-  "colours_short": {
-    "en": "{token} reaches Lc {reached} where its text needs {claimed}; it may be hard to read.",
-    "zh": "{token} 只有 Lc {reached}，它的文字需要 {claimed}；可能难以看清。"
+  "colours_apca_note": {
+    "en": "APCA contrast against {surface}, calculated after converting OKLCH to sRGB.",
+    "zh": "以 {surface} 为背景，将 OKLCH 转成 sRGB 后计算 APCA。"
+  },
+  "colours_apca_value": {
+    "en": "Lc {value} · target |Lc| ≥ {target}",
+    "zh": "Lc {value} · 目标 |Lc| ≥ {target}"
+  },
+  "colours_apca_short": {
+    "en": "Lc {value} · below target |Lc| ≥ {target}",
+    "zh": "Lc {value} · 未达目标 |Lc| ≥ {target}"
+  },
+  "colours_apca_unmeasured": {
+    "en": "Unavailable · target |Lc| ≥ {target}",
+    "zh": "无法计算 · 目标 |Lc| ≥ {target}"
   },
   "colours_foreign": {
     "en": "{token} is not a colour of this theme and has no effect.",
@@ -11562,10 +11594,6 @@
   "colours_unreadable": {
     "en": "{token}: {value} is not a CSS colour.",
     "zh": "{token}：{value} 不是 CSS 颜色。"
-  },
-  "colours_fine": {
-    "en": "Every text colour is legible on the brightest surface it sits on.",
-    "zh": "每种文字颜色在它所在的最亮表面上都清晰可读。"
   },
   "talk_policy_changed": {
     "en": "From the next step: {mode} mode, {limit}",
