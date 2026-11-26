@@ -84,10 +84,7 @@ impl Doorway {
             return Err(AxError::failure(
                 AxCode::Busy,
                 "replace the city key",
-                format!(
-                    "the remote door is open at {}",
-                    standing.opened.url.as_str()
-                ),
+                format!("the remote door is open at {}", standing.origin.as_str()),
             )
             .with_recovery("close it first with `/remote close`, then replace the key"));
         }

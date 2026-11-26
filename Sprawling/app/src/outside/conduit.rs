@@ -108,6 +108,14 @@ impl Conduit {
     }
 }
 
+impl Drop for Conduit {
+    fn drop(&mut self) {
+        if let Err(refused) = self.doorway.end_session(self.session) {
+            eprintln!("  a remote session could not be released: {refused}");
+        }
+    }
+}
+
 fn refused(authority: Authority, class: VerbClass) -> AxError {
     match (authority, class) {
         (Authority::Watch, VerbClass::Act) => AxError::failure(

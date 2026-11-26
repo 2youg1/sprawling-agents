@@ -31,9 +31,14 @@ city = { workspace = true }
 collab = { workspace = true }
 browser = { workspace = true }
 agent_protocols = { workspace = true }
-# The remote listener answers its two WebSocket paths and the page on one
-# port (Sprawling/remote_access/Spec.lean §8-10).
 axum = { workspace = true }
+bytes = "1"
+h3 = "0.0.8"
+h3-quinn = { version = "0.0.10", features = ["datagram"] }
+h3-webtransport = "0.1.2"
+quinn = { version = "0.11", default-features = false, features = ["runtime-tokio", "rustls-aws-lc-rs"] }
+rustls = { workspace = true }
+tower = { workspace = true }
 cap-fs-ext = { workspace = true }
 cap-std = { workspace = true }
 notify = "=8.2.0"
@@ -45,7 +50,7 @@ getrandom = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["io-util"] }
 # The monitor's counters (`Sprawling/app/Spec.lean` §8-94, §8-96): the machine's
 # memory and the volume only, not the default component, network and user
 # tables; this process is read through its own handle below, not through
@@ -126,6 +131,7 @@ winresource = { version = "0.1.31", default-features = false }
 [dev-dependencies]
 proptest.workspace = true
 tempfile.workspace = true
+wtransport = { version = "0.7", default-features = false, features = ["aws-lc-rs", "self-signed"] }
 
 [lints]
 workspace = true

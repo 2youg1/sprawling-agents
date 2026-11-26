@@ -1,10 +1,10 @@
 # sprawling-remote-access
 
-The remote door, and the routes that carry its bytes and decide nothing. A person who leaves the computer their city runs on still reaches that city from a tablet or a phone: sees it, answers what it asks, stops it. While the door is shut a city answers on loopback, or on the local network with a pairing token, and nowhere else. Rust code names the crate `remote_access`; `cargo -p` takes `sprawling-remote-access`.
+The remote door's pairing, device authentication and sealed sessions let a person reach the running city from a browser while the door is open. Rust code names the crate `remote_access`, and Cargo names the package `sprawling-remote-access`.
 
-The crate is two layers, and only the second one can be replaced. The security core decides who gets in: `door` holds whether the door is open and in which epoch, the pairings still waiting, the paired devices and the sessions they hold; `pairing` mints the one-time pairing code; `keys` holds hybrid signing keys, ML-DSA-44 with Ed25519, derived from one 32-byte seed; `handshake` runs the key exchange of every connection, X25519 with ML-KEM-768, and its `pairing` half runs a device's first one; `seal` wraps every frame of a session in AES-256-GCM with a counter against replay; `confirm` holds the one request that waits for the code the city prints on its console. The second layer is `route`, which makes the remote listener on loopback reachable from outside and does nothing else: a same-host Caddy HTTP/3 listener for public access, a loopback command integration, and a scripted route for tests.
+The security core decides who gets in. `door` holds whether the door is open and in which epoch, the pairings still waiting, the paired devices and the sessions they hold; `pairing` mints the one-time pairing code; `keys` holds hybrid signing keys, ML-DSA-44 with Ed25519, derived from one 32-byte seed; `handshake` runs the key exchange of every connection, X25519 with ML-KEM-768, and its `pairing` half runs a device's first one; `seal` wraps every frame of a session in AES-256-GCM with a counter against replay; `confirm` holds the one request that waits for the code the city prints on its console.
 
-The door's decisions never name a route, and a route sees handshake messages and ciphertext only. The handshake authenticates the keys pinned at pairing rather than an address, and every frame is sealed end to end, so a route cannot pose as either side. What a route still delivers is the page itself, and a route that rewrote the page would read what the page reads: the person who chooses the route carries that trust, and cryptography cannot take it from them (`Sprawling/remote_access/Spec.lean` D10).
+The handshake authenticates the keys pinned at pairing. Each application frame is sealed end to end. The browser also trusts the WebUI served by the city process.
 
 This crate owns no socket, no listener, no WebSocket, no device table on disk, no clock and no entropy source. The remote listener, the relay that hands each opened frame to the city's `/ws`, the device table, the console itself and the `[remote]` configuration table all belong to the assembly layer in `Sprawling/app` (`bin::outside`, `bin::assembly::remote_door`).
 
@@ -19,9 +19,8 @@ Each module holds one decision:
 - `handshake::pairing` — a state machine, the device's first connection. The city alone signs the first message, so the pairing code never travels in the clear; the device checks the city's fingerprint before it answers, and the claim carrying the code arrives sealed under keys derived from that exchange.
 - `seal` — a state machine. The nonce is a direction tag and a counter that is never sent, so a frame replayed, dropped, reordered or turned around fails to open, and a frame that fails ends the session. The payload's first byte says whether it is a wire frame or a lock.
 - `confirm` — a state machine with a guard. One request waits at a time; every answer the guard reads ends it, so one request gives one guess. The guard refuses an answer that comes sooner than a second after the previous one, and locks after ten misses until the city restarts.
-- `route` — the seam, with three implementations. `open` returns only once the address is reachable from outside, and answers the `https` address and whether its host name survives a restart; `close` may be called twice and answers success on a route that was never open.
 
-`route` is the port of the seven shapes in [`ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) section 9, and its implementations are adapters. The city selects `caddy::Caddy` for public access. It recognizes the Cloudflare configuration for migration and accepts a command route whose reported URL is loopback.
+The city process serves its embedded WebUI and the remote door over HTTP/3 and WebTransport. It rereads the city configuration on each opening.
 
 ## When a call fails
 
@@ -33,20 +32,16 @@ A refusal is an `AxError` in three parts: the failed action, the subject, and a 
 | `E_INVALID_ARGS` | An epoch is reused, an unknown device is revoked, a device name is empty or past its limit, a public key or signature is the wrong length, or a written device or fingerprint does not read back | Fix the value. A device table with one unreadable row is refused whole by the assembly layer. |
 | `E_WIRE_MISMATCH` | A handshake message is the wrong length, or a payload's first byte is unknown, a lock carries trailing bytes, a frame is not UTF-8, or a payload is empty | End the connection; the other end is not speaking this protocol. |
 | `E_BUDGET_EXHAUSTED` | One direction's frame counter is used up | Reconnect: a new session brings new keys and a counter from zero. |
-| `E_CONFIG_INVALID` | A route address is not `https` with a host, a tunnel name or a printed address line is malformed, or the vault's city-key text does not read back | Correct the configuration. Until the city key reads back, the door sends no invitation and answers no handshake. |
-| `E_TOOL_UNAVAILABLE` | A route's program will not start, exits before it is ready or before it prints its address, or no free loopback port is available | Install or point at the program, then open the route again. |
-| `E_TIMEOUT` | A route is not ready, or has printed no address, when the patience given at construction runs out | The child process is ended and no route is open. |
+| `E_CONFIG_INVALID` | The vault’s city-key text does not read back | Correct the city key. Until it reads back, the door refuses invitations and handshakes. |
 | `E_STORAGE_FATAL` | The cryptography library refuses a derivation, a signature or a seal that should have succeeded | Nothing was produced; restart the city and report the platform. |
 
-Three refusals happen before anything is attempted. `PublicUrl::parse` refuses an address that is not `https` with a host, and one carrying user information or a fragment, because the address is printed into a QR code and the invitation appends a fragment of its own. `TunnelName::parse` refuses a name the program would read as an option. `Confirm::request` refuses once its guard has locked, so a code nobody may answer is never printed.
+The city assembles the HTTP/3 listener when the door opens. Invalid HTTPS or TLS settings and UDP bind failures are reported against the city configuration. See [Choosing the route](../../docs/operate/operating.md#choosing-the-route). `Confirm::request` refuses once its guard has locked.
 
 ## Constraints a reader acts on
 
 - The crate declares no features; nothing here can be compiled out.
 - The security core does no I/O, and time and entropy arrive as parameters, so every decision replays. The one exception is the ephemeral keys of both handshakes: the cryptography library draws them, because ML-KEM encapsulation takes no external entropy.
-- `Route`'s two methods are synchronous and block until the route is ready or the patience runs out (`Sprawling/remote_access/Spec.lean` D15). A caller runs them on a thread of its own; this crate depends on no executor.
-- The two production routes start a child process through `child::command`, so a route never inherits the city's console or its secrets (D24).
-- This crate reads no configuration. The caller parses the `[remote]` table and constructs `Tunnel`, `RouteCommand` and `Permanence` (D22).
+- The assembly layer owns the city configuration and public listener.
 - Opening the door, replacing the city key and confirming a request wait for the code the console prints; closing the door and locking it from a device do not (D4, D5). The code never enters a frame or a page.
 - The city key's seed lives in the city's vault, not in the city directory, and `keys::from_sealed` is this crate's only exposure of a seed (D23).
 - There is no `unsafe` in this crate. The vectors under `Tools/fixtures/remote-handshake` are written by its tests: run the tests whose names contain `vector` or `fixture` with `GOLDEN_WRITE=1` to write them again rather than editing the files, since the deterministic files are rewritten byte for byte and the two carrying randomness only when the committed copy no longer verifies.
@@ -55,7 +50,7 @@ Three refusals happen before anything is attempted. `PublicUrl::parse` refuses a
 
 One workspace package depends on it: `sprawling`, which is the assembly root. `cargo tree --workspace -i sprawling-remote-access -e normal --depth 1` prints the current list.
 
-Its line in the `depmap` block of [`ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) section 3 allows it `kernel` and `child`. Beyond those it names `aws-lc-rs` for the cryptography and `zeroize` for the seeds.
+The dependency graph in [ARCHITECTURE.md](../../docs/ARCHITECTURE.md) records the boundary between this crate and the assembly layer.
 
 ## Specification
 
@@ -72,4 +67,4 @@ cargo nextest run -p sprawling -E 'binary(remote_door)'          # the remote do
 cargo xtask gates spec depmap                                   # its specification and its dependency edges
 ```
 
-The door, the pairing code, the keys, both handshakes and the seal give the same bytes on Windows, macOS and Linux. The `cloudflare` route is not in the automatic tests: it needs an account, a domain and a connection to the edge, and section 8-8 of the SPEC holds the check an operator runs once by hand. `just models` builds every crate's specification, and `just test` runs the tests the whole workspace shares.
+The door, the pairing code, the keys, both handshakes and the seal give the same bytes on Windows, macOS and Linux. The app integration tests open the public listener and pair over a real WebTransport stream. `just models` builds every crate's specification, and `just test` runs the tests the whole workspace shares.

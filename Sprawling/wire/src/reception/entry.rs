@@ -13,8 +13,6 @@ const SAME_ORIGIN: &str = "same-origin";
 
 const DEFAULT_HTTP_PORT: u16 = 80;
 
-const DEFAULT_HTTPS_PORT: &str = ":443";
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ListenerOrigins {
     hosts: Hosts,
@@ -70,18 +68,6 @@ impl ListenerOrigins {
     }
 
     #[must_use]
-    pub fn routed(local: SocketAddr, public: &str) -> Self {
-        let mut listener = Self::of(local);
-        if let (Some(name), Hosts::Named { names, origins }) =
-            (public_name(public), &mut listener.hosts)
-        {
-            origins.push(format!("https://{name}"));
-            names.push(name);
-        }
-        listener
-    }
-
-    #[must_use]
     pub fn url(&self) -> &str {
         &self.url
     }
@@ -115,16 +101,6 @@ impl Hosts {
         let origins = names.iter().map(|name| format!("http://{name}")).collect();
         Self::Named { names, origins }
     }
-}
-
-fn public_name(public: &str) -> Option<String> {
-    let (scheme, rest) = public.split_once("://")?;
-    let authority = rest.split(['/', '?']).next()?.to_ascii_lowercase();
-    let name = authority
-        .strip_suffix(DEFAULT_HTTPS_PORT)
-        .map_or(authority.as_str(), |bare| bare)
-        .to_owned();
-    (scheme.eq_ignore_ascii_case("https") && !name.is_empty()).then_some(name)
 }
 
 fn spelled(name: &str, port: u16) -> Vec<String> {
@@ -399,47 +375,6 @@ mod tests {
         assert!(!origins.admits_host("192.168.1.10:9999"));
         assert!(origins.admits_origin("http://192.168.1.10:2501", "192.168.1.10:2501"));
         assert!(!origins.admits_origin("http://10.0.0.5:2501", "192.168.1.10:2501"));
-    }
-
-    #[test]
-    fn a_routed_listener_admits_its_loopback_names_and_the_public_name_only() {
-        let origins = ListenerOrigins::routed(
-            "127.0.0.1:41000".parse().unwrap(),
-            "https://City.example.net:443/remote?x",
-        );
-        let at = |host, origin| {
-            let presented = Presented {
-                host: Some(host),
-                origin,
-                sec_fetch_site: Some("same-origin"),
-            };
-            decide_entry(&origins, presented, Arrival::Socket)
-        };
-        let public = Some("https://city.example.net");
-        let browser = Entry::Caller(Caller::Browser);
-        let seen = [
-            at("city.example.net", public),
-            at("127.0.0.1:41000", public),
-            at("localhost:41000", Some("http://localhost:41000")),
-            at("127.0.0.1:41000", None),
-            at("evil.example", public),
-            at("city.example.net:41000", public),
-            at("city.example.net", Some("https://evil.example")),
-            at("city.example.net", Some("http://city.example.net")),
-        ];
-        assert_eq!(
-            seen,
-            [
-                browser,
-                browser,
-                browser,
-                Entry::Caller(Caller::Native),
-                Entry::Refused(EntryRefusal::ForeignHost),
-                Entry::Refused(EntryRefusal::ForeignHost),
-                Entry::Refused(EntryRefusal::ForeignOrigin),
-                Entry::Refused(EntryRefusal::ForeignOrigin),
-            ]
-        );
     }
 
     #[test]

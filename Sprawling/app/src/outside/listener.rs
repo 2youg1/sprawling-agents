@@ -3,150 +3,347 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use std::net::{Ipv4Addr, SocketAddr};
+use std::error::Error;
+use std::net::SocketAddr;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
 use axum::Router;
-use axum::body::{Body, Bytes};
-use axum::extract::{DefaultBodyLimit, State};
-use axum::http::{HeaderMap, StatusCode, header};
-use axum::response::{IntoResponse, Response};
-use axum::routing::post;
-use futures_util::{SinkExt, StreamExt};
-use kernel::event::record::RemoteClosing;
+use axum::body::Body;
+use axum::http::{Method, Request, Response, StatusCode, header};
+use bytes::Bytes;
+use city::RemoteRoute;
+use futures_util::StreamExt;
+use h3::ext::Protocol;
+use h3_webtransport::server::{AcceptedBi, WebTransportSession};
 use kernel::{AxCode, AxError};
-use remote_access::handshake::{Finish, HELLO_BYTES, Hello, PAIR_HELLO_BYTES, PairHello};
-use remote_access::route::Opened;
-use tokio_tungstenite::tungstenite::Message as CityMessage;
+use quinn::crypto::rustls::QuicServerConfig;
+use reqwest::Url;
+use rustls::pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject};
+use tower::ServiceExt;
 
-use super::conduit::{Conduit, Step};
 use super::console::Lasting;
 use super::keeper::{Doorway, Phase};
-use super::pipe::{self, Pipe, Pipes};
+use super::relay::{self, HANDSHAKE_PATIENCE, Run};
+use super::stream::Device;
 
-pub(crate) const PAIR_PATH: &str = "/remote/pair";
+type Failure = Box<dyn Error + Send + Sync>;
+type Answer = h3::server::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes>;
 
-pub(crate) const SESSION_PATH: &str = "/remote/session";
-
+const MAX_CONNECTIONS: usize = 64;
+const PAGE_CHUNK_BYTES: usize = 16 * 1024;
 const TICK: Duration = Duration::from_secs(1);
-
-const HANDSHAKE_PATIENCE: Duration = Duration::from_secs(10);
 
 #[derive(Clone)]
 pub(crate) struct Reaching {
     pub(crate) runtime: tokio::runtime::Handle,
-
+    pub(crate) city_root: PathBuf,
     pub(crate) city: SocketAddr,
-
     pub(crate) token: String,
-
     pub(crate) page: Arc<wire::ClientAssets>,
+}
+
+struct Bound {
+    endpoint: quinn::Endpoint,
+    address: SocketAddr,
+    serving: Serving,
+}
+
+struct Listening {
+    _registered: crate::browser_tool::Served,
+    endpoint: quinn::Endpoint,
+    task: tokio::task::AbortHandle,
+}
+
+impl Drop for Listening {
+    fn drop(&mut self) {
+        self.endpoint.close(0_u32.into(), b"remote door closed");
+        self.task.abort();
+    }
 }
 
 pub(super) fn open(
     doorway: &Doorway,
     reaching: &Reaching,
     lasting: Lasting,
-) -> Result<Opened, AxError> {
-    let socket = std::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
-        .and_then(|socket| socket.set_nonblocking(true).map(|()| socket))
-        .map_err(|source| unbound(&source))?;
-    let local = socket.local_addr().map_err(|source| unbound(&source))?;
-    let opened = doorway.open(local, lasting)?;
-    let origins = wire::ListenerOrigins::routed(local, opened.url.as_str());
-    let listener = {
-        let _entered = reaching.runtime.enter();
-        tokio::net::TcpListener::from_std(socket).map_err(|source| unbound(&source))
-    };
-    let listener = match listener {
-        Ok(listener) => listener,
-        Err(refused) => {
-            doorway.close(RemoteClosing::Console)?;
-            return Err(refused);
-        }
-    };
-    let task = reaching
-        .runtime
-        .spawn(answer(listener, doorway.clone(), reaching.clone(), origins));
-    let served = crate::browser_tool::serve(local);
-    doorway.attend(Box::new(Answering(task.abort_handle(), served)))?;
-    Ok(opened)
+) -> Result<Url, AxError> {
+    doorway.open(
+        lasting,
+        || prepare(doorway, reaching),
+        |Bound {
+             endpoint,
+             address,
+             serving,
+         }| {
+            let registered = crate::browser_tool::serve_public(address, &serving.origin);
+            let task = reaching.runtime.spawn(serve(endpoint.clone(), serving));
+            Box::new(Listening {
+                _registered: registered,
+                endpoint,
+                task: task.abort_handle(),
+            })
+        },
+    )
 }
 
-struct Answering(
-    tokio::task::AbortHandle,
-    #[expect(
-        dead_code,
-        reason = "held for its drop, which takes the address back when the door drops the listener"
-    )]
-    crate::browser_tool::Served,
-);
-
-impl Drop for Answering {
-    fn drop(&mut self) {
-        self.0.abort();
+fn prepare(doorway: &Doorway, reaching: &Reaching) -> Result<(Url, Bound), AxError> {
+    let RemoteRoute::H3 {
+        url,
+        listen,
+        certificate,
+        private_key,
+    } = city::remote_route(&reaching.city_root)?;
+    let file = kernel::layout::CityLayout::new(&reaching.city_root).city_config();
+    let origin = Url::parse(&url).map_err(|source| invalid(&file, "url", &url, &source))?;
+    if origin.scheme() != "https"
+        || origin.host_str().is_none()
+        || !origin.username().is_empty()
+        || origin.password().is_some()
+        || origin.path() != "/"
+        || origin.query().is_some()
+        || origin.fragment().is_some()
+    {
+        return Err(invalid(
+            &file,
+            "url",
+            &url,
+            &"use an https:// origin without a path, login, query or fragment",
+        ));
     }
+    let tls = tls(&file, &certificate, &private_key)?;
+    let page = wire::bundle_routes(
+        Arc::clone(&reaching.page),
+        &wire::PageHeaders::every_listener(),
+    )?;
+    let endpoint = {
+        let _inside = reaching.runtime.enter();
+        quinn::Endpoint::server(tls, listen)
+            .map_err(|source| invalid(&file, "listen", &listen, &source))?
+    };
+    let address = endpoint
+        .local_addr()
+        .map_err(|source| invalid(&file, "listen", &listen, &source))?;
+    Ok((
+        origin.clone(),
+        Bound {
+            endpoint,
+            address,
+            serving: Serving {
+                doorway: doorway.clone(),
+                reaching: reaching.clone(),
+                serialized_origin: origin.origin().ascii_serialization(),
+                origin,
+                page,
+            },
+        },
+    ))
+}
+
+fn tls(file: &Path, certificate: &str, private_key: &str) -> Result<quinn::ServerConfig, AxError> {
+    for (key, path) in [("certificate", certificate), ("private_key", private_key)] {
+        if !Path::new(path).is_absolute() {
+            return Err(invalid(file, key, &path, &"use an absolute PEM file path"));
+        }
+    }
+    let chain = CertificateDer::pem_file_iter(certificate)
+        .and_then(Iterator::collect)
+        .map_err(|source| invalid(file, "certificate", &certificate, &source))?;
+    let key = PrivateKeyDer::from_pem_file(private_key)
+        .map_err(|source| invalid(file, "private_key", &private_key, &source))?;
+    let mut tls = rustls::ServerConfig::builder_with_provider(Arc::new(
+        rustls::crypto::aws_lc_rs::default_provider(),
+    ))
+    .with_protocol_versions(&[&rustls::version::TLS13])
+    .map_err(|source| invalid(file, "certificate", &certificate, &source))?
+    .with_no_client_auth()
+    .with_single_cert(chain, key)
+    .map_err(|source| invalid(file, "certificate and private_key", &certificate, &source))?;
+    tls.alpn_protocols = vec![b"h3".to_vec()];
+    let crypto = QuicServerConfig::try_from(tls)
+        .map_err(|source| invalid(file, "certificate", &certificate, &source))?;
+    Ok(quinn::ServerConfig::with_crypto(Arc::new(crypto)))
+}
+
+fn invalid(
+    file: &Path,
+    key: &str,
+    value: &dyn std::fmt::Display,
+    cause: &dyn std::fmt::Display,
+) -> AxError {
+    AxError::failure(
+        AxCode::ConfigInvalid,
+        "open the remote door",
+        format!("{}: [remote] {key} = {value}: {cause}", file.display()),
+    )
+    .with_recovery("correct the indicated setting in that file and retry /remote open; see docs/operate/operating.md#choosing-the-route")
 }
 
 #[derive(Clone)]
 struct Serving {
     doorway: Doorway,
     reaching: Reaching,
-    pipes: Pipes,
+    origin: Url,
+    serialized_origin: String,
+    page: Router,
 }
 
-#[derive(Clone, Copy)]
-enum Run {
-    Pair,
-    Session,
-}
-
-async fn answer(
-    listener: tokio::net::TcpListener,
-    doorway: Doorway,
-    reaching: Reaching,
-    origins: wire::ListenerOrigins,
-) {
-    let page = match wire::bundle_routes(
-        Arc::clone(&reaching.page),
-        &wire::PageHeaders::every_listener(),
-    ) {
-        Ok(page) => wire::entered(page, wire::Arrival::Page, &origins),
-        Err(unspelt) => {
-            eprintln!(
-                "  the remote listener cannot serve the page: {}",
-                unspelt.recovery()
-            );
-            return;
-        }
-    };
-    let sockets = Router::new()
-        .route(
-            PAIR_PATH,
-            post(pair_http).layer(DefaultBodyLimit::max(PAIR_HELLO_BYTES)),
-        )
-        .route(
-            SESSION_PATH,
-            post(session_http).layer(DefaultBodyLimit::max(HELLO_BYTES)),
-        )
-        .route(pipe::OUTBOUND, post(frame_http));
-    let (pipes, _lifetime) = Pipes::listening();
-    let routes = wire::entered(sockets, wire::Arrival::Socket, &origins)
-        .merge(page)
-        .with_state(Serving {
-            doorway: doorway.clone(),
-            reaching,
-            pipes,
-        });
-    tokio::select! {
-        served = axum::serve(listener, routes) => {
-            if let Err(lost) = served {
-                eprintln!("  the remote listener stopped answering: {lost}");
+async fn serve(endpoint: quinn::Endpoint, serving: Serving) {
+    let mut connections = tokio::task::JoinSet::new();
+    let expiry = keep_time(serving.doorway.clone());
+    tokio::pin!(expiry);
+    loop {
+        tokio::select! {
+            () = &mut expiry => return,
+            incoming = endpoint.accept() => {
+                let Some(incoming) = incoming else { return };
+                if connections.len() >= MAX_CONNECTIONS {
+                    incoming.refuse();
+                } else {
+                    let serving = serving.clone();
+                    connections.spawn(async move {
+                        if let Err(_disconnected) = answer(incoming, serving).await {}
+                    });
+                }
+            }
+            joined = connections.join_next(), if !connections.is_empty() => {
+                if let Some(Err(failure)) = joined {
+                    eprintln!("  a remote connection task ended: {failure}");
+                }
             }
         }
-        () = keep_time(doorway) => {}
     }
+}
+
+async fn answer(incoming: quinn::Incoming, serving: Serving) -> Result<(), Failure> {
+    let connection = tokio::time::timeout(HANDSHAKE_PATIENCE, incoming).await??;
+    let mut builder = h3::server::builder();
+    builder
+        .enable_webtransport(true)
+        .enable_extended_connect(true)
+        .enable_datagram(true)
+        .max_webtransport_sessions(1);
+    let mut h3 = tokio::time::timeout(
+        HANDSHAKE_PATIENCE,
+        builder.build(h3_quinn::Connection::new(connection.clone())),
+    )
+    .await??;
+    while let Some(resolver) = tokio::time::timeout(HANDSHAKE_PATIENCE, h3.accept()).await?? {
+        let (request, response) =
+            tokio::time::timeout(HANDSHAKE_PATIENCE, resolver.resolve_request()).await??;
+        let status = if !serving.addressed(&request) {
+            StatusCode::MISDIRECTED_REQUEST
+        } else if let Some(run) = run(&request) {
+            if serving.same_origin(&request) {
+                let session = tokio::time::timeout(
+                    HANDSHAKE_PATIENCE,
+                    WebTransportSession::accept(request, response, h3),
+                )
+                .await??;
+                carry(&session, &serving, run).await?;
+                if let Err(_expired) =
+                    tokio::time::timeout(HANDSHAKE_PATIENCE, connection.closed()).await
+                {
+                }
+                return Ok(());
+            }
+            StatusCode::FORBIDDEN
+        } else if matches!(*request.method(), Method::GET | Method::HEAD) {
+            let answer = serving
+                .page
+                .clone()
+                .oneshot(request.map(|()| Body::empty()))
+                .await?;
+            page(response, answer).await?;
+            continue;
+        } else {
+            StatusCode::METHOD_NOT_ALLOWED
+        };
+        let refused = Response::builder()
+            .status(status)
+            .header(header::CACHE_CONTROL, "no-store")
+            .body(Body::empty())?;
+        page(response, refused).await?;
+    }
+    Ok(())
+}
+
+impl Serving {
+    fn addressed(&self, request: &Request<()>) -> bool {
+        let uri = request.uri();
+        let Some(expected) = self.serialized_origin.strip_prefix("https://") else {
+            return false;
+        };
+        uri.scheme_str() == Some("https")
+            && uri.authority().is_some_and(|value| {
+                let authority = value.as_str();
+                authority.eq_ignore_ascii_case(expected)
+                    || (self.origin.port().is_none()
+                        && authority
+                            .strip_suffix(":443")
+                            .is_some_and(|host| host.eq_ignore_ascii_case(expected)))
+            })
+    }
+
+    fn same_origin(&self, request: &Request<()>) -> bool {
+        let mut origins = request.headers().get_all(header::ORIGIN).iter();
+        origins
+            .next()
+            .is_some_and(|value| *value == self.serialized_origin)
+            && origins.next().is_none()
+    }
+}
+
+fn run(request: &Request<()>) -> Option<Run> {
+    if request.method() != Method::CONNECT
+        || request.extensions().get::<Protocol>() != Some(&Protocol::WEB_TRANSPORT)
+    {
+        return None;
+    }
+    match request.uri().path_and_query()?.as_str() {
+        "/remote/pair" => Some(Run::Pair),
+        "/remote/session" => Some(Run::Session),
+        _ => None,
+    }
+}
+
+async fn carry(
+    session: &WebTransportSession<h3_quinn::Connection, Bytes>,
+    serving: &Serving,
+    run: Run,
+) -> Result<(), Failure> {
+    if let Some(AcceptedBi::BidiStream(id, stream)) =
+        tokio::time::timeout(HANDSHAKE_PATIENCE, session.accept_bi()).await??
+        && id == session.session_id()
+    {
+        relay::carry(
+            Device::new(stream),
+            &serving.doorway,
+            &serving.reaching,
+            run,
+        )
+        .await;
+    }
+    Ok(())
+}
+
+async fn page(mut response: Answer, answer: Response<Body>) -> Result<(), Failure> {
+    let (head, body) = answer.into_parts();
+    tokio::time::timeout(
+        HANDSHAKE_PATIENCE,
+        response.send_response(Response::from_parts(head, ())),
+    )
+    .await??;
+    let mut chunks = body.into_data_stream();
+    while let Some(chunk) = chunks.next().await {
+        let mut chunk = chunk?;
+        while !chunk.is_empty() {
+            let piece = chunk.split_to(chunk.len().min(PAGE_CHUNK_BYTES));
+            tokio::time::timeout(HANDSHAKE_PATIENCE, response.send_data(piece)).await??;
+        }
+    }
+    tokio::time::timeout(HANDSHAKE_PATIENCE, response.finish()).await??;
+    Ok(())
 }
 
 async fn keep_time(doorway: Doorway) {
@@ -165,149 +362,4 @@ async fn keep_time(doorway: Doorway) {
             }
         }
     }
-}
-
-async fn pair_http(State(serving): State<Serving>, first: Bytes) -> Response {
-    begin_http(serving, first, PAIR_HELLO_BYTES, Run::Pair)
-}
-
-async fn session_http(State(serving): State<Serving>, first: Bytes) -> Response {
-    begin_http(serving, first, HELLO_BYTES, Run::Session)
-}
-
-fn begin_http(serving: Serving, first: Bytes, size: usize, run: Run) -> Response {
-    if first.len() != size {
-        return (
-            StatusCode::UNPROCESSABLE_ENTITY,
-            [(header::CACHE_CONTROL, "no-store")],
-        )
-            .into_response();
-    }
-    let (pipe, response) = match serving.pipes.start(first) {
-        Ok(opened) => opened,
-        Err(status) => return (status, [(header::CACHE_CONTROL, "no-store")]).into_response(),
-    };
-    let runtime = serving.reaching.runtime.clone();
-    drop(runtime.spawn(carry(pipe, serving, run)));
-    response
-}
-
-async fn frame_http(State(serving): State<Serving>, headers: HeaderMap, body: Body) -> Response {
-    (
-        serving.pipes.deliver(&headers, body).await,
-        [(header::CACHE_CONTROL, "no-store")],
-    )
-        .into_response()
-}
-
-async fn carry(mut device: Pipe, serving: Serving, run: Run) {
-    let ended = match run {
-        Run::Pair => pairing(&mut device, &serving.doorway).await,
-        Run::Session => session(&mut device, &serving.doorway, &serving.reaching).await,
-    };
-    let code = ended
-        .as_ref()
-        .err()
-        .map_or("", |refused| refused.code().as_str());
-    device.close(code).await;
-}
-
-async fn handshake(device: &mut Pipe) -> Result<Bytes, AxError> {
-    match tokio::time::timeout(HANDSHAKE_PATIENCE, device.recv()).await {
-        Ok(Some(bytes)) => Ok(bytes),
-        Ok(None) | Err(_) => Err(lost(
-            &"the device left or did not finish its remote handshake",
-        )),
-    }
-}
-
-async fn send(device: &Pipe, bytes: &[u8]) -> Result<(), AxError> {
-    if device.send(bytes).await {
-        Ok(())
-    } else {
-        Err(lost(&"the browser stopped reading the remote stream"))
-    }
-}
-
-async fn pairing(device: &mut Pipe, doorway: &Doorway) -> Result<(), AxError> {
-    let hello = PairHello::from_bytes(&handshake(device).await?)?;
-    let (reply, waiting) = doorway.pair_reply(&hello)?;
-    send(device, reply.as_bytes()).await?;
-    let sealed = handshake(device).await?;
-    let door = doorway.clone();
-    let answer = blocking(move || door.claim(waiting, &sealed)).await?;
-    send(device, &answer).await
-}
-
-async fn session(device: &mut Pipe, doorway: &Doorway, reaching: &Reaching) -> Result<(), AxError> {
-    let hello = Hello::from_bytes(&handshake(device).await?)?;
-    let (reply, waiting) = doorway.session_reply(&hello)?;
-    send(device, reply.as_bytes()).await?;
-    let finish = Finish::from_bytes(&handshake(device).await?)?;
-    let door = doorway.clone();
-    let admitted = blocking(move || door.admit(waiting, &finish)).await?;
-    device.authenticated();
-    let (mut city, _) = tokio_tungstenite::connect_async(format!("ws://{}/ws", reaching.city))
-        .await
-        .map_err(|source| {
-            AxError::failure(
-                AxCode::ConfigInvalid,
-                "reach the city for a remote device",
-                source.to_string(),
-            )
-            .with_recovery("the city's own listener did not answer; restart the city")
-        })?;
-    let mut conduit = Conduit::new(doorway.clone(), admitted, reaching.token.clone());
-    loop {
-        tokio::select! {
-            from_device = device.recv() => match from_device {
-                Some(sealed) => match conduit.judge(&sealed)? {
-                    Step::Forward(text) => city.send(CityMessage::Text(text.into())).await.map_err(|source| lost(&source))?,
-                    Step::Answer(sealed) => send(device, &sealed).await?,
-                    Step::Lock => {
-                        let door = doorway.clone();
-                        blocking(move || door.close(RemoteClosing::Locked)).await?;
-                        return Ok(());
-                    }
-                },
-                None => return Ok(()),
-            },
-            from_city = city.next() => match from_city {
-                Some(Ok(CityMessage::Text(text))) => send(device, &conduit.seal_for_device(text.as_str())?).await?,
-                Some(Ok(CityMessage::Binary(_) | CityMessage::Ping(_) | CityMessage::Pong(_) | CityMessage::Frame(_))) => {}
-                Some(Ok(CityMessage::Close(_)) | Err(_)) | None => return Ok(()),
-            },
-        }
-    }
-}
-
-async fn blocking<T: Send + 'static>(
-    work: impl FnOnce() -> Result<T, AxError> + Send + 'static,
-) -> Result<T, AxError> {
-    tokio::task::spawn_blocking(work).await.map_err(|joined| {
-        AxError::failure(
-            AxCode::StorageFatal,
-            "keep the remote door",
-            joined.to_string(),
-        )
-        .with_recovery("restart the city: the door starts closed")
-    })?
-}
-
-fn lost(source: &dyn std::fmt::Display) -> AxError {
-    AxError::failure(
-        AxCode::WireMismatch,
-        "relay a remote session",
-        source.to_string(),
-    )
-    .with_recovery("connect again")
-}
-
-fn unbound(source: &std::io::Error) -> AxError {
-    AxError::failure(
-        AxCode::ConfigInvalid,
-        "bind the remote listener",
-        source.to_string(),
-    )
-    .with_recovery("this machine refused a loopback port; close what holds them and try again")
 }
