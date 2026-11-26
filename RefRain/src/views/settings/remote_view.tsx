@@ -91,17 +91,26 @@ export default function Remote() {
       setStanding({ kind: "invited", invitation, told: { kind: "unkept" }, busy: false });
       return;
     }
-    const persisted =
-      "storage" in navigator ? await navigator.storage.persist().catch(() => false) : false;
-
     history.replaceState(null, "", toFragment({ kind: "setup", group: "remote" }));
-    setStanding({
-      kind: "paired",
-      device,
-      told: persisted ? null : { kind: "unpersisted" },
-      busy: false,
-    });
+    setStanding({ kind: "paired", device, told: null, busy: false });
     u.conn.retry();
+
+    const persistence =
+      "storage" in navigator
+        ? navigator.storage.persist().catch(() => false)
+        : Promise.resolve(false);
+    void persistence.then((persisted) => {
+      if (persisted) return;
+      const current = standing();
+      if (
+        current.kind === "paired" &&
+        current.device === device &&
+        current.told === null &&
+        !current.busy
+      ) {
+        setStanding({ ...current, told: { kind: "unpersisted" } });
+      }
+    });
   }
 
   async function lock(device: Device): Promise<void> {

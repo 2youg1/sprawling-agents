@@ -60,10 +60,14 @@ class Packets {
 }
 
 export async function reach(url: string, first: FrameBytes): Promise<Door | null> {
+  const target = URL.parse(url);
+  if (target === null || target.protocol !== "https:" || target.origin !== window.location.origin) {
+    return null;
+  }
   const request = new AbortController();
-  const response = await fetch(url, {
+  const response = await fetch(target, {
     method: "POST",
-    mode: "same-origin",
+    mode: "cors",
     credentials: "omit",
     redirect: "error",
     cache: "no-store",
@@ -80,7 +84,7 @@ export async function reach(url: string, first: FrameBytes): Promise<Door | null
     request.abort();
     return null;
   }
-  return connected(new URL("/remote/frame", url), token, response.body, request);
+  return connected(new URL("/remote/frame", target), token, response.body, request);
 }
 
 function connected(
@@ -138,7 +142,7 @@ function connected(
           if (shut) return;
           const answer = await fetch(url, {
             method: "POST",
-            mode: "same-origin",
+            mode: "cors",
             credentials: "omit",
             redirect: "error",
             cache: "no-store",
