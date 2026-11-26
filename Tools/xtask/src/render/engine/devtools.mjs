@@ -111,14 +111,22 @@ async function pair(page, admission, defer) {
 async function readPass(page, pass, input, target, previous) {
   await until(
     () =>
-      page.read(`location.href === ${JSON.stringify(target.href)} &&
+      page
+        .read(
+          `location.href === ${JSON.stringify(target.href)} &&
         typeof window.__renderDocument === 'number' &&
         window.__renderDocument !== ${JSON.stringify(previous)} &&
-        document.readyState !== 'loading' && innerWidth === ${pass.width}`).catch(error => {
-        if (/context (was destroyed|with specified id)|Cannot find (default )?context/.test(error.message))
-          return false;
-        throw error;
-      }),
+        document.readyState !== 'loading' && innerWidth === ${pass.width}`,
+        )
+        .catch((error) => {
+          if (
+            /context (was destroyed|with specified id)|Cannot find (default )?context/.test(
+              error.message,
+            )
+          )
+            return false;
+          throw error;
+        }),
     VIEW,
     `the browser did not open ${input.route} at ${pass.width} CSS pixels`,
   );
@@ -256,7 +264,9 @@ async function run(input) {
       try {
         results.push(await readPass(page, pass, input, target, previous));
       } catch (error) {
-        throw new Error(`the browser could not measure ${input.route} at ${pass.width}px: ${error.message}`);
+        throw new Error(
+          `the browser could not measure ${input.route} at ${pass.width}px: ${error.message}`,
+        );
       }
     }
     return { results };
