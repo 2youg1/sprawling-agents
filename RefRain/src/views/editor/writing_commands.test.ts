@@ -115,6 +115,24 @@ describe("selective undo", () => {
     expect(undoRows(received)).toEqual([]);
     expect(planUndo(received, new Set([earliest.id])).kind).toBe("empty");
   });
+
+  test("reversing the later edit releases an earlier edit of the restored text", () => {
+    const base = EditorState.create({ doc: "交付。", extensions: undoPoolExtension });
+    const first = base.update({ changes: { from: 2, insert: "下周一" } }).state;
+    const second = first.update({ changes: { from: 2, to: 5, insert: "周一上午" } }).state;
+    const [newer, older] = undoRows(second);
+    expect(newer).toBeDefined();
+    expect(older).toBeDefined();
+    if (newer === undefined || older === undefined) return;
+    const reverseNewer = planUndo(second, new Set([newer.id]));
+    expect(reverseNewer.kind).toBe("ready");
+    if (reverseNewer.kind !== "ready") return;
+    const restored = second.update({ changes: reverseNewer.changes, userEvent: "input.revert" }).state;
+    expect(restored.doc.toString()).toBe("交付下周一。");
+    const reverseOlder = planUndo(restored, new Set([older.id]));
+    expect(reverseOlder.kind === "ready" ? reverseOlder.changes.apply(restored.doc).toString() : reverseOlder.kind)
+      .toBe("交付。");
+  });
 });
 
 test("typewriter measures from the scrolling viewport and moves only to the nearest boundary", () => {
