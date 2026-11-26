@@ -6,7 +6,12 @@
 import { ensureSyntaxTree, language } from "@codemirror/language";
 import { isolateHistory } from "@codemirror/commands";
 import {
-  EditorState, StateEffect, StateField, type ChangeSpec, type Text, type Transaction,
+  EditorState,
+  StateEffect,
+  StateField,
+  type ChangeSpec,
+  type Text,
+  type Transaction,
 } from "@codemirror/state";
 import type { SyntaxNode } from "@lezer/common";
 
@@ -44,8 +49,12 @@ const recentIndent = StateField.define<AddedIndent | null>({
 export function ordinaryParagraph(node: SyntaxNode): boolean {
   if (node.name !== "Paragraph" || node.parent?.name !== "Document") return false;
   const only = node.firstChild;
-  return only === null || only.from !== node.from || only.to !== node.to ||
-    (only.name !== "Image" && only.name !== "DisplayMath");
+  return (
+    only === null ||
+    only.from !== node.from ||
+    only.to !== node.to ||
+    (only.name !== "Image" && only.name !== "DisplayMath")
+  );
 }
 
 function prefix(line: string): number | null {
@@ -82,7 +91,8 @@ export function freshParagraph(doc: Text, at: number): number | null {
     at !== line.to ||
     !/^\u3000*[“‘「『《〈（]*$/u.test(line.text) ||
     (line.number > 1 && !/^[ \t]*$/u.test(doc.line(line.number - 1).text))
-  ) return null;
+  )
+    return null;
   return line.from;
 }
 
@@ -121,25 +131,37 @@ function withdrawn(tx: Transaction): AddedIndent | null {
 }
 
 export function typedIndent(enabled: () => boolean) {
-  return [recentIndent, EditorState.transactionFilter.of((tx) => {
-    if (!enabled() || !tx.docChanged || tx.isUserEvent("input.type.compose"))
-      return tx;
-    if (tx.isUserEvent("input") || tx.isUserEvent("delete")) {
-      const undo = withdrawn(tx);
-      if (undo !== null) return [tx, {
-        changes: { from: undo.from, to: undo.from + undo.insert.length },
-        effects: written.of(null),
-        sequential: true,
-      }];
-    }
-    if (!tx.isUserEvent("input.type")) return tx;
-    const { selection, doc } = tx.startState;
-    if (selection.ranges.length !== 1 || !selection.main.empty) return tx;
-    const start = freshParagraph(doc, selection.main.head);
-    if (start === null) return tx;
-    const indent = finishParagraph(tx.state, tx.changes.mapPos(start, -1));
-    return indent === null ? tx : [tx, {
-      ...paragraphInput(indent), annotations: isolateHistory.of("before"),
-    }];
-  })];
+  return [
+    recentIndent,
+    EditorState.transactionFilter.of((tx) => {
+      if (!enabled() || !tx.docChanged || tx.isUserEvent("input.type.compose")) return tx;
+      if (tx.isUserEvent("input") || tx.isUserEvent("delete")) {
+        const undo = withdrawn(tx);
+        if (undo !== null)
+          return [
+            tx,
+            {
+              changes: { from: undo.from, to: undo.from + undo.insert.length },
+              effects: written.of(null),
+              sequential: true,
+            },
+          ];
+      }
+      if (!tx.isUserEvent("input.type")) return tx;
+      const { selection, doc } = tx.startState;
+      if (selection.ranges.length !== 1 || !selection.main.empty) return tx;
+      const start = freshParagraph(doc, selection.main.head);
+      if (start === null) return tx;
+      const indent = finishParagraph(tx.state, tx.changes.mapPos(start, -1));
+      return indent === null
+        ? tx
+        : [
+            tx,
+            {
+              ...paragraphInput(indent),
+              annotations: isolateHistory.of("before"),
+            },
+          ];
+    }),
+  ];
 }

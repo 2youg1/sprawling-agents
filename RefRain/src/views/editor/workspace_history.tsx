@@ -57,38 +57,64 @@ export function WorkspaceUndo(props: PanelProps) {
   return (
     <div class="workspace-edit-panel">
       <div class="workspace-edit-list">
-        <For each={rows()}>{(row, index) => (
-          <label class="workspace-edit-choice">
-            <input type="checkbox" data-control="" data-context-focus={index() === 0 ? "" : undefined}
-              checked={picked().has(row.id)} onChange={(event) => pick(row.id, event.currentTarget.checked)} />
-            <span>{label(row.line, row.snippet)}</span>
-          </label>
-        )}</For>
+        <For each={rows()}>
+          {(row, index) => (
+            <label class="workspace-edit-choice">
+              <input
+                type="checkbox"
+                data-control=""
+                data-context-focus={index() === 0 ? "" : undefined}
+                checked={picked().has(row.id)}
+                onChange={(event) => pick(row.id, event.currentTarget.checked)}
+              />
+              <span>{label(row.line, row.snippet)}</span>
+            </label>
+          )}
+        </For>
       </div>
-      <output role="status">{notice() || (() => {
-        const held = plan();
-        if (held.kind === "conflict")
-          return fill(word("writing_undo_conflict"), { edit: label(held.later.line, held.later.snippet) });
-        if (rows().length === 0) return word("writing_undo_empty");
-        return held.kind === "empty" ? word("writing_undo_pick") : "";
-      })()}</output>
-      <Show when={preview()}>{(difference) => (
-        <div class="workspace-edit-list workspace-edit-diff">
-          <For each={difference().spans}>{(span) => (
-            <div>
-              <span class="text-text-quiet">{span.line}</span>
-              <Show when={span.before !== ""}><del>{span.before}</del></Show>
-              <Show when={span.after !== ""}><ins>{span.after}</ins></Show>
-            </div>
-          )}</For>
-          <Show when={difference().spans.length < difference().count}>
-            {fill(word("writing_preview_limit"), { count: String(difference().count) })}
-          </Show>
-        </div>
-      )}</Show>
+      <output role="status">
+        {notice() ||
+          (() => {
+            const held = plan();
+            if (held.kind === "conflict")
+              return fill(word("writing_undo_conflict"), {
+                edit: label(held.later.line, held.later.snippet),
+              });
+            if (rows().length === 0) return word("writing_undo_empty");
+            return held.kind === "empty" ? word("writing_undo_pick") : "";
+          })()}
+      </output>
+      <Show when={preview()}>
+        {(difference) => (
+          <div class="workspace-edit-list workspace-edit-diff">
+            <For each={difference().spans}>
+              {(span) => (
+                <div>
+                  <span class="text-text-quiet">{span.line}</span>
+                  <Show when={span.before !== ""}>
+                    <del>{span.before}</del>
+                  </Show>
+                  <Show when={span.after !== ""}>
+                    <ins>{span.after}</ins>
+                  </Show>
+                </div>
+              )}
+            </For>
+            <Show when={difference().spans.length < difference().count}>
+              {fill(word("writing_preview_limit"), { count: String(difference().count) })}
+            </Show>
+          </div>
+        )}
+      </Show>
       <div class="workspace-edit-actions justify-end">
-        <button type="button" data-control="surface" disabled={plan().kind !== "ready" || props.view.state.readOnly}
-          onClick={apply}>{word("writing_undo_apply")}</button>
+        <button
+          type="button"
+          data-control="surface"
+          disabled={plan().kind !== "ready" || props.view.state.readOnly}
+          onClick={apply}
+        >
+          {word("writing_undo_apply")}
+        </button>
       </div>
     </div>
   );
@@ -110,7 +136,12 @@ export function WorkspaceIndent(props: PanelProps & { readonly done: () => void 
       count += 1;
       if (shown.length < 32) {
         const line = doc.lineAt(from);
-        shown.push(fill(word("writing_undo_change"), { line: String(line.number), text: line.text.slice(0, 120) }));
+        shown.push(
+          fill(word("writing_undo_change"), {
+            line: String(line.number),
+            text: line.text.slice(0, 120),
+          }),
+        );
       }
     });
     return { shown, count };
@@ -123,21 +154,32 @@ export function WorkspaceIndent(props: PanelProps & { readonly done: () => void 
     }
     if (props.view.state.readOnly || pick.changes.empty) return;
     props.view.dispatch({
-      changes: pick.changes, annotations: isolateHistory.of("full"), userEvent: "input.indent",
+      changes: pick.changes,
+      annotations: isolateHistory.of("full"),
+      userEvent: "input.indent",
     });
     props.done();
   }
   return (
     <div class="workspace-edit-panel">
-      <output role="status">{notice() || (lines().count === 0
-        ? word("writing_indent_empty")
-        : fill(word("writing_indent_count"), { count: String(lines().count) }))}</output>
+      <output role="status">
+        {notice() ||
+          (lines().count === 0
+            ? word("writing_indent_empty")
+            : fill(word("writing_indent_count"), { count: String(lines().count) }))}
+      </output>
       <div class="workspace-edit-list">
         <For each={lines().shown}>{(line) => <div class="workspace-edit-choice">{line}</div>}</For>
       </div>
       <div class="workspace-edit-actions justify-end">
-        <button type="button" data-control="surface" disabled={preview().changes.empty || props.view.state.readOnly}
-          onClick={apply}>{word("writing_indent_apply")}</button>
+        <button
+          type="button"
+          data-control="surface"
+          disabled={preview().changes.empty || props.view.state.readOnly}
+          onClick={apply}
+        >
+          {word("writing_indent_apply")}
+        </button>
       </div>
     </div>
   );

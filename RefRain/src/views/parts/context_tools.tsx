@@ -290,11 +290,7 @@ function ContextSurface(props: Props) {
       props.controller.enter(shortcut);
       return;
     }
-    if (
-      event.key === "ArrowRight" &&
-      index >= 0 &&
-      current?.hasAttribute("aria-haspopup")
-    ) {
+    if (event.key === "ArrowRight" && index >= 0 && current?.hasAttribute("aria-haspopup")) {
       event.preventDefault();
       event.stopPropagation();
       rows[index]?.click();
@@ -361,7 +357,13 @@ function ContextSurface(props: Props) {
     document.addEventListener(
       "keydown",
       (event) => {
-        if (event.key !== "Escape" || event.isComposing || event.defaultPrevented || active !== props.controller) return;
+        if (
+          event.key !== "Escape" ||
+          event.isComposing ||
+          event.defaultPrevented ||
+          active !== props.controller
+        )
+          return;
         event.preventDefault();
         event.stopPropagation();
         props.controller.back();

@@ -33,16 +33,16 @@ function FileProperties(props: FileProps) {
   }
   return (
     <div class="workspace-edit-panel">
-        <form class="refrain-files-tools" onSubmit={category}>
-          <label>
-            {say(props.lang, "shell_file_category")}
-            <input name="category" value={props.file.record.category ?? ""} />
-          </label>
-          <button data-control="" class="refrain-nav-button" type="submit">
-            {say(props.lang, "shell_save_category")}
-          </button>
-        </form>
-        <a href={props.docs.link(props.file)}>{say(props.lang, "shell_file_link")}</a>
+      <form class="refrain-files-tools" onSubmit={category}>
+        <label>
+          {say(props.lang, "shell_file_category")}
+          <input name="category" value={props.file.record.category ?? ""} />
+        </label>
+        <button data-control="" class="refrain-nav-button" type="submit">
+          {say(props.lang, "shell_save_category")}
+        </button>
+      </form>
+      <a href={props.docs.link(props.file)}>{say(props.lang, "shell_file_link")}</a>
     </div>
   );
 }

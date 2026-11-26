@@ -9,9 +9,8 @@ import { Effect, Option, Result, Schema } from "effect";
 import type { EditorChange } from "../../core/document_pos";
 import { readDraft, writeDraft } from "../../core/document_save";
 import { EDITABLE_BYTES_MAX } from "../../core/document_windows";
-import { fill, langOf, say } from "../../core/lang";
+import { langOf, say } from "../../core/lang";
 import type { Lang } from "../../core/lang";
-import { kib } from "../../core/time";
 import { preferences } from "../../core/prefs";
 import { storeValue } from "../../core/solid_store";
 import { writingPreferences } from "../../core/writing";
@@ -25,7 +24,7 @@ import type { PreviewResource } from "./markdown_widgets";
 import { phrasesIn } from "./reading";
 import { MarkdownFileHead, MarkdownReadout } from "./workspace_chrome";
 import { createWritingTools } from "./workspace_context";
-import { WorkspacePreview, workspaceFormat } from "./workspace_preview";
+import { WorkspaceDocumentSurface, workspaceFormat } from "./workspace_preview";
 import { WorkspaceProposal } from "./workspace_proposal";
 import { writeRefusal, type WriteReceipt } from "./workspace_receipt";
 import {
@@ -81,7 +80,7 @@ export default function WorkspaceDocument(props: WorkspaceDocumentProps) {
   const markdown = () => format().kind === "markdown";
   const hasPreview = () => ["html", "mermaid", "math"].includes(format().kind);
   const [receipt, setReceipt] = createSignal<WriteReceipt>({ kind: "clean" });
-  const [dirty, publishDirty] = createSignal(false);
+  const [dirty, setDirty] = createSignal(false);
   const writing = storeValue(writingPreferences().held);
   const [mode, setMode] = createSignal<MarkdownMode>("live");
   const [preview, setPreview] = createSignal<string | null>(null);
@@ -105,7 +104,6 @@ export default function WorkspaceDocument(props: WorkspaceDocumentProps) {
   let closedDraft: string | undefined;
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
   let saveDue: number | undefined;
-  let previousDirty = false;
   let reviewing = false;
   const prefs = preferences();
   const validVersion = Schema.decodeUnknownOption(B3Hash);
@@ -114,10 +112,12 @@ export default function WorkspaceDocument(props: WorkspaceDocumentProps) {
     lang,
     editing: () => editor,
     revision: editRevision,
-    save: () => { void save(); },
-    canSave: () => dirty() && !changed() && receipt().kind !== "saving" &&
-      editor?.view.state.readOnly === false,
-    attach: untrack(() => props.onSelection === undefined ? undefined : attach),
+    save: () => {
+      void save();
+    },
+    canSave: () =>
+      dirty() && !changed() && receipt().kind !== "saving" && editor?.view.state.readOnly === false,
+    attach: untrack(() => (props.onSelection === undefined ? undefined : attach)),
     properties: untrack(() => props.properties),
   });
 
@@ -137,12 +137,6 @@ export default function WorkspaceDocument(props: WorkspaceDocumentProps) {
       to: editor.fromBaseline(wanted.to),
     });
   };
-
-  function setDirty(next: boolean): void {
-    if (next === previousDirty) return;
-    previousDirty = next;
-    publishDirty(next);
-  }
 
   function keepWhenQuiet(): void {
     const remaining = draftDue - performance.now();
@@ -417,13 +411,32 @@ export default function WorkspaceDocument(props: WorkspaceDocumentProps) {
       data-writing-indent={markdown() ? writing().indentation : undefined}
       style={{ "--writing-gutter-digits": gutterDigits() }}
     >
-      <Show when={markdown()} fallback={
-        <WorkspaceDocumentTools lang={lang()} editable={editable()} previewable={hasPreview()}
-          previewing={preview() !== null} onPreview={pickPreview} dirty={dirty()}
-          changed={changed()} receipt={receipt()} onSave={() => void save()} />
-      }>
-        <MarkdownFileHead name={props.name} lang={lang()} mode={mode()} editable={editable()}
-          dirty={dirty()} receipt={receipt()} onMode={(next) => editor?.setMarkdown(next)} onClose={props.close} />
+      <Show
+        when={markdown()}
+        fallback={
+          <WorkspaceDocumentTools
+            lang={lang()}
+            editable={editable()}
+            previewable={hasPreview()}
+            previewing={preview() !== null}
+            onPreview={pickPreview}
+            dirty={dirty()}
+            changed={changed()}
+            receipt={receipt()}
+            onSave={() => void save()}
+          />
+        }
+      >
+        <MarkdownFileHead
+          name={props.name}
+          lang={lang()}
+          mode={mode()}
+          editable={editable()}
+          dirty={dirty()}
+          receipt={receipt()}
+          onMode={(next) => editor?.setMarkdown(next)}
+          onClose={props.close}
+        />
       </Show>
       <WorkspaceDocumentFeedback
         lang={lang()}
@@ -450,42 +463,33 @@ export default function WorkspaceDocument(props: WorkspaceDocumentProps) {
           />
         )}
       </Show>
-      <Show when={editable()}>
-        <Show when={props.bytes.length > EDITABLE_BYTES_MAX}>
-          <p role="status">
-            {fill(say(lang(), "refrain_too_large"), {
-              total: kib(props.bytes.length),
-              through: kib(Math.min(props.bytes.length, EDITABLE_BYTES_MAX)),
-            })}
-          </p>
-        </Show>
-        <div
-          class="workspace-editor-host"
-          ref={(node) => {
-            host = node;
-          }}
-          hidden={preview() !== null}
-          data-refrain-reading-canvas
-        />
-      </Show>
-      <Show when={format().kind === "docx" || format().kind === "image" || preview() !== null}>
-        <WorkspacePreview
+      <WorkspaceDocumentSurface
+        lang={lang()}
+        name={props.name}
+        bytes={props.bytes}
+        format={format()}
+        editable={editable()}
+        preview={preview()}
+        mountEditor={(node) => {
+          host = node;
+        }}
+      />
+      <Show
+        when={markdown()}
+        fallback={
+          <WorkspaceDocumentStatus
+            lang={lang()}
+            version={shownVersion() ?? props.version}
+            bytes={editable() ? { total: totalBytes(), line: lineBytes() } : undefined}
+          />
+        }
+      >
+        <MarkdownReadout
           lang={lang()}
-          name={props.name}
-          text={preview() ?? ""}
-          bytes={props.bytes}
-          format={format()}
+          draft={totalBytes()}
+          line={lineBytes()}
+          version={shownVersion() ?? props.version}
         />
-      </Show>
-      <Show when={!editable() && format().kind !== "docx" && format().kind !== "image"}>
-        <p role="status">{say(lang(), "refrain_format_opaque")}</p>
-      </Show>
-      <Show when={markdown()} fallback={
-        <WorkspaceDocumentStatus lang={lang()} version={shownVersion() ?? props.version}
-          bytes={editable() ? { total: totalBytes(), line: lineBytes() } : undefined} />
-      }>
-        <MarkdownReadout lang={lang()} draft={totalBytes()} line={lineBytes()}
-          version={shownVersion() ?? props.version} />
       </Show>
       <ContextTools controller={tools.controller} lang={lang()} />
     </section>

@@ -323,7 +323,9 @@ export function lookOf(state: TreeState, uid: string, hands: TreeHands): TreeLoo
         key: branch.word,
         mark: BRANCH_MARK[branch.word] ?? null,
         direct:
-          only?.kind === "group" && branch.entries.length === 1 && branch.more.length === 0 &&
+          only?.kind === "group" &&
+          branch.entries.length === 1 &&
+          branch.more.length === 0 &&
           branch.word === HEADING[only.group]
             ? groupOf(only.group, state.group, hands)
             : null,

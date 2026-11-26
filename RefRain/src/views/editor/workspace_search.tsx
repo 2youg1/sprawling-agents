@@ -4,8 +4,15 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import {
-  closeSearchPanel, findNext, findPrevious, getSearchQuery, openSearchPanel,
-  replaceAll, replaceNext, SearchQuery, setSearchQuery,
+  closeSearchPanel,
+  findNext,
+  findPrevious,
+  getSearchQuery,
+  openSearchPanel,
+  replaceAll,
+  replaceNext,
+  SearchQuery,
+  setSearchQuery,
 } from "@codemirror/search";
 import { runScopeHandlers, type Command, type EditorView } from "@codemirror/view";
 import { createMemo, createSignal, onSettled, Show } from "solid-js";
@@ -23,7 +30,15 @@ export function WorkspaceSearch(props: { readonly view: EditorView; readonly lan
 
   function change(next: Partial<ConstructorParameters<typeof SearchQuery>[0]>): void {
     const { search, replace, caseSensitive, literal, regexp, wholeWord } = held();
-    const query = new SearchQuery({ search, replace, caseSensitive, literal, regexp, wholeWord, ...next });
+    const query = new SearchQuery({
+      search,
+      replace,
+      caseSensitive,
+      literal,
+      regexp,
+      wholeWord,
+      ...next,
+    });
     setHeld(query);
     props.view.dispatch({ effects: setSearchQuery.of(query) });
   }
@@ -80,24 +95,29 @@ export function WorkspaceSearch(props: { readonly view: EditorView; readonly lan
   });
 
   return (
-    <div class="workspace-edit-panel" onKeyDown={(event) => {
-      if (event.defaultPrevented || event.isComposing) return;
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
-        event.preventDefault();
-        field?.focus({ preventScroll: true });
-        field?.select();
-      } else if (runScopeHandlers(props.view, event, "search-panel")) {
-        event.preventDefault();
-        bump((value) => value + 1);
-      }
-    }}>
+    <div
+      class="workspace-edit-panel"
+      onKeyDown={(event) => {
+        if (event.defaultPrevented || event.isComposing) return;
+        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
+          event.preventDefault();
+          field?.focus({ preventScroll: true });
+          field?.select();
+        } else if (runScopeHandlers(props.view, event, "search-panel")) {
+          event.preventDefault();
+          bump((value) => value + 1);
+        }
+      }}
+    >
       <label class="workspace-edit-field">
         <span>{word("refrain_cm_find")}</span>
         <input
           type="search"
           data-control=""
           data-context-focus=""
-          ref={(node) => { field = node; }}
+          ref={(node) => {
+            field = node;
+          }}
           value={held().search}
           onInput={(event) => change({ search: event.currentTarget.value })}
           onKeyDown={(event) => {
@@ -111,40 +131,87 @@ export function WorkspaceSearch(props: { readonly view: EditorView; readonly lan
         <output role="status" class="grow">
           {held().search !== "" && !held().valid ? word("writing_search_invalid") : count()}
         </output>
-        <button type="button" data-control="surface" aria-label={word("refrain_cm_previous")}
-          disabled={matches().total === 0} onClick={() => command(findPrevious)}>
+        <button
+          type="button"
+          data-control="surface"
+          aria-label={word("refrain_cm_previous")}
+          disabled={matches().total === 0}
+          onClick={() => command(findPrevious)}
+        >
           <Glyph name="up" size="sm" />
         </button>
-        <button type="button" data-control="surface" aria-label={word("refrain_cm_next")}
-          disabled={matches().total === 0} onClick={() => command(findNext)}>
+        <button
+          type="button"
+          data-control="surface"
+          aria-label={word("refrain_cm_next")}
+          disabled={matches().total === 0}
+          onClick={() => command(findNext)}
+        >
           <Glyph name="up" size="sm" class="rotate-180" />
         </button>
       </div>
       <div class="workspace-edit-actions">
-        <label><input type="checkbox" data-control="" checked={held().caseSensitive}
-          onChange={(event) => change({ search: held().search, caseSensitive: event.currentTarget.checked })} />
+        <label>
+          <input
+            type="checkbox"
+            data-control=""
+            checked={held().caseSensitive}
+            onChange={(event) =>
+              change({ search: held().search, caseSensitive: event.currentTarget.checked })
+            }
+          />
           {word("refrain_cm_match_case")}
         </label>
-        <label><input type="checkbox" data-control="" checked={held().regexp}
-          onChange={(event) => change({ search: held().search, regexp: event.currentTarget.checked })} />
+        <label>
+          <input
+            type="checkbox"
+            data-control=""
+            checked={held().regexp}
+            onChange={(event) =>
+              change({ search: held().search, regexp: event.currentTarget.checked })
+            }
+          />
           {word("refrain_cm_regexp")}
         </label>
-        <label><input type="checkbox" data-control="" checked={held().wholeWord}
-          onChange={(event) => change({ search: held().search, wholeWord: event.currentTarget.checked })} />
+        <label>
+          <input
+            type="checkbox"
+            data-control=""
+            checked={held().wholeWord}
+            onChange={(event) =>
+              change({ search: held().search, wholeWord: event.currentTarget.checked })
+            }
+          />
           {word("refrain_cm_by_word")}
         </label>
       </div>
       <Show when={!props.view.state.readOnly}>
         <label class="workspace-edit-field">
           <span>{word("refrain_cm_replace")}</span>
-          <input type="text" data-control="" value={held().replace}
-            onInput={(event) => change({ search: held().search, replace: event.currentTarget.value })} />
+          <input
+            type="text"
+            data-control=""
+            value={held().replace}
+            onInput={(event) =>
+              change({ search: held().search, replace: event.currentTarget.value })
+            }
+          />
         </label>
         <div class="workspace-edit-actions justify-end">
-          <button type="button" data-control="surface" disabled={matches().total === 0} onClick={() => command(replaceCurrent)}>
+          <button
+            type="button"
+            data-control="surface"
+            disabled={matches().total === 0}
+            onClick={() => command(replaceCurrent)}
+          >
             {word("refrain_cm_replace_one")}
           </button>
-          <button type="button" data-control="surface" disabled={matches().total === 0} onClick={() => command(replaceAll)}>
+          <button
+            type="button"
+            data-control="surface"
+            disabled={matches().total === 0}
+            onClick={() => command(replaceAll)}
+          >
             {word("refrain_cm_replace_all")}
           </button>
         </div>

@@ -26,20 +26,29 @@ export function followWriting(update: ViewUpdate): void {
         tx.isUserEvent("input.type") ||
         tx.isUserEvent("delete"),
     )
-  ) return;
+  )
+    return;
   const previous = update.changes.mapPos(startState.selection.main.head, -1);
   const head = state.selection.main.head;
   if (previous === head) return;
   view.requestMeasure({
     key: typewriterMeasure,
     read(now: EditorView) {
-      if (now.state.doc !== state.doc || !now.state.selection.eq(state.selection) || now.compositionStarted)
+      if (
+        now.state.doc !== state.doc ||
+        !now.state.selection.eq(state.selection) ||
+        now.compositionStarted
+      )
         return 0;
       const from = now.coordsAtPos(previous, -1);
       const to = now.coordsAtPos(head);
       if (to === null || (from !== null && from.top < to.bottom && to.top < from.bottom)) return 0;
       const scroll = now.scrollDOM;
-      return writingOffset(scroll.getBoundingClientRect().top + scroll.clientTop, scroll.clientHeight, (to.top + to.bottom) / 2);
+      return writingOffset(
+        scroll.getBoundingClientRect().top + scroll.clientTop,
+        scroll.clientHeight,
+        (to.top + to.bottom) / 2,
+      );
     },
     write(offset, now) {
       if (offset !== 0 && now.state.doc === state.doc && now.state.selection.eq(state.selection))

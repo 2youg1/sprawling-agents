@@ -24,7 +24,8 @@ export function MarkdownFileHead(props: {
 }) {
   const warning = () => ["conflict", "refused", "pending"].includes(props.receipt.kind);
   const waiting = () => props.dirty || props.receipt.kind === "saving";
-  const label = () => writeReceiptWord(props.receipt, props.dirty, props.lang) ||
+  const label = () =>
+    writeReceiptWord(props.receipt, props.dirty, props.lang) ||
     say(props.lang, "refrain_receipt_saved");
   return (
     <header class="refrain-file-header workspace-markdown-header">
@@ -37,18 +38,24 @@ export function MarkdownFileHead(props: {
       </div>
       <Show when={props.editable}>
         <label class="workspace-live-switch">
-          <input type="checkbox" role="switch" data-control=""
+          <input
+            type="checkbox"
+            role="switch"
+            data-control=""
             checked={props.mode === "live"}
-            onChange={(event) => props.onMode(event.currentTarget.checked ? "live" : "source")} />
+            onChange={(event) => props.onMode(event.currentTarget.checked ? "live" : "source")}
+          />
           <span class="workspace-live-track" aria-hidden="true" />
           <span>{say(props.lang, "refrain_live")}</span>
         </label>
       </Show>
-      <Show when={props.onClose} keyed>{(close) => (
-        <button type="button" data-control="surface" class="refrain-nav-button" onClick={close}>
-          {say(props.lang, "shell_close_file")}
-        </button>
-      )}</Show>
+      <Show when={props.onClose} keyed>
+        {(close) => (
+          <button type="button" data-control="surface" class="refrain-nav-button" onClick={close}>
+            {say(props.lang, "shell_close_file")}
+          </button>
+        )}
+      </Show>
     </header>
   );
 }
@@ -81,8 +88,12 @@ export function MarkdownReadout(props: {
   });
   const label = () => say(props.lang, "writing_copy_digest");
   const digest = () => `${say(props.lang, "writing_blake3")} ${props.version.slice(0, 9)}…`;
-  const receipt = () => copied().kind === "copied" ? say(props.lang, "writing_copied_digest") :
-    copied().kind === "refused" ? say(props.lang, "writing_copy_failed") : "";
+  const receipt = () =>
+    copied().kind === "copied"
+      ? say(props.lang, "writing_copied_digest")
+      : copied().kind === "refused"
+        ? say(props.lang, "writing_copy_failed")
+        : "";
   const format = (value: number) => value.toLocaleString(props.lang);
   return (
     <div class="workspace-writing-readout">
@@ -92,13 +103,30 @@ export function MarkdownReadout(props: {
       </p>
       <div class="workspace-writing-digest">
         <Tip text={receipt() || label()} id={hint}>
-          <button type="button" data-control="surface" data-copy-receipt={copied().kind}
-            aria-label={label()} aria-describedby={hint} onClick={() => copy(props.version)}>
+          <button
+            type="button"
+            data-control="surface"
+            data-copy-receipt={copied().kind}
+            aria-label={label()}
+            aria-describedby={hint}
+            onClick={() => copy(props.version)}
+          >
             <span>{digest()}</span>
-            <Glyph name={copied().kind === "copied" ? "check" : copied().kind === "refused" ? "cross" : "copy"} size="sm" />
+            <Glyph
+              name={
+                copied().kind === "copied"
+                  ? "check"
+                  : copied().kind === "refused"
+                    ? "cross"
+                    : "copy"
+              }
+              size="sm"
+            />
           </button>
         </Tip>
-        <output class="sr-only" role="status">{receipt()}</output>
+        <output class="sr-only" role="status">
+          {receipt()}
+        </output>
       </div>
     </div>
   );

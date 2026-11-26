@@ -4,8 +4,10 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { createEffect, createSignal, Match, Show, Switch } from "solid-js";
-import { say } from "../../core/lang";
+import { EDITABLE_BYTES_MAX } from "../../core/document_windows";
+import { fill, say } from "../../core/lang";
 import type { Lang } from "../../core/lang";
+import { kib } from "../../core/time";
 import { drawnAs, markdownFile } from "./formats/format";
 import { framed } from "./formats/framed";
 import { drawMath, formulaOf } from "./formats/math";
@@ -36,7 +38,49 @@ interface PreviewProps {
   readonly format: WorkspaceFormat;
 }
 
-export function WorkspacePreview(props: PreviewProps) {
+export function WorkspaceDocumentSurface(
+  props: Omit<PreviewProps, "text"> & {
+    readonly editable: boolean;
+    readonly preview: string | null;
+    readonly mountEditor: (node: HTMLDivElement) => void;
+  },
+) {
+  const binaryPreview = () => props.format.kind === "docx" || props.format.kind === "image";
+  return (
+    <>
+      <Show when={props.editable}>
+        <Show when={props.bytes.length > EDITABLE_BYTES_MAX}>
+          <p role="status">
+            {fill(say(props.lang, "refrain_too_large"), {
+              total: kib(props.bytes.length),
+              through: kib(Math.min(props.bytes.length, EDITABLE_BYTES_MAX)),
+            })}
+          </p>
+        </Show>
+        <div
+          class="workspace-editor-host"
+          ref={props.mountEditor}
+          hidden={props.preview !== null}
+          data-refrain-reading-canvas
+        />
+      </Show>
+      <Show when={binaryPreview() || props.preview !== null}>
+        <WorkspacePreview
+          lang={props.lang}
+          name={props.name}
+          text={props.preview ?? ""}
+          bytes={props.bytes}
+          format={props.format}
+        />
+      </Show>
+      <Show when={!props.editable && !binaryPreview()}>
+        <p role="status">{say(props.lang, "refrain_format_opaque")}</p>
+      </Show>
+    </>
+  );
+}
+
+function WorkspacePreview(props: PreviewProps) {
   const [url, setUrl] = createSignal<string>();
   const [page, setPage] = createSignal<string>();
   const [failure, setFailure] = createSignal(false);

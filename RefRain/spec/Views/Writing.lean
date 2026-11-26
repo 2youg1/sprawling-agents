@@ -16,7 +16,7 @@ selection context action and the editor's attachment action use the same range.
 The file canvas seats one Markdown header above one editing surface. Its switch
 selects live or source without replacing the document. The hollow mark denotes
 a draft; the tick denotes the acknowledged version. Refusal and uncertainty
-have spoken and visible text. The lower-left rail has two lines: draft and
+have spoken and visible text. The lower-left readout has two lines: draft and
 active logical-line bytes, then nine hexadecimal characters of the saved
 BLAKE3 and an ellipsis. Activation copies all 64 characters. The readout sits
 outside the writing measure or follows the surface where the margin is too

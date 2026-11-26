@@ -21,11 +21,20 @@ export default function WritingCases() {
     <GalleryCase label="Markdown · writing surface, save mark and left readout" width={1440}>
       <div class="@container/shell">
         <div class="frame h-96 overflow-hidden bg-page">
-          <div class="refrain-workspace col-span-full row-span-full grid min-h-0 grid-cols-subgrid grid-rows-subgrid" data-subject="files">
+          <div
+            class="refrain-workspace col-span-full row-span-full grid min-h-0 grid-cols-subgrid grid-rows-subgrid"
+            data-subject="files"
+          >
             <div class="refrain-canvas">
               <Show when={open()}>
-                <WorkspaceDocument name="Meeting.md" bytes={BYTES} version={VERSION} lang={lang()}
-                  save={() => Promise.resolve({ version: VERSION })} close={() => setOpen(false)} />
+                <WorkspaceDocument
+                  name="Meeting.md"
+                  bytes={BYTES}
+                  version={VERSION}
+                  lang={lang()}
+                  save={() => Promise.resolve({ version: VERSION })}
+                  close={() => setOpen(false)}
+                />
               </Show>
             </div>
           </div>

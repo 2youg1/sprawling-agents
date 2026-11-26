@@ -16,7 +16,8 @@ export function quoteMarkdown(view: EditorView): boolean {
     const last = state.doc.lineAt(Math.max(range.from, range.to - 1)).number;
     const lines = [];
     for (let number = first; number <= last; number += 1) lines.push(state.doc.line(number));
-    const remove = lines.some((line) => QUOTE.test(line.text)) &&
+    const remove =
+      lines.some((line) => QUOTE.test(line.text)) &&
       lines.every((line) => QUOTE.test(line.text) || line.text.trim() === "");
     const edits: ChangeSpec[] = [];
     for (const line of lines) {
@@ -31,12 +32,17 @@ export function quoteMarkdown(view: EditorView): boolean {
     const changes = state.changes(edits);
     return {
       changes,
-      range: range.empty ? EditorSelection.cursor(changes.mapPos(range.head, 1)) : range.map(changes),
+      range: range.empty
+        ? EditorSelection.cursor(changes.mapPos(range.head, 1))
+        : range.map(changes),
     };
   });
   if (quoted.changes.empty) return false;
   view.dispatch({
-    ...quoted, scrollIntoView: true, annotations: isolateHistory.of("full"), userEvent: "input.format.quote",
+    ...quoted,
+    scrollIntoView: true,
+    annotations: isolateHistory.of("full"),
+    userEvent: "input.format.quote",
   });
   return true;
 }

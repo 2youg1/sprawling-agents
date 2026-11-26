@@ -322,9 +322,11 @@ function drawNode(
       const first = state.doc.lineAt(node.from);
       const missing = missingIndent(first.text).length;
       if (missing > 0) {
-        out.push(Decoration.line({
-          class: missing === 1 ? "cm-writing-indent-one" : "cm-writing-indent-two",
-        }).range(first.from));
+        out.push(
+          Decoration.line({
+            class: missing === 1 ? "cm-writing-indent-one" : "cm-writing-indent-two",
+          }).range(first.from),
+        );
       }
     }
     const widget = renderHere ? terminal(state, node, options) : null;

@@ -24,7 +24,8 @@ const TYPEWRITER = "refrain.editor.typewriter";
 export function loadWriting(rows: Rows) {
   const held = writable<Writing>({
     measure: MEASURES.find((measure) => measure === rows.getItem(MEASURE)) ?? "silver",
-    indentation: INDENTATIONS.find((indentation) => indentation === rows.getItem(INDENTATION)) ?? "off",
+    indentation:
+      INDENTATIONS.find((indentation) => indentation === rows.getItem(INDENTATION)) ?? "off",
     typewriter: rows.getItem(TYPEWRITER) === "on",
   });
   return {

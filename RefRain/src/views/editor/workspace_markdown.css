@@ -199,7 +199,9 @@
   opacity: 0;
 }
 
-.workspace-writing-digest button:is(:focus-visible, :hover, [data-copy-receipt="copied"], [data-copy-receipt="refused"]) svg {
+.workspace-writing-digest
+  button:is(:focus-visible, :hover, [data-copy-receipt="copied"], [data-copy-receipt="refused"])
+  svg {
   opacity: 1;
 }
 

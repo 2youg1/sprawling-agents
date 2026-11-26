@@ -44,9 +44,7 @@ export default function WritingView(props: { readonly lang: Lang }) {
             if (value !== undefined) prefs.measure(value);
           }}
         >
-          <For each={MEASURES}>
-            {(each) => <option value={each}>{word(MEASURE[each])}</option>}
-          </For>
+          <For each={MEASURES}>{(each) => <option value={each}>{word(MEASURE[each])}</option>}</For>
         </select>
       </label>
       <label class="flex flex-wrap items-center justify-between gap-snug">

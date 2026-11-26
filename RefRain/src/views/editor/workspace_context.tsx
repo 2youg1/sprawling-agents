@@ -62,7 +62,9 @@ export function createWritingTools(options: Commands) {
           glyph: "refresh",
           openOnHover: true,
           disabled: readonly,
-          panel: () => <WorkspaceUndo view={editor.view} lang={options.lang()} revision={options.revision} />,
+          panel: () => (
+            <WorkspaceUndo view={editor.view} lang={options.lang()} revision={options.revision} />
+          ),
         },
         search(editor),
         {
@@ -79,27 +81,44 @@ export function createWritingTools(options: Commands) {
           glyph: "record",
           disabled: readonly,
           panel: (controls) => (
-            <WorkspaceIndent view={editor.view} lang={options.lang()} revision={options.revision} done={controls.close} />
+            <WorkspaceIndent
+              view={editor.view}
+              lang={options.lang()}
+              revision={options.revision}
+              done={controls.close}
+            />
           ),
         },
       ];
       const properties = options.properties;
-      if (properties !== undefined) tools.push({
-        id: "properties", label: say(lang, "shell_file_details"), glyph: "record", panel: properties,
-      });
-      if (range !== null) tools.push(...workspaceSelectionTools(
-        lang,
-        readonly() ? undefined : editor.format,
-        options.attach === undefined ? undefined : () => options.attach?.(range),
-      ));
-      else tools.push({
-        id: QUOTE_FORMAT.id,
-        label: say(lang, QUOTE_FORMAT.label),
-        disabled: readonly,
-        run: () => editor.format(QUOTE_FORMAT),
-      });
-      const kind = event instanceof KeyboardEvent ? "keyboard" :
-        event instanceof PointerEvent && event.pointerType === "touch" ? "touch" : "pointer";
+      if (properties !== undefined)
+        tools.push({
+          id: "properties",
+          label: say(lang, "shell_file_details"),
+          glyph: "record",
+          panel: properties,
+        });
+      if (range !== null)
+        tools.push(
+          ...workspaceSelectionTools(
+            lang,
+            readonly() ? undefined : editor.format,
+            options.attach === undefined ? undefined : () => options.attach?.(range),
+          ),
+        );
+      else
+        tools.push({
+          id: QUOTE_FORMAT.id,
+          label: say(lang, QUOTE_FORMAT.label),
+          disabled: readonly,
+          run: () => editor.format(QUOTE_FORMAT),
+        });
+      const kind =
+        event instanceof KeyboardEvent
+          ? "keyboard"
+          : event instanceof PointerEvent && event.pointerType === "touch"
+            ? "touch"
+            : "pointer";
       controller.open({ tools, restore }, { kind, event, x, y });
     },
   };

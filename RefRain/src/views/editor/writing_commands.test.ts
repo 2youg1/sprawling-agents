@@ -63,10 +63,13 @@ describe("writing indentation", () => {
   test("typing inside a quote and a fenced diagram keeps the literal bytes", () => {
     for (const text of ["> ", "```mermaid\n", "# ", "- ", "| "]) {
       const base = EditorState.create({
-        doc: text, selection: { anchor: text.length }, extensions: [markdown(), typedIndent(() => true)],
+        doc: text,
+        selection: { anchor: text.length },
+        extensions: [markdown(), typedIndent(() => true)],
       });
       const next = base.update({
-        changes: { from: text.length, insert: "甲" }, selection: { anchor: text.length + 1 },
+        changes: { from: text.length, insert: "甲" },
+        selection: { anchor: text.length + 1 },
         userEvent: "input.type",
       });
       expect(next.state.doc.toString()).toBe(text + "甲");
@@ -75,9 +78,15 @@ describe("writing indentation", () => {
 
   test("withdraws only the generated prefix when the active paragraph becomes a heading", () => {
     const base = EditorState.create({ extensions: [markdown(), typedIndent(() => true)] });
-    const typed = base.update({ changes: { from: 0, insert: "标题" }, userEvent: "input.type" }).state;
+    const typed = base.update({
+      changes: { from: 0, insert: "标题" },
+      userEvent: "input.type",
+    }).state;
     expect(typed.doc.toString()).toBe(FULL.repeat(2) + "标题");
-    const title = typed.update({ changes: { from: typed.doc.length, insert: "\n===" }, userEvent: "input.type" }).state;
+    const title = typed.update({
+      changes: { from: typed.doc.length, insert: "\n===" },
+      userEvent: "input.type",
+    }).state;
     expect(title.doc.toString()).toBe("标题\n===");
   });
 });
@@ -92,10 +101,13 @@ describe("selective undo", () => {
     expect(earliest).toBeDefined();
     if (earliest === undefined) return;
     const partial = planUndo(current, new Set([earliest.id]));
-    expect(partial.kind === "ready" ? partial.changes.apply(current.doc).toString() : partial.kind)
-      .toBe("甲 乙 丁");
+    expect(
+      partial.kind === "ready" ? partial.changes.apply(current.doc).toString() : partial.kind,
+    ).toBe("甲 乙 丁");
     const all = planUndo(current, new Set(rows.map((row) => row.id)));
-    expect(all.kind === "ready" ? all.changes.apply(current.doc).toString() : all.kind).toBe("甲 乙 丙");
+    expect(all.kind === "ready" ? all.changes.apply(current.doc).toString() : all.kind).toBe(
+      "甲 乙 丙",
+    );
   });
 
   test("requires an overlapping later edit and leaves no plan after an external revision", () => {
@@ -108,9 +120,12 @@ describe("selective undo", () => {
     if (earliest === undefined) return;
     expect(planUndo(current, new Set([earliest.id])).kind).toBe("conflict");
     const all = planUndo(current, new Set(rows.map((row) => row.id)));
-    expect(all.kind === "ready" ? all.changes.apply(current.doc).toString() : all.kind).toBe("交付。");
+    expect(all.kind === "ready" ? all.changes.apply(current.doc).toString() : all.kind).toBe(
+      "交付。",
+    );
     const received = current.update({
-      changes: { from: 0, insert: "新" }, annotations: Transaction.addToHistory.of(false),
+      changes: { from: 0, insert: "新" },
+      annotations: Transaction.addToHistory.of(false),
     }).state;
     expect(undoRows(received)).toEqual([]);
     expect(planUndo(received, new Set([earliest.id])).kind).toBe("empty");
@@ -127,15 +142,22 @@ describe("selective undo", () => {
     const reverseNewer = planUndo(second, new Set([newer.id]));
     expect(reverseNewer.kind).toBe("ready");
     if (reverseNewer.kind !== "ready") return;
-    const restored = second.update({ changes: reverseNewer.changes, userEvent: "input.revert" }).state;
+    const restored = second.update({
+      changes: reverseNewer.changes,
+      userEvent: "input.revert",
+    }).state;
     expect(restored.doc.toString()).toBe("交付下周一。");
     const reverseOlder = planUndo(restored, new Set([older.id]));
-    expect(reverseOlder.kind === "ready" ? reverseOlder.changes.apply(restored.doc).toString() : reverseOlder.kind)
-      .toBe("交付。");
+    expect(
+      reverseOlder.kind === "ready"
+        ? reverseOlder.changes.apply(restored.doc).toString()
+        : reverseOlder.kind,
+    ).toBe("交付。");
   });
 });
 
 test("typewriter measures from the scrolling viewport and moves only to the nearest boundary", () => {
-  expect([50, 100, 150, 300, 350, 390].map((caret) => writingOffset(50, 400, caret)))
-    .toEqual([-100, -50, 0, 0, 0, 40]);
+  expect([50, 100, 150, 300, 350, 390].map((caret) => writingOffset(50, 400, caret))).toEqual([
+    -100, -50, 0, 0, 0, 40,
+  ]);
 });

@@ -7,11 +7,7 @@ import { Show } from "solid-js";
 import { fill, say, type Lang } from "../../core/lang";
 import Glyph from "../parts/glyph.solid";
 import type { ContextTool } from "../parts/context_tools";
-import {
-  CONTEXT_FORMATS,
-  markdownShortcut,
-  type MarkdownFormat,
-} from "./markdown_editing";
+import { CONTEXT_FORMATS, markdownShortcut, type MarkdownFormat } from "./markdown_editing";
 import { writeReceiptWord, type WriteReceipt } from "./workspace_receipt";
 
 interface Props {

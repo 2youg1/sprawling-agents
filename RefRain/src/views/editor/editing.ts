@@ -251,14 +251,18 @@ export function openEditor(setup: EditorSetup): Editing {
         rectangularSelection(),
         highlightActiveLine(),
         ...(setup.onFind === undefined ? [] : [highlightActiveLineGutter(), undoPoolExtension]),
-        search(setup.onFind === undefined ? { top: true } : {
-          createPanel: () => {
-            const dom = setup.parent.ownerDocument.createElement("div");
-            dom.hidden = true;
-            dom.className = "workspace-search-anchor";
-            return { dom };
-          },
-        }),
+        search(
+          setup.onFind === undefined
+            ? { top: true }
+            : {
+                createPanel: () => {
+                  const dom = setup.parent.ownerDocument.createElement("div");
+                  dom.hidden = true;
+                  dom.className = "workspace-search-anchor";
+                  return { dom };
+                },
+              },
+        ),
         keymap.of([
           {
             key: "Mod-f",
@@ -281,15 +285,17 @@ export function openEditor(setup: EditorSetup): Editing {
         ]),
         merge.of([]),
         locked.of(EditorState.readOnly.of(false)),
-        setup.markdown === undefined ? [] : [
-          markdownEditing(setup.markdown),
-          typedIndent(() => indentation === "source"),
-        ],
+        setup.markdown === undefined
+          ? []
+          : [markdownEditing(setup.markdown), typedIndent(() => indentation === "source")],
         EditorView.domEventHandlers({
           compositionstart(_event, editor) {
             composing = true;
             if (indentation === "source" && editor.state.selection.main.empty)
-              composingParagraph = freshParagraph(editor.state.doc, editor.state.selection.main.head);
+              composingParagraph = freshParagraph(
+                editor.state.doc,
+                editor.state.selection.main.head,
+              );
             if (composingParagraph !== null)
               editor.dispatch({ annotations: isolateHistory.of("before") });
             return false;
@@ -300,10 +306,16 @@ export function openEditor(setup: EditorSetup): Editing {
               if (!alive) return;
               const start = composingParagraph;
               composingParagraph = null;
-              if (indentation === "source" && start !== null && start <= view.state.doc.length &&
-                  !view.state.readOnly && !view.compositionStarted) {
+              if (
+                indentation === "source" &&
+                start !== null &&
+                start <= view.state.doc.length &&
+                !view.state.readOnly &&
+                !view.compositionStarted
+              ) {
                 const insert = finishParagraph(view.state, start);
-                if (insert !== null) view.dispatch({ ...paragraphInput(insert), userEvent: "input.type.compose" });
+                if (insert !== null)
+                  view.dispatch({ ...paragraphInput(insert), userEvent: "input.type.compose" });
               }
               if (awaiting !== null) {
                 const mode = awaiting;

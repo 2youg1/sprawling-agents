@@ -4,7 +4,15 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { invertedEffects, isolateHistory } from "@codemirror/commands";
-import { ChangeSet, StateEffect, StateField, Transaction, type ChangeSpec, type EditorState, type Text } from "@codemirror/state";
+import {
+  ChangeSet,
+  StateEffect,
+  StateField,
+  Transaction,
+  type ChangeSpec,
+  type EditorState,
+  type Text,
+} from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 
 const POOL_ACTIONS = 64;
@@ -78,9 +86,10 @@ function entryOf(tx: Transaction, id: number, previous: Entry | undefined): Entr
     units += to - from + inserted.length;
     if (snippet !== "") return;
     line = tx.startState.doc.lineAt(from).number;
-    snippet = inserted.length > 0
-      ? inserted.sliceString(0, PREVIEW_LENGTH)
-      : tx.startState.doc.sliceString(from, Math.min(to, from + PREVIEW_LENGTH));
+    snippet =
+      inserted.length > 0
+        ? inserted.sliceString(0, PREVIEW_LENGTH)
+        : tx.startState.doc.sliceString(from, Math.min(to, from + PREVIEW_LENGTH));
   });
   return {
     id,
@@ -119,16 +128,23 @@ export const undoJournal = StateField.define<Journal>({
     }
     if (tx.docChanged && tx.annotation(Transaction.addToHistory) === false)
       return { next: old.next, entries: [] };
-    const entries = marks.length === 0 ? old.entries : old.entries.map((entry) => {
-      const latest = [...marks].reverse().find((named) => named.ids.has(entry.id));
-      return latest === undefined ? entry : { ...entry, reversed: latest.reversed };
-    });
+    const entries =
+      marks.length === 0
+        ? old.entries
+        : old.entries.map((entry) => {
+            const latest = [...marks].reverse().find((named) => named.ids.has(entry.id));
+            return latest === undefined ? entry : { ...entry, reversed: latest.reversed };
+          });
     if (!tx.docChanged) return { ...old, entries };
     const last = entries.at(-1);
     const time = tx.annotation(Transaction.time) ?? 0;
     const typing = tx.isUserEvent("input.type") || tx.isUserEvent("delete");
     if (
-      typing && last?.typing && !last.reversed && boundary !== "before" && boundary !== "full" &&
+      typing &&
+      last?.typing &&
+      !last.reversed &&
+      boundary !== "before" &&
+      boundary !== "full" &&
       (tx.isUserEvent("input.type.compose") || time - last.time < TYPING_GAP) &&
       changesContact(last.inverse, tx.changes, true)
     ) {
@@ -148,7 +164,10 @@ export const undoPoolExtension = [
 ];
 
 export function undoRows(state: EditorState): readonly Entry[] {
-  return state.field(undoJournal).entries.filter((entry) => !entry.reversed).reverse();
+  return state
+    .field(undoJournal)
+    .entries.filter((entry) => !entry.reversed)
+    .reverse();
 }
 
 export type UndoPoolPlan =
@@ -204,7 +223,11 @@ export function planUndo(state: EditorState, picked: ReadonlySet<number>): UndoP
   return { kind: "ready", changes: planned, journal, doc: state.doc };
 }
 
-function dependencyFor(entries: readonly Entry[], entry: Entry, picked: ReadonlySet<number>): Entry | undefined {
+function dependencyFor(
+  entries: readonly Entry[],
+  entry: Entry,
+  picked: ReadonlySet<number>,
+): Entry | undefined {
   let inverse = entry.inverse;
   for (const next of entries) {
     if (next.id <= entry.id) continue;
@@ -218,11 +241,19 @@ function dependencyFor(entries: readonly Entry[], entry: Entry, picked: Readonly
   return undefined;
 }
 
-export function applyUndo(view: EditorView, plan: UndoPoolPlan, picked: ReadonlySet<number>): boolean {
+export function applyUndo(
+  view: EditorView,
+  plan: UndoPoolPlan,
+  picked: ReadonlySet<number>,
+): boolean {
   if (
-    plan.kind !== "ready" || view.state.doc !== plan.doc ||
-    view.state.field(undoJournal) !== plan.journal || view.state.readOnly || view.compositionStarted
-  ) return false;
+    plan.kind !== "ready" ||
+    view.state.doc !== plan.doc ||
+    view.state.field(undoJournal) !== plan.journal ||
+    view.state.readOnly ||
+    view.compositionStarted
+  )
+    return false;
   view.dispatch({
     changes: plan.changes,
     effects: mark.of({ ids: picked, reversed: true }),
