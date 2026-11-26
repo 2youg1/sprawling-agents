@@ -127,7 +127,11 @@ export function watchAppearance(root: HTMLElement, kept: PreferenceDoor): void {
     };
     if (root.dataset.theme === lighting() && root.dataset.palette === palette) return;
     const document = root.ownerDocument;
-    if (root.dataset.theme === undefined || !("startViewTransition" in document) || motionOff(root)) {
+    if (
+      root.dataset.theme === undefined ||
+      !("startViewTransition" in document) ||
+      motionOff(root)
+    ) {
       paint();
     } else {
       void document.startViewTransition(paint).ready.catch(() => undefined);

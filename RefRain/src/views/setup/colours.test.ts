@@ -138,7 +138,13 @@ describe("legibility", () => {
       "--tier-slack": "0.05",
     };
     const claims = textClaims(
-      ["--color-raised", "--color-text", "--color-text-quiet", "--color-text-faint", "--color-accent"],
+      [
+        "--color-raised",
+        "--color-text",
+        "--color-text-quiet",
+        "--color-text-faint",
+        "--color-accent",
+      ],
       (name) => declared[name] ?? "",
     );
     expect(claims).toEqual({
