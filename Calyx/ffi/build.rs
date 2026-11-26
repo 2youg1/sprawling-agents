@@ -29,6 +29,7 @@ fn main() -> Result<(), String> {
     let out = PathBuf::from(variable("OUT_DIR")?);
     let target = target()?;
     compiled(&here, &out, &target)?;
+    println!("cargo::metadata=zig_source={}", here.join("zig").display());
     println!("cargo::rustc-link-search=native={}", out.display());
     println!("cargo::rustc-link-lib=static={LIBRARY}");
     Ok(())

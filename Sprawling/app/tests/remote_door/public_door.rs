@@ -11,6 +11,7 @@
     reason = "test code"
 )]
 
+use std::io::{self, ErrorKind};
 use std::path::Path;
 use std::time::Duration;
 
@@ -25,6 +26,24 @@ use wtransport::endpoint::{ConnectOptions, endpoint_side::Client};
 use wtransport::{ClientConfig, Connection, Endpoint, Identity, RecvStream, SendStream};
 
 use super::harness::PATIENCE;
+
+const WSAEACCES: i32 = 10_013;
+
+fn tcp_port_unavailable(source: &io::Error) -> bool {
+    source.kind() == ErrorKind::AddrInUse
+        || (cfg!(windows) && source.raw_os_error() == Some(WSAEACCES))
+}
+
+#[cfg(windows)]
+#[test]
+fn a_winsock_bind_refusal_rejects_the_candidate_port() {
+    assert!(tcp_port_unavailable(&io::Error::from_raw_os_error(
+        WSAEACCES
+    )));
+    assert!(!tcp_port_unavailable(&io::Error::from(
+        ErrorKind::PermissionDenied
+    )));
+}
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct Visit {
@@ -247,7 +266,7 @@ impl PublicDoor {
                 let udp = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
                 match std::net::TcpListener::bind(udp.local_addr().unwrap()) {
                     Ok(tcp) => Some((udp, tcp)),
-                    Err(source) if source.kind() == std::io::ErrorKind::AddrInUse => None,
+                    Err(source) if tcp_port_unavailable(&source) => None,
                     Err(source) => panic!("reserve the test port for TCP: {source}"),
                 }
             })

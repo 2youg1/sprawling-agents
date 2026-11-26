@@ -22,7 +22,7 @@
 - **从结果追到过程。** 从 Git 提交追到发起它的运行，再看提示、工具输出和验收证据。Ledger 可以离线校验和重放，不会重跑工具或再次调用模型。
 - **工作区放在自己的机器上。** Rust 主机内嵌 WebUI，也有原生终端；不需要整座城时，可以只运行 Mei。
 
-当前源码版本为 <!-- xtask:begin workspace_version -->0.18.2<!-- xtask:end -->。
+当前源码版本为 <!-- xtask:begin workspace_version -->0.18.3<!-- xtask:end -->。
 
 <p align="center">
   <a href="docs/images/city-overview.webp"><img alt="演示城市的总览，显示 City Hall、两栋项目楼和已完成的运行" src="docs/images/city-overview.webp" width="100%"></a>

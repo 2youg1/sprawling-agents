@@ -47,13 +47,6 @@ impl Colours {
             Colours::Forced => "forced colours",
         }
     }
-
-    fn slug(&self) -> &'static str {
-        match *self {
-            Colours::AsAuthored => "authored",
-            Colours::Forced => "forced",
-        }
-    }
 }
 
 pub(super) struct Pass {
@@ -97,10 +90,6 @@ impl Pass {
 
     pub(super) fn draws_forced_colours(&self) -> bool {
         self.colours == Colours::Forced
-    }
-
-    pub(super) fn slug(&self) -> String {
-        format!("{}-{}-{}", self.width, self.theme(), self.colours.slug())
     }
 
     pub(super) fn called(&self) -> String {

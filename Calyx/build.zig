@@ -13,15 +13,21 @@ pub fn build(b: *std.Build) void {
         "Optimization mode for Calyx Zig libraries",
     ) orelse .safe;
     const pic = b.option(bool, "pic", "Emit position-independent code") orelse true;
+    const leaf_source = b.option(
+        std.Build.LazyPath,
+        "console-leaf",
+        "Zig source directory of the console renderer",
+    ) orelse b.path("ffi/zig");
+    const leaf_root = leaf_source.path(b, "leaf.zig");
 
     const leaf_logic = b.createModule(.{
-        .root_source_file = b.path("ffi/zig/leaf.zig"),
+        .root_source_file = leaf_root,
         .target = target,
         .optimize = optimize,
         .pic = pic,
     });
     const leaf_c_mod = b.createModule(.{
-        .root_source_file = b.path("ffi/zig/leaf_c.zig"),
+        .root_source_file = leaf_source.path(b, "leaf_c.zig"),
         .target = target,
         .optimize = optimize,
         .pic = pic,
@@ -73,7 +79,7 @@ pub fn build(b: *std.Build) void {
 
     const leaf_tests = b.addTest(.{
         .root_module = b.createModule(.{
-            .root_source_file = b.path("ffi/zig/leaf.zig"),
+            .root_source_file = leaf_root,
             .target = target,
             .optimize = optimize,
         }),

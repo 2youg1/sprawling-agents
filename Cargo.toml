@@ -56,7 +56,7 @@ default-members = [
 # published unless its own manifest says `publish = false`, which the
 # repository's development tools do (`Sprawling/app/Spec.lean` §8-157).
 [workspace.package]
-version = "0.18.2"
+version = "0.18.3"
 description = "A local multi-agent harness for persistent agent teams: long-running project work, agent communication, and experiments in coordination and social simulation."
 edition = "2024"
 license = "MPL-2.0"
@@ -282,27 +282,27 @@ comrak = { version = "1.2", default-features = false }
 # names are written. Each version pins `[workspace.package] version`
 # exactly, because a path dependency without one cannot be published;
 # Cargo refuses to resolve a pin that disagrees with it.
-kernel = { package = "sprawling-kernel", path = "Sprawling/kernel", version = "=0.18.2" }
-child = { package = "sprawling-child", path = "Sprawling/child", version = "=0.18.2" }
-storage = { package = "sprawling-storage", path = "Sprawling/storage", version = "=0.18.2" }
-gateway = { package = "sprawling-gateway", path = "Sprawling/gateway", version = "=0.18.2" }
-runtime = { package = "sprawling-runtime", path = "Sprawling/runtime", version = "=0.18.2" }
-collab = { package = "sprawling-collab", path = "Sprawling/collab", version = "=0.18.2" }
-city = { package = "sprawling-city", path = "Sprawling/city", version = "=0.18.2" }
-documents = { package = "sprawling-documents", path = "Sprawling/documents", version = "=0.18.2" }
+kernel = { package = "sprawling-kernel", path = "Sprawling/kernel", version = "=0.18.3" }
+child = { package = "sprawling-child", path = "Sprawling/child", version = "=0.18.3" }
+storage = { package = "sprawling-storage", path = "Sprawling/storage", version = "=0.18.3" }
+gateway = { package = "sprawling-gateway", path = "Sprawling/gateway", version = "=0.18.3" }
+runtime = { package = "sprawling-runtime", path = "Sprawling/runtime", version = "=0.18.3" }
+collab = { package = "sprawling-collab", path = "Sprawling/collab", version = "=0.18.3" }
+city = { package = "sprawling-city", path = "Sprawling/city", version = "=0.18.3" }
+documents = { package = "sprawling-documents", path = "Sprawling/documents", version = "=0.18.3" }
 # `wire` turns its default features off here because accounting and
 # xtask take it without its listener; sprawling and citysim name `server`
 # themselves, so a feature later added to its default reaches neither.
-wire = { package = "sprawling-wire", path = "Sprawling/wire", version = "=0.18.2", default-features = false }
-browser = { package = "sprawling-browser", path = "Sprawling/browser", version = "=0.18.2" }
-agent_protocols = { package = "sprawling-agent-protocols", path = "Sprawling/agent_protocols", version = "=0.18.2" }
-remote_access = { package = "sprawling-remote-access", path = "Sprawling/remote_access", version = "=0.18.2" }
-accounting = { package = "sprawling-accounting", path = "Sprawling/accounting", version = "=0.18.2" }
-sprawling = { path = "Sprawling/app", version = "=0.18.2" }
-desktop = { package = "sprawling-desktop", path = "Sprawling/desktop", version = "=0.18.2" }
-desktop_ffi = { package = "sprawling-desktop-ffi", path = "Sprawling/desktop/ffi", version = "=0.18.2" }
-console_ffi = { package = "sprawling-console-ffi", path = "Calyx/ffi", version = "=0.18.2" }
-calyx = { package = "sprawling-calyx", path = "Calyx", version = "=0.18.2" }
+wire = { package = "sprawling-wire", path = "Sprawling/wire", version = "=0.18.3", default-features = false }
+browser = { package = "sprawling-browser", path = "Sprawling/browser", version = "=0.18.3" }
+agent_protocols = { package = "sprawling-agent-protocols", path = "Sprawling/agent_protocols", version = "=0.18.3" }
+remote_access = { package = "sprawling-remote-access", path = "Sprawling/remote_access", version = "=0.18.3" }
+accounting = { package = "sprawling-accounting", path = "Sprawling/accounting", version = "=0.18.3" }
+sprawling = { path = "Sprawling/app", version = "=0.18.3" }
+desktop = { package = "sprawling-desktop", path = "Sprawling/desktop", version = "=0.18.3" }
+desktop_ffi = { package = "sprawling-desktop-ffi", path = "Sprawling/desktop/ffi", version = "=0.18.3" }
+console_ffi = { package = "sprawling-console-ffi", path = "Calyx/ffi", version = "=0.18.3" }
+calyx = { package = "sprawling-calyx", path = "Calyx", version = "=0.18.3" }
 
 # C3 hardening: panicking constructs and silent numeric
 # corruption are compile-time errors everywhere; tests relax locally.

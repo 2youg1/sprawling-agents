@@ -20,6 +20,16 @@ release notes and their commits.
 
 ---
 
+## v0.18.3-261127
+
+The wire moves from 82 to 83. Reload RefRain tabs after upgrading. The ledger format stays at 2 and the configuration format stays at 1. Stop the city and verify a restorable backup before updating.
+
+- The city serves RefRain over HTTP/3 and carries remote pairing and sessions over WebTransport. Pair from a compatible browser with the city's one-use invitation. Existing `route = "h3"` configurations remove the `command` field (#409, #410).
+- RefRain improves Markdown editing, tests continuing and branching historical sessions in the browser, and previews built-in and custom colour palettes (#402).
+- Plans retain task dependencies and show progress by stage (#400).
+- Mei reduces latency when opening long sessions and starting Python tools (#411).
+- Cargo builds Calyx from the Zig renderer shipped by `sprawling-console-ffi`, including when the two crates are unpacked separately.
+
 ## v0.18.2-261126
 
 - RefRain autosaves Markdown after four seconds of inactivity while preserving undo history. PDF position survives reopening, and layout changes and zoom use the same page coordinate (#392).

@@ -22,7 +22,7 @@ Give a team a place to work. In Sprawling, a workspace is a city: projects live 
 - **Follow the work all the way back.** Look from a Git commit to the run, its prompt, tool results and evidence. Verify and replay the Ledger offline without calling the model again.
 - **Keep the workspace on your machine.** Start with the Rust host and its embedded WebUI. Use the terminal when you want it, or run just Mei when a whole city is too much.
 
-This source tree is at <!-- xtask:begin workspace_version -->0.18.2<!-- xtask:end -->.
+This source tree is at <!-- xtask:begin workspace_version -->0.18.3<!-- xtask:end -->.
 
 <p align="center">
   <a href="docs/images/city-overview.webp"><img alt="A demo city overview with City Hall, two project buildings and completed runs" src="docs/images/city-overview.webp" width="100%"></a>

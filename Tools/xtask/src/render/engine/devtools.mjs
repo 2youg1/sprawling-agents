@@ -5,10 +5,11 @@
 
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const POLL = 100;
 const STARTUP = 25_000;
-const DRAW = 35_000;
+const VIEW = 60_000;
 
 function clean(message) {
   return String(message).replace(/#open=[A-Za-z0-9_-]+/g, "#open=<redacted>");
@@ -58,7 +59,11 @@ function connect(endpoint) {
     });
   }
   async function read(expression) {
-    const frame = await send("Runtime.evaluate", { expression, returnByValue: true });
+    const frame = await send("Runtime.evaluate", {
+      expression,
+      awaitPromise: true,
+      returnByValue: true,
+    });
     if (frame.exceptionDetails)
       throw new Error(frame.exceptionDetails.exception?.description ?? frame.exceptionDetails.text);
     return frame.result.value;
@@ -66,15 +71,106 @@ function connect(endpoint) {
   return { opened, send, read, close: () => socket.close() };
 }
 
-async function run(input) {
-  const admission = new URL((await Bun.file(input.entry).text()).trim());
+async function admissionOf(entry) {
+  if (entry === null) return null;
+  const admission = new URL((await Bun.file(entry).text()).trim());
   if (
     admission.protocol !== "http:" ||
     admission.hostname !== "127.0.0.1" ||
     !admission.hash.startsWith("#open=")
   )
     throw new Error("the render entry must be the one-use URL of a disposable loopback city");
-  const target = new URL(admission.origin + "/#/" + input.route);
+  return admission;
+}
+
+async function navigate(page, target) {
+  const reached = await page.send("Page.navigate", { url: target.href });
+  if (reached.errorText) throw new Error(reached.errorText);
+}
+
+async function pair(page, admission, defer) {
+  await navigate(page, admission);
+  await until(
+    () =>
+      page.read(`(() => {
+        if (location.origin !== ${JSON.stringify(admission.origin)}) return false;
+        const steady = location.hash !== '' && location.hash !== '#/welcome' &&
+          !location.hash.startsWith('#open=');
+        if (steady && (document.querySelector('#workspace-subject-key') ||
+            document.querySelector('main textarea'))) return true;
+        const defer = [...document.querySelectorAll('main button')].find(button =>
+          ${JSON.stringify(defer)}.includes(button.textContent.trim()) && button.getClientRects().length > 0);
+        if (defer) defer.click();
+        return false;
+      })()`),
+    STARTUP,
+    "the served client never reached the paired entrance",
+  );
+}
+
+async function readPass(page, pass, input, target, previous) {
+  await until(
+    () =>
+      page
+        .read(
+          `location.href === ${JSON.stringify(target.href)} &&
+        typeof window.__renderDocument === 'number' &&
+        window.__renderDocument !== ${JSON.stringify(previous)} &&
+        document.readyState !== 'loading' && innerWidth === ${pass.width}`,
+        )
+        .catch((error) => {
+          if (
+            /context (was destroyed|with specified id)|Cannot find (default )?context/.test(
+              error.message,
+            )
+          )
+            return false;
+          throw error;
+        }),
+    VIEW,
+    `the browser did not open ${input.route} at ${pass.width} CSS pixels`,
+  );
+  const marker = input.route === "gallery" ? 'main section[aria-label^="kbd ·"]' : "main";
+  return page.read(`(async () => {
+    await new Promise((resolve, reject) => {
+      let settle;
+      const check = () => {
+        const problem = window.__renderProblems[0];
+        if (problem) finish(new Error(problem));
+        else if (document.querySelector(${JSON.stringify(marker)}) &&
+                 !document.querySelector(${JSON.stringify(input.pending)})) {
+          settle ??= setTimeout(() => finish(), ${input.settle});
+        } else {
+          clearTimeout(settle);
+          settle = undefined;
+        }
+      };
+      const observer = new MutationObserver(check);
+      const deadline = setTimeout(() => finish(new Error(
+        'the view did not become ready within ${VIEW / 1000} real seconds'
+      )), ${VIEW});
+      function finish(error) {
+        observer.disconnect();
+        clearTimeout(deadline);
+        clearTimeout(settle);
+        window.removeEventListener('error', check);
+        window.removeEventListener('unhandledrejection', check);
+        if (error) reject(error);
+        else resolve();
+      }
+      observer.observe(document.documentElement, { attributes: true, childList: true, subtree: true });
+      window.addEventListener('error', check);
+      window.addEventListener('unhandledrejection', check);
+      check();
+    });
+    return (function () {${pass.probe}})();
+  })()`);
+}
+
+async function run(input) {
+  const admission = await admissionOf(input.entry);
+  const target = admission ? new URL(admission.origin + "/") : pathToFileURL(input.index);
+  target.hash = "/" + input.route;
   const environment = { ...process.env };
   for (const [kind, key] of [
     ["config", "XDG_CONFIG_HOME"],
@@ -97,10 +193,12 @@ async function run(input) {
       "--disable-background-networking",
       "--disable-component-update",
       "--disable-dev-shm-usage",
+      "--disable-gpu",
       "--disable-crash-reporter",
       "--disable-sync",
       "--hide-scrollbars",
       "--use-mock-keychain",
+      ...(admission ? [] : ["--allow-file-access-from-files"]),
       "--remote-debugging-address=127.0.0.1",
       "--remote-debugging-port=0",
       "--user-data-dir=" + profile,
@@ -137,33 +235,12 @@ async function run(input) {
     await page.opened;
     await page.send("Page.enable");
     await page.send("Page.addScriptToEvaluateOnNewDocument", {
-      source: `window.__renderProblems = [];
+      source: `window.__renderDocument = performance.timeOrigin;
+      window.__renderProblems = [];
       window.addEventListener('error', event => __renderProblems.push(event.message || 'uncaught'));
       window.addEventListener('unhandledrejection', event => __renderProblems.push(event.reason?.stack || String(event.reason)));`,
     });
-    const admit = await page.send("Page.navigate", { url: admission.href });
-    if (admit.errorText) throw new Error(admit.errorText);
-    await until(
-      () =>
-        page.read(`(() => {
-          if (location.origin !== ${JSON.stringify(admission.origin)}) return false;
-          const steady = location.hash !== '' && location.hash !== '#/welcome' &&
-            !location.hash.startsWith('#open=');
-          if (steady && (document.querySelector('#workspace-subject-key') ||
-              document.querySelector('main textarea'))) return true;
-          const defer = [...document.querySelectorAll('main button')].find(button =>
-            ${JSON.stringify(input.defer)}.includes(button.textContent.trim()) && button.getClientRects().length > 0);
-          if (defer) defer.click();
-          return false;
-        })()`),
-      STARTUP,
-      "the served client never reached the paired entrance",
-    );
-
-    const ready =
-      input.route === "gallery"
-        ? `!!document.querySelector('main section[aria-label^="kbd ·"]')`
-        : "!!document.querySelector('main')";
+    if (admission) await pair(page, admission, input.defer);
     const results = [];
     for (const pass of input.passes) {
       await page.send("Emulation.setDeviceMetricsOverride", {
@@ -172,48 +249,25 @@ async function run(input) {
         mobile: false,
         deviceScaleFactor: 1,
       });
-      await page.send("Emulation.setEmulatedMedia", {
-        features: [{ name: "forced-colors", value: pass.forced ? "active" : "none" }],
-      });
-      if (results.length === 0) {
+      const features = [{ name: "forced-colors", value: pass.forced ? "active" : "none" }];
+      if (pass.forced) features.push({ name: "prefers-contrast", value: "more" });
+      await page.send("Emulation.setEmulatedMedia", { features });
+      let previous = null;
+      if (results.length > 0) {
+        previous = await page.read("window.__renderDocument");
+        await page.send("Page.reload");
+      } else if (admission) {
         await page.read(`location.hash = ${JSON.stringify(target.hash)}`);
       } else {
-        await page.send("Page.reload");
+        await navigate(page, target);
       }
-      await until(
-        () =>
-          page.read(
-            `location.hash === ${JSON.stringify(target.hash)} && innerWidth === ${pass.width} && ${ready}`,
-          ),
-        STARTUP,
-        `the served fixture did not open at ${pass.width} CSS pixels`,
-      );
-      await page.read(`(() => {
-        const script = document.createElement('template');
-        script.innerHTML = ${JSON.stringify(pass.probe)};
-        for (const item of script.content.children) {
-          if (item.tagName !== 'SCRIPT') document.body.append(item.cloneNode(true));
-          else new Function(item.textContent)();
-        }
-        return true;
-      })()`);
-      const snapshot = await until(
-        () =>
-          page.read(`(() => {
-        const out = (id) => document.getElementById(id)?.innerHTML ?? '';
-        const failed = out('sprawling-render-failed') || window.__renderProblems?.[0];
-        if (failed) return { failed };
-        const conditions = out('sprawling-render-conditions');
-        return conditions ? { conditions, sink: out('sprawling-render'), declared: out('sprawling-render-declared') } : null;
-      })()`),
-        DRAW,
-        `the render probe produced no reading at ${pass.width} CSS pixels`,
-      );
-      if (snapshot.failed)
+      try {
+        results.push(await readPass(page, pass, input, target, previous));
+      } catch (error) {
         throw new Error(
-          `the served page failed before the probe could measure it: ${snapshot.failed}`,
+          `the browser could not measure ${input.route} at ${pass.width}px: ${error.message}`,
         );
-      results.push(snapshot);
+      }
     }
     return { results };
   } finally {

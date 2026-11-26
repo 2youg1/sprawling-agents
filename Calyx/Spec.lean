@@ -104,6 +104,15 @@ stdin）。理由：一次完成要求无参 TTY 与显式 `calyx` 均可进交�
 `--resume`／`--acp` 交给只认 `--replay` 的 `calyx`。 -/
 /-! D5 Mei 状态行采用会话累计值。每条助手响应加一步，provider 返回的输入、缓存创建和缓存读取 token 求和后计入同一会话。部分缺失的历史用量显示为未知或下界。恢复重放已保存的统计观测，`/new` 清零。每次请求的窗口比例省去，同一段历史被多次读取时确实产生多份会话输入 token。理由：提交新任务与运行模型工具只改变会话内的计数，单次请求读数不能满足会话累计口径。 -/
 
+/-! D22 Cargo 构建 Calyx 时，渲染叶包通过 `cargo::metadata=zig_source` 交出其 Zig 源目录，
+壳的构建脚本从 `DEP_SPRAWLING_CONSOLE_LEAF_ZIG_SOURCE` 取得目录并传给 Zig 的
+`-Dconsole-leaf`。Zig 的本地缓存放在 Cargo 的 `OUT_DIR`，归档内的源码目录保持只读。
+元数据缺失或无法解码时，`E_CALYX_ZIG_SOURCE` 指明壳的 Cargo 清单和移除构建脚本覆盖的办法。
+直接在仓库的 Calyx 目录运行 `zig build` 时使用 `ffi/zig`。
+理由：Cargo 将壳和渲染叶归档为独立的包，渲染叶是其 Zig 源的唯一拥有者。被否：从壳查找
+嵌套的 Cargo 包，发布归档没有该目录；在壳的包里再携带一份渲染叶，两个拷贝会漂移。
+验收：分别解开 `cargo package` 生成的壳和渲染叶归档后，通过原构建脚本构建壳与可执行文件。 -/
+
 namespace Calyx.SessionTotals
 
 structure Totals where

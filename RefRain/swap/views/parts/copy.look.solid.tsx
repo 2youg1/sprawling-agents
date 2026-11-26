@@ -5,13 +5,14 @@
 
 import { createUniqueId, Show } from "solid-js";
 import type { CopyLook } from "../../../src/views/parts/copy";
+import Tip from "../../../src/views/parts/control_tip";
 import Glyph from "../../../src/views/parts/glyph.solid";
 import "./copy.solid.css";
 
 export default function AlternateCopy(look: CopyLook) {
   const note = createUniqueId();
-  return (
-    <span class="swap-copy">
+  function Key() {
+    return (
       <button
         class="swap-copy-key"
         type={look.key.type}
@@ -24,9 +25,25 @@ export default function AlternateCopy(look: CopyLook) {
         <Glyph name={look.face} size="sm" />
         <Show when={look.form === "named"}>{look.name}</Show>
       </button>
-      <span class="swap-copy-note" id={note}>
-        {look.note}
-      </span>
+    );
+  }
+  return (
+    <span class="swap-copy">
+      <Show
+        when={look.form === "bare"}
+        fallback={
+          <>
+            <Key />
+            <span class="swap-copy-note" id={note}>
+              {look.note}
+            </span>
+          </>
+        }
+      >
+        <Tip text={look.note} id={note}>
+          <Key />
+        </Tip>
+      </Show>
       <span class="sr-only" {...look.heard}>
         {look.said}
       </span>

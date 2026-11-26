@@ -429,7 +429,7 @@ dependencies = [
 
 [[package]]
 name = "citysim"
-version = "0.18.2"
+version = "0.18.3"
 dependencies = [
  "serde_json",
  "sha2",
@@ -2914,7 +2914,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling"
-version = "0.18.2"
+version = "0.18.3"
 dependencies = [
  "axum",
  "bytes",
@@ -2971,7 +2971,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling-accounting"
-version = "0.18.2"
+version = "0.18.3"
 dependencies = [
  "base64 0.23.1",
  "cssparser",
@@ -2997,7 +2997,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling-agent-protocols"
-version = "0.18.2"
+version = "0.18.3"
 dependencies = [
  "proptest",
  "reqwest",
@@ -3010,7 +3010,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling-benchstat"
-version = "0.18.2"
+version = "0.18.3"
 dependencies = [
  "csv",
  "rustfft",
@@ -3024,7 +3024,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling-browser"
-version = "0.18.2"
+version = "0.18.3"
 dependencies = [
  "base64 0.23.1",
  "png",
@@ -3035,7 +3035,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling-calyx"
-version = "0.18.2"
+version = "0.18.3"
 dependencies = [
  "getrandom 0.4.3",
  "serde_json",
@@ -3049,11 +3049,11 @@ dependencies = [
 
 [[package]]
 name = "sprawling-child"
-version = "0.18.2"
+version = "0.18.3"
 
 [[package]]
 name = "sprawling-city"
-version = "0.18.2"
+version = "0.18.3"
 dependencies = [
  "cap-fs-ext",
  "cap-std",
@@ -3067,7 +3067,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling-collab"
-version = "0.18.2"
+version = "0.18.3"
 dependencies = [
  "proptest",
  "serde",
@@ -3080,7 +3080,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling-console-ffi"
-version = "0.18.2"
+version = "0.18.3"
 dependencies = [
  "libc",
  "vt100",
@@ -3089,7 +3089,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling-desktop"
-version = "0.18.2"
+version = "0.18.3"
 dependencies = [
  "base64 0.23.1",
  "image",
@@ -3107,7 +3107,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling-desktop-ffi"
-version = "0.18.2"
+version = "0.18.3"
 dependencies = [
  "proptest",
  "win32job",
@@ -3117,7 +3117,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling-documents"
-version = "0.18.2"
+version = "0.18.3"
 dependencies = [
  "comrak",
  "schemars",
@@ -3127,7 +3127,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling-gateway"
-version = "0.18.2"
+version = "0.18.3"
 dependencies = [
  "apple-native-keyring-store",
  "argon2",
@@ -3151,7 +3151,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling-kernel"
-version = "0.18.2"
+version = "0.18.3"
 dependencies = [
  "blake3",
  "insta",
@@ -3170,7 +3170,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling-mei"
-version = "0.18.2"
+version = "0.18.3"
 dependencies = [
  "base64 0.23.1",
  "httparse",
@@ -3183,7 +3183,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling-remote-access"
-version = "0.18.2"
+version = "0.18.3"
 dependencies = [
  "aws-lc-rs",
  "sprawling-kernel",
@@ -3192,7 +3192,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling-runtime"
-version = "0.18.2"
+version = "0.18.3"
 dependencies = [
  "base64 0.23.1",
  "find-msvc-tools",
@@ -3221,7 +3221,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling-storage"
-version = "0.18.2"
+version = "0.18.3"
 dependencies = [
  "blake3",
  "git2",
@@ -3237,7 +3237,7 @@ dependencies = [
 
 [[package]]
 name = "sprawling-wire"
-version = "0.18.2"
+version = "0.18.3"
 dependencies = [
  "aws-lc-rs",
  "axum",
@@ -4492,7 +4492,7 @@ dependencies = [
 
 [[package]]
 name = "xtask"
-version = "0.18.2"
+version = "0.18.3"
 dependencies = [
  "blake3",
  "flate2",
