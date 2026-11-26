@@ -8,6 +8,7 @@ use std::process::Command;
 
 const LIBRARY: &str = "sprawling_calyx_shell";
 const FACE: &str = "calyx";
+const CONSOLE_LEAF: &str = "DEP_SPRAWLING_CONSOLE_LEAF_ZIG_SOURCE";
 
 fn main() -> Result<(), String> {
     println!("cargo::rerun-if-env-changed=DOCS_RS");
@@ -16,12 +17,14 @@ fn main() -> Result<(), String> {
     }
     println!("cargo::rerun-if-changed=build.zig");
     println!("cargo::rerun-if-changed=shell");
-    println!("cargo::rerun-if-changed=ffi/zig");
+    let leaf = std::env::var(CONSOLE_LEAF)
+        .map_err(|err| format!("Cargo supplied no Zig source directory from sprawling-console-ffi ({CONSOLE_LEAF}): {err}"))?;
+    println!("cargo::rerun-if-changed={leaf}");
 
     let here = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").map_err(|e| e.to_string())?);
     let out = PathBuf::from(std::env::var("OUT_DIR").map_err(|e| e.to_string())?);
     let zig_target = zig_target()?;
-    built(&here, &out, &zig_target)?;
+    built(&here, &out, &zig_target, &leaf)?;
     println!(
         "cargo::rustc-link-search=native={}",
         out.join("lib").display()
@@ -68,13 +71,14 @@ fn zig_target() -> Result<String, String> {
 }
 
 #[expect(clippy::disallowed_methods, reason = "build script (child D4)")]
-fn built(here: &Path, out: &Path, zig_target: &str) -> Result<(), String> {
+fn built(here: &Path, out: &Path, zig_target: &str, leaf: &str) -> Result<(), String> {
     let status = Command::new("zig")
         .current_dir(here)
         .args([
             "build",
             "-Doptimize=safe",
             &format!("-Dtarget={zig_target}"),
+            &format!("-Dconsole-leaf={leaf}"),
             "--prefix",
         ])
         .arg(out)

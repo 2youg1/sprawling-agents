@@ -1,9 +1,9 @@
-sprawling <!-- xtask:begin workspace_version -->0.18.2<!-- xtask:end --> 改进 RefRain 的 Markdown 编辑和 PDF 阅读。Markdown 在停笔后自动保存并保留撤销历史。滚动浏览大型 PDF 时先显示页面预览，区域附件仍保留原始像素。Mei 缩短了工具执行和事件传递的等待。
+sprawling <!-- xtask:begin workspace_version -->0.18.3<!-- xtask:end --> 通过 HTTP/3 提供远程 RefRain，配对和会话走 WebTransport。RefRain 改进了 Markdown 编辑和主题预览，计划会记录任务依赖并显示分阶段进度。Mei 缩短了打开长会话和启动 Python 工具的等待。Cargo 可从分别发布的 Calyx 和渲染器包构建终端壳。
 
-Wire 仍为 82，账本格式仍为 2，配置格式仍为 1。
+Wire 从 82 升到 83，升级后请刷新已打开的 RefRain 页面。账本格式仍为 2，配置格式仍为 1。已有 `route = "h3"` 配置需移除 `command` 字段。
 
 ---
 
-sprawling 0.18.2 improves Markdown editing and PDF reading in RefRain. Markdown autosaves after a pause and retains undo history. Large PDF pages display previews while scrolling, and region attachments retain their original pixels. Mei reduces waits during tool execution and event delivery.
+sprawling 0.18.3 serves remote RefRain over HTTP/3, with WebTransport for pairing and sessions. RefRain improves Markdown editing and theme previews. Plans retain task dependencies and show progress by stage. Mei reduces waits when opening long sessions and starting Python tools. Cargo builds the terminal shell from the separately published Calyx and renderer crates.
 
-Wire stays at 82, ledger format stays at 2, and configuration format stays at 1.
+Wire moves from 82 to 83. Reload open RefRain tabs after upgrading. The ledger format stays at 2 and the configuration format stays at 1. Existing `route = "h3"` configurations remove the `command` field.

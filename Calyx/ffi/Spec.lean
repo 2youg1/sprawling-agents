@@ -184,7 +184,7 @@ pub fn seconds_since_midnight(millis: u64) -> Option<u32>; // 系统本地时区
 
 /-! D1 渲染器是一片 Zig 叶子，在它自己的包里；渲染路径的 `unsafe` 只在 leaf 那一次调用
 
-决定：控制台的排版与转义序列由 Zig 写成，静态链接进二进制；叶子只读借来的 scene、只写借来的缓冲，不读时钟、不开文件、不留状态；包的 lint 表与工作区相同，只有 `unsafe_code` 是 `deny`，`console_ffi::leaf` 里那一次调用在最窄处以 `#[expect(unsafe_code, reason = …)]` 放开，旁边一行 `SAFETY:` 写使它成立、可能为假的前提。`build.rs` 用 `zig-version` 钉住的 Zig 按目标三元组 `zig build-lib`，非 Windows 目标加 `-fPIC`；仓库里构建时这份钉与 `Sprawling/desktop/ffi/zig-version` 必须相同。`ReleaseSafe` 让叶子的每个越界与溢出检查留在发布的二进制里，失败即陷入；`panic = std.debug.no_panic`，叶子不带栈回溯机制，在每个目标上构建得一样。
+决定：控制台的排版与转义序列由 Zig 写成，静态链接进二进制；叶子只读借来的 scene、只写借来的缓冲，不读时钟、不开文件、不留状态；包的 lint 表与工作区相同，只有 `unsafe_code` 是 `deny`，`console_ffi::leaf` 里那一次调用在最窄处以 `#[expect(unsafe_code, reason = …)]` 放开，旁边一行 `SAFETY:` 写使它成立、可能为假的前提。`build.rs` 用 `zig-version` 钉住的 Zig 按目标三元组 `zig build-lib`，非 Windows 目标加 `-fPIC`；仓库里构建时这份钉与 `Sprawling/desktop/ffi/zig-version` 必须相同。Cargo 通过本包的 `links` 元数据 `zig_source` 把 Zig 源目录交给壳，供独立归档后的构建使用（`Calyx/Spec.lean` D22）。`ReleaseSafe` 让叶子的每个越界与溢出检查留在发布的二进制里，失败即陷入；`panic = std.debug.no_panic`，叶子不带栈回溯机制，在每个目标上构建得一样。
 
 理由：控制台用 Zig 实现（人的定规）。叶子是纯函数，所以边界只有两段字节与一个结果结构，scene 由 Rust 的唯一写者产生，读不懂的 scene 是写者的缺陷而不是输入。
 
