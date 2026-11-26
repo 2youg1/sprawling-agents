@@ -6,7 +6,6 @@
 import { createSignal, onSettled, Show } from "solid-js";
 import { storeValue } from "../../core/solid_store";
 
-import { encode } from "../../core/remote/base32";
 import { lockOver, pairOver, remoteUrl } from "../../core/remote/connect";
 import { forget, keep, kept, type Device } from "../../core/remote/device";
 import { invitationIn, isInvitation, type Invitation } from "../../core/remote/invitation";
@@ -66,6 +65,7 @@ export default function Remote() {
     setStanding({ kind: "invited", invitation, told: null, busy: true });
     const seed = crypto.getRandomValues(new Uint8Array(SEED_BYTES));
     const key = await keyFrom(seed);
+    seed.fill(0);
     if (key === null) {
       setStanding({ kind: "lacking", lack: "crypto" });
       return;
@@ -95,7 +95,12 @@ export default function Remote() {
       "storage" in navigator ? await navigator.storage.persist().catch(() => false) : false;
 
     history.replaceState(null, "", toFragment({ kind: "setup", group: "remote" }));
-    setStanding({ kind: "seed", seed: encode(seed), device, persisted });
+    setStanding({
+      kind: "paired",
+      device,
+      told: persisted ? null : { kind: "unpersisted" },
+      busy: false,
+    });
   }
 
   async function lock(device: Device): Promise<void> {
@@ -116,11 +121,6 @@ export default function Remote() {
     const current = standing();
     if (current.kind === "invited" && !current.busy) void pair(current.invitation);
   }
-  function seen(): void {
-    const current = standing();
-    if (current.kind === "seed")
-      setStanding({ kind: "paired", device: current.device, told: null, busy: false });
-  }
   function lockNow(): void {
     const current = standing();
     if (current.kind === "paired" && !current.busy) void lock(current.device);
@@ -137,7 +137,6 @@ export default function Remote() {
         standing={standing()}
         keeps={keeps()}
         onPair={pairNow}
-        onSeen={seen}
         onLock={lockNow}
         onForget={forgetNow}
       />

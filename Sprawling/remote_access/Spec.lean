@@ -511,7 +511,7 @@ D7 每个错误码能否不可能发生：`E_GATE_DENIED` 不能——它报的�
 - 1b 选 **aws-lc-rs**（已在依赖图里，经 rustls 引入）：它在稳定接口上提供 ML-KEM-768、ML-DSA-44、X25519、Ed25519、HKDF 与 AES-GCM，是一个带 FIPS 验证历史的库，比拼接几个各自维护的 RustCrypto crate 少一个信任面。浏览器侧：X25519、Ed25519、HKDF、AES-GCM 用 WebCrypto；ML-KEM 与 ML-DSA 需要一个纯 JS 实现，用 `@noble/post-quantum`（MIT），信任口径见 D21；加入它要改 `Tools/xtask/src/npm.rs` 的 `RUNTIME` 表，是一次门的改动，按 AGENTS.md 单独提交。
 - 互通向量（§8-12）不加依赖：十六进制的读写在测试里，不引入 JSON 解析器（D20）。
 
-D21 浏览器一侧的 ML-KEM 与 ML-DSA 用 `@noble/post-quantum`，精确钉版本，只由远程页面懒加载；种子只在配对时显示一次（定规）。它是一个自审、未经独立审计的 0.x 库，而 Rust 一侧选 aws-lc-rs 的理由之一是它的 FIPS 验证历史，两侧的信任口径因此不同；接受它的条件是它的 ML-KEM-768 与 ML-DSA-44 过 §8-12 的向量与夹具。版本号只写在 `RefRain/package.json`，`Tools/xtask/src/npm.rs` 的 `RUNTIME` 表收它一项，两处都归客户端的那次改动。懒加载让没有打开远程页面的人不为它付字节。种子：页面在配对时把 52 个字符的种子给人看一次，不保存；两半密钥分开保存，Ed25519 那一半是 WebCrypto 的不可导出密钥（D1）。代价是重装 PWA 就要重新配对。落选的三种：把 aws-lc 或 RustCrypto 编成 wasm（两端同源，体积推断大一个数量级，aws-lc 编 wasm 未验证）；等浏览器原生支持 ML-KEM 与 ML-DSA（远程门推迟到不定的时候）；种子加密后存进 IndexedDB（页面持有种子，D1 的不可导出就不成立）。出现独立审计，或主流引擎的 WebCrypto 原生提供这两种算法时，重新考虑这一条。
+D21 浏览器一侧的 ML-KEM 与 ML-DSA 用 `@noble/post-quantum`，只由远程页面懒加载。它是一个自审、未经独立审计的 0.x 库，而 Rust 一侧选 aws-lc-rs 的理由之一是它的 FIPS 验证历史，两侧的信任口径因此不同；接受它的条件是它的 ML-KEM-768 与 ML-DSA-44 过 §8-12 的向量与夹具。版本号只写在 `RefRain/package.json`，`Tools/xtask/src/npm.rs` 的 `RUNTIME` 表收它一项，两处都归客户端的那次改动。懒加载让没有打开远程页面的人不为它付字节。种子仅供浏览器派生设备密钥。种子能重建两半私钥，页面不显示也不持久保存；两半密钥分开保存，Ed25519 那一半是 WebCrypto 的不可导出密钥（D1）。代价是重装 PWA 就要重新配对。落选的三种：把 aws-lc 或 RustCrypto 编成 wasm（两端同源，体积推断大一个数量级，aws-lc 编 wasm 未验证）；等浏览器原生支持 ML-KEM 与 ML-DSA（远程门推迟到不定的时候）；种子加密后存进 IndexedDB（页面持有种子，D1 的不可导出就不成立）。出现独立审计，或主流引擎的 WebCrypto 原生提供这两种算法时，重新考虑这一条。
 -/
 
 /-! ## 14 硬编码声明

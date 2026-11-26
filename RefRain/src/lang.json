@@ -7023,18 +7023,6 @@
     "en": "This browser keeps no IndexedDB for this page, so a paired key would be lost at once.",
     "zh": "这个浏览器不给这一页 IndexedDB，配对得到的钥匙会立刻丢掉。"
   },
-  "remote_seed": {
-    "en": "Your device seed",
-    "zh": "你的设备种子"
-  },
-  "remote_seed_about": {
-    "en": "Shown once and kept nowhere. Reinstalling this page means pairing again.",
-    "zh": "只显示这一次，哪里都不保存。重装这一页就要重新配对。"
-  },
-  "remote_seed_seen": {
-    "en": "I have written it down",
-    "zh": "我记下了"
-  },
   "remote_persist_refused": {
     "en": "The browser did not promise to keep this page's storage. It may clear it when space runs short, and then this device pairs again.",
     "zh": "浏览器没有答应保留这一页的存储。空间吃紧时它可能清掉，那时这台设备要重新配对。"
@@ -11762,10 +11750,6 @@
   "remote_step_device": {
     "en": "On the other device, scan the code or open the link. The link looks like this; the page it opens says Pair this device.",
     "zh": "在另一台设备上扫码或打开链接。链接长这样；打开的页面写着「配对这台设备」。"
-  },
-  "remote_step_seed": {
-    "en": "Press Pair on the device. It shows a seed once, in groups of four letters; write it down, then press the button under it.",
-    "zh": "在设备上按「配对」。它只显示一次种子，四个字母一组；抄下来，再按它下面的按钮。"
   },
   "remote_restart_unknown": {
     "en": "When the city's computer restarts: on Windows and macOS the pairing stays, kept by Credential Manager or the Keychain; on Linux it lasts until the computer reboots, unless the city uses the encrypted vault file. Open the dependencies page to see which this city has.",
