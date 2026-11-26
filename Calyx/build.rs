@@ -4,24 +4,33 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, ExitCode};
 
 const LIBRARY: &str = "sprawling_calyx_shell";
 const FACE: &str = "calyx";
 const CONSOLE_LEAF: &str = "DEP_SPRAWLING_CONSOLE_LEAF_ZIG_SOURCE";
 
-fn main() -> Result<(), String> {
+fn main() -> ExitCode {
+    match build() {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("{error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn build() -> Result<(), String> {
     println!("cargo::rerun-if-env-changed=DOCS_RS");
     if std::env::var_os("DOCS_RS").is_some() {
         return Ok(());
     }
     println!("cargo::rerun-if-changed=build.zig");
     println!("cargo::rerun-if-changed=shell");
-    let leaf = std::env::var(CONSOLE_LEAF)
-        .map_err(|err| format!("Cargo supplied no Zig source directory from sprawling-console-ffi ({CONSOLE_LEAF}): {err}"))?;
+    let here = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").map_err(|e| e.to_string())?);
+    let leaf = leaf_source(&here)?;
     println!("cargo::rerun-if-changed={leaf}");
 
-    let here = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").map_err(|e| e.to_string())?);
     let out = PathBuf::from(std::env::var("OUT_DIR").map_err(|e| e.to_string())?);
     let zig_target = zig_target()?;
     built(&here, &out, &zig_target, &leaf)?;
@@ -39,6 +48,31 @@ fn main() -> Result<(), String> {
     }
     install_face(&out, &target_os)?;
     Ok(())
+}
+
+fn leaf_source(here: &Path) -> Result<String, String> {
+    std::env::var(CONSOLE_LEAF).map_err(|source| {
+        let path = here.join("Cargo.toml").display().to_string();
+        let value = match source {
+            std::env::VarError::NotPresent => "<missing>".to_owned(),
+            std::env::VarError::NotUnicode(raw) => format!("{raw:?}"),
+        };
+        let target = std::env::var_os("TARGET").map_or_else(
+            || "<target>".to_owned(),
+            |value| value.to_string_lossy().into_owned(),
+        );
+        format!(
+            r#"```toml
+code = "E_CALYX_ZIG_SOURCE"
+action = "build the Calyx shell"
+subject = "sprawling-calyx"
+path = {path:?}
+value = {value:?}
+rule = "Cargo supplies {CONSOLE_LEAF} from sprawling-console-ffi's zig_source metadata"
+fix = "Remove the [target.{target}.sprawling_console_leaf] table from Cargo configuration and rerun cargo build --locked -p sprawling-calyx"
+```"#
+        )
+    })
 }
 
 fn zig_target() -> Result<String, String> {
