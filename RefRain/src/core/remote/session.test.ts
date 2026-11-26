@@ -8,7 +8,7 @@ import { describe, expect, test } from "bun:test";
 import type { Line } from "../line";
 import type { Door, Refusal } from "./connect";
 import type { Session } from "./handshake";
-import { reach } from "./pipe";
+import { reach } from "./transport";
 import { opener, payloadBytes, payloadOf, sealer } from "./seal";
 import { talk } from "./session";
 
@@ -91,12 +91,12 @@ async function settled(until: () => boolean): Promise<void> {
 const texts = Array.from({ length: FRAMES }, (_, at) => `{"frame":${String(at)}}`);
 
 describe("a line over a remote session", () => {
-  test("streams a batch bigger than the buffer without closing the pipe", async () => {
-    const previous = Object.getOwnPropertyDescriptor(globalThis, "location");
-    const fetch = globalThis.fetch;
+  test("preserves ordered frames across fragmented duplex stream chunks and backpressure", async () => {
+    const location = Object.getOwnPropertyDescriptor(globalThis, "location");
+    const transport = Object.getOwnPropertyDescriptor(globalThis, "WebTransport");
     const origin = "https://city.example";
-    Object.defineProperty(globalThis, "location", { configurable: true, value: new URL(origin) });
     const frames = Array.from({ length: 12 }, (_, value) => value);
+    const sent: number[][] = [];
     const bytes = new Uint8Array([
       ...frames.flatMap((value) => [0, 0, 0, 0, 1, value]),
       1,
@@ -105,21 +105,45 @@ describe("a line over a remote session", () => {
       0,
       0,
     ]);
-    globalThis.fetch = Object.assign(
-      () => Promise.resolve(new Response(bytes, { headers: { "x-sprawling-pipe": "test" } })),
-      { preconnect: fetch.preconnect },
-    );
+    class Loop {
+      readonly ready = Promise.resolve();
+      readonly closed = Promise.resolve();
+      close() {}
+      createBidirectionalStream() {
+        return Promise.resolve({
+          readable: new ReadableStream({
+            start(controller) {
+              controller.enqueue(bytes.slice(0, 3));
+              controller.enqueue(bytes.slice(3));
+              controller.close();
+            },
+          }),
+          writable: new WritableStream<Uint8Array>({
+            write(chunk) {
+              sent.push(Array.from(chunk));
+            },
+          }),
+        });
+      }
+    }
+    Object.defineProperty(globalThis, "location", { configurable: true, value: new URL(origin) });
+    Object.defineProperty(globalThis, "WebTransport", { configurable: true, value: Loop });
     await (async () => {
-      const pipe = await reach(origin + "/remote/session", new Uint8Array());
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      const door = await reach(origin + "/remote/session", new Uint8Array([55]));
+      door?.send(new Uint8Array([56, 57]));
       const received = [];
-      for (const _frame of frames) received.push((await pipe?.next())?.[0]);
+      for (const _frame of frames) received.push((await door?.next())?.[0]);
       expect(received).toEqual(frames);
-      expect(await pipe?.closed).toBeNull();
+      expect(await door?.closed).toBeNull();
+      expect(sent).toEqual([
+        [0, 0, 0, 0, 1, 55],
+        [0, 0, 0, 0, 2, 56, 57],
+      ]);
     })().finally(() => {
-      globalThis.fetch = fetch;
-      if (previous === undefined) Reflect.deleteProperty(globalThis, "location");
-      else Object.defineProperty(globalThis, "location", previous);
+      if (location === undefined) Reflect.deleteProperty(globalThis, "location");
+      else Object.defineProperty(globalThis, "location", location);
+      if (transport === undefined) Reflect.deleteProperty(globalThis, "WebTransport");
+      else Object.defineProperty(globalThis, "WebTransport", transport);
     });
   });
 

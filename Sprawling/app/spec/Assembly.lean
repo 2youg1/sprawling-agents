@@ -198,27 +198,17 @@ pub(super) fn dropping(city_root: PathBuf) -> wire::DropSink;   // listening 把
 -/
 
 /-!
-## 8-151 `/remote open` 按城的 `[remote]` 选通路（`bin::assembly::remote_door`，形状：adapter；`Sprawling/city/Spec.lean` §8-39，Sprawling/remote_access/Spec.lean §8-7 到 §8-9、D22）
+## 8-151 `/remote open` 按城的 `[remote]` 选通路（`bin::assembly::remote_door`，形状：adapter；`Sprawling/city/Spec.lean` §8-39，Sprawling/remote_access/Spec.lean §8-10）
 
-§8-139 的门有了看守、监听与中继，但没有一条通路能把它从这台电脑之外够到。这一节把城的 `[remote]` 表接到 `remote_access::route` 这条缝上。
+操作者更新城级 `[remote]` 后，下一次开门将新设置绑定到城进程内的 QUIC 入口。HTTPS 源和 PEM 文件经验证后绑定 UDP，账本成功记录开门才开始接收连接。端口、证书或账本出错时保留关闭状态。关门释放入口，停止现有连接。
 
 ```rust
-// bin::outside::keeper
-pub(crate) type Choosing = Box<dyn FnMut() -> Result<Box<dyn Route + Send>, AxError> + Send>;
-// bin::assembly::remote_door
-const ROUTE_PATIENCE: TimeoutMs = TimeoutMs(30_000);     // 一次 open 最长等多久
-fn chosen(city_root: &Path) -> Result<Box<dyn Route + Send>, AxError>;
+pub(crate) struct Reaching { pub(crate) city_root: PathBuf, /* runtime, city, token, page */ }
+pub(super) fn open(doorway: &Doorway, reaching: &Reaching, lasting: Lasting) -> Result<Url, AxError>;
 ```
 
-- **一处选择**：`chosen` 读 `city::remote_route`（`Sprawling/city/Spec.lean` §8-39）。`H3` 构造城所在机器 `Caddy` 网关，接到城的回环远程监听。`Cloudflare` 答迁移拒绝，`Command` 只接受输出回环地址；两种拒绝都点名城的配置文件与失败值。`Outdoors::keep` 把一个读城根的闭包交给 `Keeping.choose`，门在每次 `open` 时调它（§8-139）。
-- **拒绝**：没配 `[remote]`、公网配置错误或网关未就绪均在开门之前拒绝，账本没有开门记录。一次启动等待最多 30 秒。
-- **绑定之后的地址**：`Outdoors` 与另外三个读者——`bin::main::city` 印的横幅、控制台 `/serving` 印的地址、打开浏览器探的地址——读的都是绑定之后的地址：`wire::Bound::local_addr`（`Sprawling/wire/Spec.lean` §8-46，wire D16）在绑定时读一次，`assembly::listening` 经 `Listening::local_addr` 把它交给 `Outdoors::new` 与这三个读者。城在 `:0` 上服务时，中继连的是系统分到的那个端口，端到端测试因此在 `127.0.0.1:0` 上起城。**被否**：`listening` 先在 `:0` 上试绑一次拿到端口、放掉，再把具体端口交给 `wire::bind`（试绑与真绑之间别的进程可以把端口拿走，`Sprawling/wire/Spec.lean` §8-46 已否这一做法）。
+集成场景用两种浏览器或 Rust 设备从同一个 HTTPS 源取页面、完成首次配对和后续签名认证，再在一条流中并行发送命令和读取事件。异常场景检查外源、禁用的旧传输、已撤销设备和关门后的拒绝。
 
-**测试**：
-
-- `assembly::remote_door::tests::a_city_with_no_remote_table_is_refused_naming_the_table`：城那一层没有 `[remote]`，`chosen` 答 `E_CONFIG_INVALID`，恢复语里有 `route`、`tunnel`、`url`、`command`、`permanence`。
-- `assembly::remote_door::tests::the_route_the_table_names_is_the_one_that_opens`：`command` 一臂写一个不存在的程序，打开时的拒绝是 `E_TOOL_UNAVAILABLE` 且主体带那个程序名；`cloudflare` 的设置答出 `E_CONFIG_INVALID` 和城所在机器 `h3` 的迁移说明。
-- `Sprawling/app/tests/remote_door/main.rs::a_device_reaches_the_city_through_the_door_over_real_sockets`：`assembly::init_city` 造城，城那一层写 `[remote] route = "command"`，命令是这个测试程序自己（`route_stand_in`，一个只在被当作通路时做事的被忽略的测试：它从 `SPRAWLING_REMOTE_LOCAL` 读到回环地址，印出 `{"url": "https://<那个地址>"}` 后等着被结束），于是「外面」就是回环本身。起 `sprawling serve <城> 127.0.0.1:0 --console`，在它的标准输入上打 `/remote open`、`/remote pair phone`，从印出的链接读出配对码与指纹；设备一侧用 `remote_access` 在 `/remote/pair` 上配对、在 `/remote/session` 上建会话；会话里发线协议的 `Hello`、一个 `Read` 帧（`Ask` `Metrics`，答回 `Answered`）、一个 `Act` 帧（`Halt` 全城，设备收到 `city_halted` 的事件帧）与一个 `LocalOnly` 帧（`Reveal`，答回 `E_GATE_DENIED` 的 `Refusal`）；再打 `/remote close`。结束城之后读账：远程门的四行与 `city_halted` 依次是 `remote_opened`、`device_paired`、`remote_session_started`、`city_halted`、`remote_closed`。
 -/
 
 /-! D16 远程门的五行经 worker 的 relay 写，不经命令桌
@@ -228,12 +218,12 @@ fn chosen(city_root: &Path) -> Result<Box<dyn Route + Send>, AxError>;
 
 /-! D17 通路在每次 `/remote open` 时按 `[remote]` 造出，随门开、随门关（§8-151）
 
-人改了城的 `[remote]`，下一次 `/remote open` 就用新的通路，不必重启城：城的签名密钥只活在这个进程里（Sprawling/remote_access/Spec.lean §3），重启一次，每台设备都要重新配对。选择只有 `remote_door::chosen` 一处，它对 `city::RemoteRoute` 穷尽匹配，`Doorway` 只认 `Route` 这条缝。**被否**：开城时读一次、把造好的通路放进 `Keeping`（改了配置要重启城，代价是全部设备重新配对；配错的 `[remote]` 还会让 `/remote devices`、`/remote revoke` 这些与通路无关的动词一起失效）；让 `remote_access` 的通路类型自己从 TOML 读出（第二个配置读者，梯子与拒法要再写一遍，remote_access D22）。**重开参数**：通路的打开变得昂贵到要在开城时预热，或一座城要同时开着几条通路。
+下次开门重新读 `[remote]`。证书更新与监听地址调整无需重启城市。开门时读错配置只拒绝开门，设备列表、撤销和换钥匙仍可用。落选：启动时准备入口，会让配置失败影响其他动词，并要求重启才能应用新证书。
 -/
 
 /-! D18 远程门的端到端测试用 Rust 写，起真二进制（§8-151）
 
-黑盒检查按 `xtask boundary` 归 `Tools/adversary/` 的 Lean，可设备那一半的配对握手、会话握手与封装（ML-KEM、ML-DSA、AES-GCM）只在 `remote_access` 里有实现，Lean 那一侧今天说不了远程门的话；在 Lean 里再实现一遍，就是第二份密码学。所以 `Sprawling/app/tests/remote_door/main.rs` 起 `sprawling serve`，以 `remote_access` 的设备一侧走真套接字，起二进制与开 WebSocket 的几行各带 `boundary-ok`。**被否**：在进程内驱动 `bin::outside`（`outside` 不是库的公开面，而且那样测不到控制台读 `/remote open`、装配层读 `[remote]`、命令通路起子进程这三段生产路径）。**重开参数**：`Tools/adversary/` 有了一个能做混合签名与封装的设备，这条测试就搬过去，`boundary-ok` 随之删掉。
+`Sprawling/app/tests/remote_door/main.rs` 起真实 `sprawling serve`，使用独立 WebTransport 客户端和 `remote_access` 设备密码学。测试从生产入口走配对、签名会话、复用页面、协议拒绝和控制台确认，并用真实配对 Hello 的截断与异常长度验证读帧边界。进程内测试无法走完配置、TLS、HTTP/3 和浏览器帧入口。
 -/
 
 /-!

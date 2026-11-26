@@ -12,17 +12,32 @@ use serde_json::Value;
 use crate::ContextId;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct OwnListeners(BTreeSet<SocketAddr>);
+pub struct OwnListeners {
+    sockets: BTreeSet<SocketAddr>,
+    origins: BTreeSet<(String, u16)>,
+}
 
 impl OwnListeners {
     #[must_use]
     pub fn new(listeners: impl IntoIterator<Item = SocketAddr>) -> OwnListeners {
-        OwnListeners(listeners.into_iter().collect())
+        OwnListeners {
+            sockets: listeners.into_iter().collect(),
+            origins: BTreeSet::new(),
+        }
+    }
+
+    #[must_use]
+    pub fn with_origins(mut self, origins: impl IntoIterator<Item = String>) -> OwnListeners {
+        self.origins
+            .extend(origins.into_iter().filter_map(|origin| {
+                host_and_port(&origin).map(|(host, port)| (host.to_ascii_lowercase(), port))
+            }));
+        self
     }
 
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.sockets.is_empty() && self.origins.is_empty()
     }
 
     #[must_use]
@@ -30,18 +45,23 @@ impl OwnListeners {
         let Some((host, port)) = host_and_port(url) else {
             return false;
         };
+        let name = host.to_ascii_lowercase();
         let literal = host.parse::<IpAddr>().ok().map(|ip| ip.to_canonical());
         let loopback = literal.map_or_else(
-            || {
-                let name = host.to_ascii_lowercase();
-                name == "localhost" || name.ends_with(".localhost")
-            },
+            || name == "localhost" || name.ends_with(".localhost"),
             |ip| ip.is_loopback(),
         );
-        self.0.iter().filter(|at| at.port() == port).any(|at| {
-            let bound = at.ip().to_canonical();
-            loopback || literal == Some(bound) || (bound.is_unspecified() && literal.is_some())
-        })
+        self.origins.contains(&(name, port))
+            || self
+                .sockets
+                .iter()
+                .filter(|at| at.port() == port)
+                .any(|at| {
+                    let bound = at.ip().to_canonical();
+                    loopback
+                        || literal == Some(bound)
+                        || (bound.is_unspecified() && literal.is_some())
+                })
     }
 
     pub fn refuse(&self, action: &str, url: &str) -> Result<(), AxError> {

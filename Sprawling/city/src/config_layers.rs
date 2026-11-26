@@ -43,7 +43,7 @@ pub use catalog_session::{
 };
 pub use city_layer::{CitySetting, stated_city_config, write_city_setting};
 pub use ladder::Layer;
-pub use remote::{HostPermanence, RemoteRoute, remote_route};
+pub use remote::{RemoteRoute, remote_route};
 pub use resident::settled_harness;
 pub use search::{city_search, default_search_supplier};
 pub use search::{search_supplier, settled_search, write_search};
@@ -183,7 +183,7 @@ impl ConfigLayer {
                 .and_then(|section| section.shelves.clone()),
             skill_pins: file.skills.map(|section| section.pins).unwrap_or_default(),
             naming: file.identity.map(|section| section.version),
-            remote: file.remote.map(remote::stated).transpose()?,
+            remote: file.remote,
             agents: file.agent.map(agents::rows).transpose()?,
             catalog: file.catalog.map(catalog::stated).transpose()?,
         })

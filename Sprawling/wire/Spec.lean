@@ -402,7 +402,6 @@ aggregate ──▶ 上游 City 的 WS 连接（发送面类型上只收 Query�
 | D53 | V0.0.11 的线上改形一次进位，由第一条车道落地 | `Sprawling/wire/spec/Frames.lean` |
 | D54 | 每个调用方都要非环境凭据，入口先判 Host 与 Origin | `Sprawling/wire/spec/Reception/Entry.lean` |
 | D55 | 会话令牌在最后一条 socket 结束后空闲 60 s 失效 | `Sprawling/wire/spec/Server/Sessions.lean` |
-| D56 | 远程监听有自己的 Host 与 Origin 名单，由同一个 `decide_entry` 判 | `Sprawling/wire/spec/Reception/Entry.lean` |
 | D57 | 人打的 id 走 `AttachEndpoint.named`，模型行带 `listing` | `Sprawling/wire/spec/Frames.lean` |
 | D58 | 模型表的占位由城的梯子按行作答，来源是一个闭集的枚举 | `Sprawling/wire/spec/Answer/ModelFigures.lean` |
 | D59 | 建楼页：`CreateBuilding` 带人写的规则与可缺的主机导入源，楼行标出可收编的文件夹，模板字节可先问 | `Sprawling/wire/spec/Frames.lean` |

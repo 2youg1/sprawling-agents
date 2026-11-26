@@ -8,5 +8,4 @@ pub mod door;
 pub mod handshake;
 pub mod keys;
 pub mod pairing;
-pub mod route;
 pub mod seal;

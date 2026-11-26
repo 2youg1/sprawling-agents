@@ -12,20 +12,21 @@
 )]
 
 mod harness;
+mod public_door;
 use harness::*;
+use public_door::{PublicDoor, Visit};
 
 use std::time::Duration;
 
 use futures_util::StreamExt;
 use kernel::{AxCode, EventKind, EventRecord, IdemKey, RunId, Seq};
 use remote_access::handshake::{CityFingerprint, Invitation};
-use remote_access::route::command::LOCAL_ENV;
 
 #[expect(
     clippy::disallowed_methods,
     reason = "each remote door and its client inherit the same isolated home"
 )]
-fn serve_workspace() -> Option<(accounting::worker::InitReport, Served)> {
+fn serve_workspace() -> Option<(accounting::worker::InitReport, Served, PublicDoor)> {
     const CASE: &str = "SPRAWLING_REMOTE_DOOR_TEST_CASE";
     let thread = std::thread::current();
     let case = thread.name().unwrap();
@@ -48,32 +49,21 @@ fn serve_workspace() -> Option<(accounting::worker::InitReport, Served)> {
     let workspace = home.path().join("workspace");
     let private = home.workspace(&workspace).unwrap();
     let raised = sprawling::assembly::init_city(&private).unwrap();
-    choose_this_binary_as_the_route(&private);
-    Some((raised, Served::start(&workspace)))
-}
-
-#[test]
-#[ignore = "the route command the end-to-end test starts; it does nothing on its own"]
-fn route_stand_in() {
-    let Ok(local) = std::env::var(LOCAL_ENV) else {
-        return;
-    };
-
-    println!("\n{{\"url\": \"https://{local}\"}}");
-
-    std::thread::sleep(PATIENCE.saturating_mul(2));
+    let gateway = PublicDoor::configure(&private);
+    Some((raised, Served::start(&workspace), gateway))
 }
 
 #[test]
 fn a_device_reaches_the_city_through_the_door_over_real_sockets() {
-    let Some((raised, mut city)) = serve_workspace() else {
+    let Some((raised, mut city, gateway)) = serve_workspace() else {
         return;
     };
 
     let opened = city.type_line("/remote open --for 1h", "the remote door is open");
-    let at = between(&opened, "at https://", char::is_whitespace);
+    let address = between(&opened, "at https://", char::is_whitespace);
     let home = between(&opened, "WebUI    http://", char::is_whitespace);
-    let page = fetched(&at, "/");
+    assert!(std::net::TcpStream::connect(address.trim_end_matches('/')).is_err());
+    let page = gateway.page();
     let served_at_home = fetched(&home, "/");
     let invited = city.type_line(&format!("/remote pair {PHONE}"), "pairing code");
     let invitation = Invitation {
@@ -81,7 +71,7 @@ fn a_device_reaches_the_city_through_the_door_over_real_sockets() {
         code: between(&invited, "#pair=", |each| each == '&'),
     };
 
-    let answered = visit(&at, &invitation);
+    let answered = gateway.visit(&invitation);
     let closed = city.type_line("/remote close", "the remote door is closed");
     drop(city);
 
@@ -102,10 +92,9 @@ fn a_device_reaches_the_city_through_the_door_over_real_sockets() {
         })
         .collect();
     assert_eq!(
-        (page.0.contains(" 200 "), page, answered, door),
+        (page, answered, door),
         (
-            true,
-            served_at_home,
+            served_at_home.2,
             Visit {
                 welcomed: true,
                 read_answered: true,
@@ -155,7 +144,7 @@ const SPACED: Duration = Duration::from_millis(remote_access::confirm::CONFIRM_S
 
 #[test]
 fn a_page_opens_the_door_only_with_the_code_the_console_printed() {
-    let Some((raised, mut city)) = serve_workspace() else {
+    let Some((raised, mut city, _gateway)) = serve_workspace() else {
         return;
     };
     let banner = city.type_line("/remote devices", "no device is paired");
@@ -246,7 +235,7 @@ fn a_page_opens_the_door_only_with_the_code_the_console_printed() {
 
 #[test]
 fn ten_wrong_codes_lock_the_pages_door_verbs_and_close_the_door() {
-    let Some((raised, mut city)) = serve_workspace() else {
+    let Some((raised, mut city, _gateway)) = serve_workspace() else {
         return;
     };
     let banner = city.type_line("/remote devices", "no device is paired");

@@ -7112,8 +7112,8 @@
     "zh": "门结束了这次连接，没有说原因。"
   },
   "remote_unreachable": {
-    "en": "Nothing answers here. Is the door open, and is this the address the console printed?",
-    "zh": "这里没有回答。门开着吗？这是控制台印出的那个地址吗？"
+    "en": "Could not connect. Check that the door is open, use the address shown in the console, and make sure your browser supports WebTransport.",
+    "zh": "连接失败。请确认远程门已打开，使用控制台显示的地址，并确认浏览器支持 WebTransport。"
   },
   "run_cached": {
     "en": "cached",
