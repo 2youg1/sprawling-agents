@@ -43,7 +43,14 @@ pub(crate) struct Reaching {
     pub(crate) page: Arc<wire::ClientAssets>,
 }
 
+struct Bound {
+    endpoint: quinn::Endpoint,
+    address: SocketAddr,
+    serving: Serving,
+}
+
 struct Listening {
+    _registered: crate::browser_tool::Served,
     endpoint: quinn::Endpoint,
     task: tokio::task::AbortHandle,
 }
@@ -63,9 +70,15 @@ pub(super) fn open(
     doorway.open(
         lasting,
         || prepare(doorway, reaching),
-        |(endpoint, serving)| {
+        |Bound {
+             endpoint,
+             address,
+             serving,
+         }| {
+            let registered = crate::browser_tool::serve_public(address, &serving.origin);
             let task = reaching.runtime.spawn(serve(endpoint.clone(), serving));
             Box::new(Listening {
+                _registered: registered,
                 endpoint,
                 task: task.abort_handle(),
             })
@@ -73,10 +86,7 @@ pub(super) fn open(
     )
 }
 
-fn prepare(
-    doorway: &Doorway,
-    reaching: &Reaching,
-) -> Result<(Url, (quinn::Endpoint, Serving)), AxError> {
+fn prepare(doorway: &Doorway, reaching: &Reaching) -> Result<(Url, Bound), AxError> {
     let RemoteRoute::H3 {
         url,
         listen,
@@ -110,18 +120,22 @@ fn prepare(
         quinn::Endpoint::server(tls, listen)
             .map_err(|source| invalid(&file, "listen", &listen, &source))?
     };
+    let address = endpoint
+        .local_addr()
+        .map_err(|source| invalid(&file, "listen", &listen, &source))?;
     Ok((
         origin.clone(),
-        (
+        Bound {
             endpoint,
-            Serving {
+            address,
+            serving: Serving {
                 doorway: doorway.clone(),
                 reaching: reaching.clone(),
                 serialized_origin: origin.origin().ascii_serialization(),
                 origin,
                 page,
             },
-        ),
+        },
     ))
 }
 
@@ -202,21 +216,29 @@ async fn serve(endpoint: quinn::Endpoint, serving: Serving) {
 
 async fn answer(incoming: quinn::Incoming, serving: Serving) -> Result<(), Failure> {
     let connection = tokio::time::timeout(HANDSHAKE_PATIENCE, incoming).await??;
-    let mut h3 = h3::server::builder()
+    let mut builder = h3::server::builder();
+    builder
         .enable_webtransport(true)
         .enable_extended_connect(true)
         .enable_datagram(true)
-        .max_webtransport_sessions(1)
-        .build(h3_quinn::Connection::new(connection.clone()))
-        .await?;
-    while let Some(resolver) = h3.accept().await? {
-        let (request, mut response) =
+        .max_webtransport_sessions(1);
+    let mut h3 = tokio::time::timeout(
+        HANDSHAKE_PATIENCE,
+        builder.build(h3_quinn::Connection::new(connection.clone())),
+    )
+    .await??;
+    while let Some(resolver) = tokio::time::timeout(HANDSHAKE_PATIENCE, h3.accept()).await?? {
+        let (request, response) =
             tokio::time::timeout(HANDSHAKE_PATIENCE, resolver.resolve_request()).await??;
         let status = if !serving.addressed(&request) {
             StatusCode::MISDIRECTED_REQUEST
         } else if let Some(run) = run(&request) {
             if serving.same_origin(&request) {
-                let session = WebTransportSession::accept(request, response, h3).await?;
+                let session = tokio::time::timeout(
+                    HANDSHAKE_PATIENCE,
+                    WebTransportSession::accept(request, response, h3),
+                )
+                .await??;
                 carry(&session, &serving, run).await?;
                 if let Err(_expired) =
                     tokio::time::timeout(HANDSHAKE_PATIENCE, connection.closed()).await
@@ -236,15 +258,11 @@ async fn answer(incoming: quinn::Incoming, serving: Serving) -> Result<(), Failu
         } else {
             StatusCode::METHOD_NOT_ALLOWED
         };
-        response
-            .send_response(
-                Response::builder()
-                    .status(status)
-                    .header(header::CACHE_CONTROL, "no-store")
-                    .body(())?,
-            )
-            .await?;
-        response.finish().await?;
+        let refused = Response::builder()
+            .status(status)
+            .header(header::CACHE_CONTROL, "no-store")
+            .body(Body::empty())?;
+        tokio::time::timeout(HANDSHAKE_PATIENCE, page(response, refused)).await??;
     }
     Ok(())
 }

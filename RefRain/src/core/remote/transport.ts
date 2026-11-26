@@ -9,6 +9,7 @@ import type { Refused } from "./handshake";
 const HEADER_BYTES = 5;
 const MAX_FRAME_BYTES = 64 * 1024 * 1024;
 const MAX_READY_FRAMES = 8;
+const OPEN_TIMEOUT_MS = 10_000;
 
 type FrameBytes = Uint8Array<ArrayBuffer>;
 
@@ -72,9 +73,12 @@ export async function reach(url: string, first: FrameBytes): Promise<Door | null
     .catch(() => null);
   if (transport === null) return null;
   void transport.closed.catch(() => null);
-  const stream = await transport.ready
-    .then(() => transport.createBidirectionalStream())
-    .catch(() => null);
+  const { promise: timeout, resolve: expired } = Promise.withResolvers<null>();
+  const timer = setTimeout(() => expired(null), OPEN_TIMEOUT_MS);
+  const stream = await Promise.race([
+    timeout,
+    transport.ready.then(() => transport.createBidirectionalStream()).catch(() => null),
+  ]).finally(() => clearTimeout(timer));
   if (stream === null) {
     transport.close();
     return null;

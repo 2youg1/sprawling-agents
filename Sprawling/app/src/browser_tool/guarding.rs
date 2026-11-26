@@ -8,17 +8,37 @@ use std::sync::Mutex;
 
 use browser::OwnListeners;
 
-static LISTENING: Mutex<Vec<SocketAddr>> = Mutex::new(Vec::new());
+#[derive(Clone, PartialEq, Eq)]
+struct Entrance {
+    address: SocketAddr,
+    origin: Option<String>,
+}
+
+static LISTENING: Mutex<Vec<Entrance>> = Mutex::new(Vec::new());
 
 #[must_use = "the address is taken back when this is dropped"]
-pub(crate) struct Served(SocketAddr);
+pub(crate) struct Served(Entrance);
 
-pub(crate) fn serve(at: SocketAddr) -> Served {
+pub(crate) fn serve(address: SocketAddr) -> Served {
+    register(Entrance {
+        address,
+        origin: None,
+    })
+}
+
+pub(crate) fn serve_public(address: SocketAddr, origin: &reqwest::Url) -> Served {
+    register(Entrance {
+        address,
+        origin: Some(origin.origin().ascii_serialization()),
+    })
+}
+
+fn register(entrance: Entrance) -> Served {
     LISTENING
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .push(at);
-    Served(at)
+        .push(entrance.clone());
+    Served(entrance)
 }
 
 impl Drop for Served {
@@ -33,11 +53,31 @@ impl Drop for Served {
 }
 
 pub(super) fn own() -> OwnListeners {
-    OwnListeners::new(
-        LISTENING
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .iter()
-            .copied(),
-    )
+    let listening = LISTENING
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    OwnListeners::new(listening.iter().map(|door| door.address))
+        .with_origins(listening.iter().filter_map(|door| door.origin.clone()))
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, reason = "test code")]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_public_door_guards_its_host_and_bound_port_until_closed() {
+        let bound = "127.0.0.1:45432".parse().unwrap();
+        let origin = reqwest::Url::parse("https://city.example").unwrap();
+        let door = serve_public(bound, &origin);
+        let listeners = own();
+        assert!(listeners.holds("https://city.example:443/#/city"));
+        assert!(listeners.holds("https://localhost:45432/"));
+        assert!(!listeners.holds("https://work.example/"));
+        assert!(!listeners.holds("https://localhost:45433/"));
+
+        drop(door);
+        assert!(!own().holds("https://city.example:443/#/city"));
+        assert!(!own().holds("https://localhost:45432/"));
+    }
 }

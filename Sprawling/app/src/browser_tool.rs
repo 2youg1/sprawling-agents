@@ -25,7 +25,7 @@ mod surveying;
 
 use building::BUILDING_DISCLOSURE;
 pub(crate) use building::for_rules;
-pub(crate) use guarding::serve;
+pub(crate) use guarding::{Served, serve, serve_public};
 
 use person::PERSON_DISCLOSURE;
 pub(crate) use person::Role;

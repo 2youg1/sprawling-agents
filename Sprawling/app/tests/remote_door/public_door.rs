@@ -12,6 +12,7 @@
 )]
 
 use std::path::Path;
+use std::time::Duration;
 
 use axum::http::{Method, Request, StatusCode};
 use bytes::Buf;
@@ -124,11 +125,17 @@ async fn exchange(
     socket.send(&sealed).await;
     loop {
         let sealed = socket.receive().await;
-        let opened = session.opener.open(&sealed).ok()?;
-        let Payload::Frame(text) = Payload::from_bytes(&opened).ok()? else {
+        let opened = session
+            .opener
+            .open(&sealed)
+            .expect("open the city's sealed answer");
+        let Payload::Frame(text) =
+            Payload::from_bytes(&opened).expect("read the city's answer payload")
+        else {
             continue;
         };
-        let frame: wire::ServerFrame = serde_json::from_str(&text).ok()?;
+        let frame: wire::ServerFrame =
+            serde_json::from_str(&text).expect("read the city's answer frame");
         if wanted(&frame) {
             return Some(frame);
         }
@@ -211,7 +218,14 @@ pub(crate) struct PublicDoor {
 impl PublicDoor {
     pub(crate) fn configure(city_root: &Path) -> Self {
         let file = kernel::layout::CityLayout::new(city_root).city_config();
-        let before = std::fs::read_to_string(&file).unwrap_or_default();
+        let before = match std::fs::read_to_string(&file) {
+            Ok(before) => before,
+            Err(source) if source.kind() == std::io::ErrorKind::NotFound => String::new(),
+            Err(source) => panic!(
+                "read the city test settings at {}: {source}",
+                file.display()
+            ),
+        };
         let identity = Identity::self_signed(["127.0.0.1"]).unwrap();
         let certificate = file.with_file_name("door-certificate.pem");
         let key = file.with_file_name("door-key.pem");
@@ -306,7 +320,16 @@ private_key = '{}'
             tls.alpn_protocols = vec![b"h3".to_vec()];
             let tls = quinn::crypto::rustls::QuicClientConfig::try_from(tls).unwrap();
             let mut client = quinn::Endpoint::client("127.0.0.1:0".parse().unwrap()).unwrap();
-            client.set_default_client_config(quinn::ClientConfig::new(std::sync::Arc::new(tls)));
+            let mut config = quinn::ClientConfig::new(std::sync::Arc::new(tls));
+            let mut transport = quinn::TransportConfig::default();
+            transport.keep_alive_interval(Some(Duration::from_secs(1)));
+            config.transport_config(std::sync::Arc::new(transport));
+            client.set_default_client_config(config);
+            let idle = client
+                .connect(self.address, "127.0.0.1")
+                .unwrap()
+                .await
+                .unwrap();
             let quic = client
                 .connect(self.address, "127.0.0.1")
                 .unwrap()
@@ -340,6 +363,9 @@ private_key = '{}'
                     while let Some(mut next) = stream.recv_data().await.unwrap() {
                         body.extend_from_slice(&next.copy_to_bytes(next.remaining()));
                     }
+                    tokio::time::timeout(Duration::from_secs(15), idle.closed())
+                        .await
+                        .expect("the city releases a connection that sends no H3 request");
                     return body;
                 }
             }
