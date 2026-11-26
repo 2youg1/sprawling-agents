@@ -21,7 +21,7 @@ mod sources;
 mod talk;
 
 use announced::{every_control_is_announceable, every_landmark_is_named, one_first_heading};
-use engine::{Measured, Opening, browser, measure};
+use engine::{Measured, Opening, browser};
 use marks::no_key_is_underlined;
 use parts::{ROSTER, every_part_draws_its_roles};
 use pass::Pass;
@@ -98,10 +98,8 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         route: &route,
     };
     let passes = pass::wanted()?;
-    let measurements = match asked_for(SERVED_ENTRY) {
-        Some(entry) => engine::served::measure(&opening, &root.join(entry), passes)?,
-        None => measure_every(&opening, passes)?,
-    };
+    let entry = asked_for(SERVED_ENTRY).map(|file| root.join(file));
+    let measurements = engine::devtools::measure(&opening, entry.as_deref(), &passes)?;
     for (pass, measured) in measurements {
         let at = format!("{route} {}", pass.called());
         if let Some(refused) = unusable(pass, &measured, &at) {
@@ -149,43 +147,6 @@ pub(crate) fn check(root: &Path) -> Result<Vec<Violation>, XtaskError> {
         }
     }
     Ok(violations)
-}
-
-const PROCESSORS_PER_PASS: usize = 3;
-const MAX_AT_ONCE: usize = 2;
-
-fn measure_every<'p>(
-    opening: &Opening,
-    passes: Vec<&'p Pass>,
-) -> Result<Vec<(&'p Pass, Measured)>, XtaskError> {
-    let at_once = match std::thread::available_parallelism() {
-        Ok(processors) => passes_at_once(processors.get()),
-        Err(_) => 1,
-    };
-    let mut measured = Vec::with_capacity(passes.len());
-    for group in passes.chunks(at_once) {
-        measured.extend(std::thread::scope(|scope| {
-            let running: Vec<_> = group
-                .iter()
-                .map(|&pass| (pass, scope.spawn(move || measure(opening, pass))))
-                .collect();
-            running
-                .into_iter()
-                .map(|(pass, handle)| {
-                    let opened = handle.join().map_err(|_| XtaskError::Cmd {
-                        cmd: format!("cargo xtask render, {}", pass.called()),
-                        msg: "the thread that opened this pass panicked".to_owned(),
-                    })??;
-                    Ok((pass, opened))
-                })
-                .collect::<Result<Vec<_>, XtaskError>>()
-        })?);
-    }
-    Ok(measured)
-}
-
-fn passes_at_once(processors: usize) -> usize {
-    (processors / PROCESSORS_PER_PASS).clamp(1, MAX_AT_ONCE)
 }
 
 fn refusable(reading: &&Deviation<'_>) -> bool {

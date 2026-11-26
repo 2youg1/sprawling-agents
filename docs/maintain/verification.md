@@ -103,7 +103,7 @@ The Gallery inventory and these per-action traces are separate evidence. They id
 
 ### Render gate with a served client
 
-`cargo xtask render` measures the built Gallery in headless Chromium. For a Chromium installation that blocks navigation to local files, start a disposable city with the same embedded client or the same specified build directory. Save its native opener's one-use loopback URL to a private file, then run `SPRAWLING_BROWSER=<Chromium executable> cargo xtask render --served-entry <private file> --bundle <built directory>`. The tool pairs through the real entry, drives Chromium locally, and reads the same DOM probe for all five width and colour conditions. Keep the one-use URL outside the repository. The probe also rejects a page error during the served run.
+`cargo xtask render` drives headless Chromium through Bun and waits for the built Gallery to load before taking DOM measurements. For a Chromium installation that blocks navigation to local files, start a disposable city with the same embedded client or the same specified build directory. Save its native opener's one-use loopback URL to a private file, then run `SPRAWLING_BROWSER=<Chromium executable> cargo xtask render --served-entry <private file> --bundle <built directory>`. The tool pairs through the real entry and reads the same DOM probe for all five width and colour conditions. Keep the one-use URL outside the repository. Either entry fails on a page error.
 
 ## What CI skips, and what it will not run
 

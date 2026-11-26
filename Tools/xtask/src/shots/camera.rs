@@ -13,8 +13,8 @@ use browser::survey::probe::SETTLE_MS;
 use super::case::{Attempt, LOGS, Took, released, removed, twice};
 use super::pages::{Frame, Shot};
 use crate::render::engine::launch::{self, AfterExit, Launch, Stderr, Tree};
-use crate::render::engine::{BUDGET_MS, preloads, url_of};
-use crate::render::probe::{PENDING, POLL_MS};
+use crate::render::engine::{preloads, url_of};
+use crate::render::probe::PENDING;
 use crate::report::XtaskError;
 use crate::walk;
 
@@ -25,6 +25,9 @@ const SINK: &str = "sprawling-shots";
 const MOST_FOLDS: usize = 512;
 
 pub(super) const CASE_PATIENCE: Duration = Duration::from_secs(45);
+
+const BUDGET_MS: u32 = 8000;
+const POLL_MS: u32 = 100;
 
 const TREE_PATIENCE: Duration = Duration::from_secs(2);
 
