@@ -127,6 +127,34 @@
           "completion_tokens": 320
         }
       }
+    ],
+    [
+      {
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Start with the soil moisture sensors in the north bed."
+            },
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": { "prompt_tokens": 6000, "completion_tokens": 13 }
+      }
+    ],
+    [
+      {
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Log the temperature in each bed at dawn and dusk."
+            },
+            "finish_reason": "stop"
+          }
+        ],
+        "usage": { "prompt_tokens": 5000, "completion_tokens": 12 }
+      }
     ]
   ]
 }

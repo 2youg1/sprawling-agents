@@ -40,6 +40,17 @@ bun run test
 bun run build
 ```
 
+## 会话发送验收
+
+脚本在浏览器打开旧会话，向上滚动后点击发送，再从原消息显式分支并发送新分支的第一条消息。它用城的账本核对续聊目标和分支起点，并确认两条回复各自显示在对应会话里。脚本复用 walk 的固定回复供应方，默认把临时数据放在 `target/send`。它与 `just walk` 和 `HotKeyE2E.ts` 共用端口，请分开运行。
+
+```sh
+just build-web
+cargo build --package sprawling --bin sprawling --package citysim --bin provider --locked
+cd RefRain
+bun scripts/session_send_e2e.ts
+```
+
 ## 技术栈与文档
 
 Solid 2 和 TypeScript 构建响应式视图；Bun 管理依赖并运行检查；Vite 8 把前端打包供 Rust 主机嵌入。原生 CSS 提供网格、主题和层叠，Effect 负责解码通信数据。视图在 [`src/views/`](src/views/)，浏览器状态在 [`src/core/`](src/core/)，界面文案来自 [`src/lang.json`](src/lang.json)。[`src/wire/`](src/wire/) 的解码器由 `cargo xtask wire-ts` 生成，供浏览器读取[城市 wire](../docs/wire.md)。

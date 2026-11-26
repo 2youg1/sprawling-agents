@@ -78,6 +78,22 @@ See the [frontend method](../docs/maintain/frontend-method.md) for how a screen 
 The interfaces, the keyboard table and the accessibility contracts are
 in [`RefRain/Spec.lean`](../RefRain/Spec.lean).
 
+## Session send acceptance
+
+The browser check opens an older session, scrolls back, and clicks Send. It
+then branches from the original message and sends the branch's first message.
+It checks the city ledger for the resumed session and branch origin, and the
+browser for the reply in each conversation. It uses the walk's scripted provider
+and saves the fixture under `target/send` by default. It shares the walk's ports,
+so run it separately from `just walk` and `HotKeyE2E.ts`.
+
+```bash
+just build-web
+cargo build --package sprawling --bin sprawling --package citysim --bin provider --locked
+cd RefRain
+bun scripts/session_send_e2e.ts
+```
+
 ## Documentation
 
 - [Keyboard and accessibility contracts](Spec.lean) · [Frontend method](../docs/maintain/frontend-method.md) · [UI design](../docs/maintain/ui-design.md)
