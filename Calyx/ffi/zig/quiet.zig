@@ -30,7 +30,7 @@ pub fn quiet(out: *std.Io.Writer, r: *scene.Reader) Error!void {
     const hint = if (hint_room >= instructions.len) instructions else if (hint_room >= short.len) short else "C: show a pairing code";
     const second = (if (code.len == 0) hint.len else label_room + code_room) + key_room;
     const block = @max(@max(text.width(url), second), text.width(transient));
-    const left = (available -| block) / 2;
+    const left = (@as(usize, columns) -| block) / 2;
     const stacked = code.len > 0 and available >= code_room and available < label_room + code_room and rows > 2;
     const lines: usize = if (stacked) 3 else 2;
     const top = (@as(usize, rows) -| lines) / 2;
