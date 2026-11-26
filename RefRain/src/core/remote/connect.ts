@@ -24,9 +24,7 @@ export interface Paired {
   readonly id: Uint8Array<ArrayBuffer>;
 }
 
-export interface Locked {
-  readonly kind: "locked";
-}
+export type Locked = { readonly kind: "locked" } | { readonly kind: "lock_unconfirmed" };
 
 export interface Opened {
   readonly kind: "opened";
@@ -94,7 +92,9 @@ export async function lockOver(url: string, device: Pinned): Promise<Locked | Re
   if (lock === null) return door.refuse("key");
   door.send(lock);
   const ended = await door.closed;
-  return ended === null ? { kind: "locked" } : { kind: "closed", code: ended };
+  if (ended === null) return { kind: "locked" };
+  if (ended === "E_WIRE_MISMATCH") return { kind: "lock_unconfirmed" };
+  return { kind: "closed", code: ended };
 }
 
 function fresh(): Uint8Array<ArrayBuffer> {

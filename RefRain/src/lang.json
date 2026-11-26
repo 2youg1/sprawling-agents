@@ -7051,6 +7051,10 @@
     "en": "locking…",
     "zh": "正在锁门…"
   },
+  "remote_lock_unconfirmed": {
+    "en": "The connection ended before the browser could confirm the door closed. Check the city's console.",
+    "zh": "连接已结束，浏览器未收到关门确认。请在城的控制台确认。"
+  },
   "remote_locked": {
     "en": "The door is locked. Paired devices stay paired; the console opens it again.",
     "zh": "门锁上了。配对过的设备仍是配对的；在控制台上可以再开。"

@@ -33,7 +33,7 @@ export type Told =
   | { readonly kind: "refusal"; readonly refusal: Refusal }
   | { readonly kind: "unkept" }
   | { readonly kind: "unpersisted" }
-  | { readonly kind: "locked" };
+  | { readonly kind: "locked" | "lock_unconfirmed" };
 
 const OPEN = "/remote open [--for 12h]";
 const PAIR = "/remote pair <name> [--watch]";
@@ -87,6 +87,8 @@ export function toldKey(told: Told): { readonly key: Key; readonly code: string 
       return { key: "remote_unkept", code: null };
     case "unpersisted":
       return { key: "remote_persist_refused", code: null };
+    case "lock_unconfirmed":
+      return { key: "remote_lock_unconfirmed", code: null };
     case "locked":
       return { key: "remote_locked", code: null };
     case "refusal":

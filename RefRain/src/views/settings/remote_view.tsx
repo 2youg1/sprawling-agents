@@ -122,8 +122,8 @@ export default function Remote() {
     setStanding({ kind: "paired", device, told: null, busy: true });
     const locked = await lockOver(url, device);
     const told =
-      locked.kind === "locked"
-        ? { kind: "locked" as const }
+      locked.kind === "locked" || locked.kind === "lock_unconfirmed"
+        ? { kind: locked.kind }
         : { kind: "refusal" as const, refusal: locked };
     setStanding({ kind: "paired", device, told, busy: false });
   }
@@ -140,7 +140,6 @@ export default function Remote() {
       setStanding({ kind: "unpaired" });
     });
   }
-  const offerDoor = () => ["unpaired", "unreadable", "lacking", "paired"].includes(standing().kind);
   return (
     <div class="flex flex-col gap-wide">
       <RemoteState
@@ -150,7 +149,7 @@ export default function Remote() {
         onLock={lockNow}
         onForget={forgetNow}
       />
-      <Show when={offerDoor()}>
+      <Show when={window.location.protocol === "http:"}>
         <RemoteDoor />
       </Show>
     </div>
