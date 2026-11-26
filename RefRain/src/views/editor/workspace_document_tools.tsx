@@ -8,25 +8,18 @@ import { fill, say, type Lang } from "../../core/lang";
 import Glyph from "../parts/glyph.solid";
 import type { ContextTool } from "../parts/context_tools";
 import {
-  MARKDOWN_FORMATS,
+  CONTEXT_FORMATS,
   markdownShortcut,
   type MarkdownFormat,
-  type MarkdownMode,
 } from "./markdown_editing";
 import { writeReceiptWord, type WriteReceipt } from "./workspace_receipt";
 
 interface Props {
   readonly lang: Lang;
   readonly editable: boolean;
-  readonly markdown: boolean;
-  readonly mode: MarkdownMode;
-  readonly onMode: (mode: MarkdownMode) => void;
-  readonly onAttach?: (() => void) | undefined;
   readonly previewable: boolean;
   readonly previewing: boolean;
   readonly onPreview: () => void;
-  readonly typewriter: boolean;
-  readonly onTypewriter: (on: boolean) => void;
   readonly dirty: boolean;
   readonly changed: boolean;
   readonly receipt: WriteReceipt;
@@ -57,10 +50,10 @@ export function workspaceSelectionTools(
   const tools: ContextTool[] =
     format === undefined
       ? []
-      : MARKDOWN_FORMATS.map((wanted) => ({
+      : CONTEXT_FORMATS.map((wanted) => ({
           id: wanted.id,
           label: say(lang, wanted.label),
-          shortcut: markdownShortcut(wanted),
+          ...(wanted.id === "quote" ? {} : { shortcut: markdownShortcut(wanted) }),
           run: () => format(wanted),
         }));
   if (attach !== undefined)
@@ -78,34 +71,6 @@ export function WorkspaceDocumentTools(props: Props) {
   return (
     <header class="workspace-document-tools">
       <Show when={props.editable}>
-        <Show when={props.markdown}>
-          <button
-            type="button"
-            data-control="surface"
-            aria-pressed={props.mode === "source" ? "true" : "false"}
-            onClick={() => props.onMode("source")}
-          >
-            <Glyph name="terminal" size="sm" />
-            {say(props.lang, "refrain_source")}
-          </button>
-          <button
-            type="button"
-            data-control="surface"
-            aria-pressed={props.mode === "live" ? "true" : "false"}
-            onClick={() => props.onMode("live")}
-          >
-            <Glyph name="record" size="sm" />
-            {say(props.lang, "refrain_live")}
-          </button>
-          <Show when={props.onAttach}>
-            {(activate) => (
-              <button type="button" data-control="surface" onClick={() => activate()()}>
-                <Glyph name="pin" size="sm" />
-                {say(props.lang, "refrain_attach_selection")}
-              </button>
-            )}
-          </Show>
-        </Show>
         <Show when={props.previewable}>
           <button
             type="button"
@@ -117,15 +82,6 @@ export function WorkspaceDocumentTools(props: Props) {
             {say(props.lang, "refrain_preview")}
           </button>
         </Show>
-        <label>
-          <input
-            type="checkbox"
-            data-control=""
-            checked={props.typewriter}
-            onChange={(event) => props.onTypewriter(event.currentTarget.checked)}
-          />
-          {say(props.lang, "refrain_typewriter")}
-        </label>
         <button
           type="button"
           data-control="surface"

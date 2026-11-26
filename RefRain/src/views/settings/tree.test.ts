@@ -135,7 +135,8 @@ describe("the settings tree's branch marks", () => {
       settings_branch_city: "city",
       settings_branch_access: "key",
       settings_branch_running: "pulse",
-      settings_branch_extensions: null,
+      setup_group_writing: "propose",
+      settings_branch_extensions: "puzzle",
       settings_branch_preferences: "setup",
       settings_branch_diagnosis: "search",
     });

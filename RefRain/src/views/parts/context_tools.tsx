@@ -40,6 +40,7 @@ export interface ContextTool {
   readonly disabled?: boolean | (() => boolean);
   readonly children?: readonly ContextTool[];
   readonly panel?: (controls: ContextToolsControls) => JSX.Element;
+  readonly openOnHover?: boolean;
   readonly hold?: (active: boolean) => void;
   readonly run?: () => void;
 }
@@ -49,6 +50,7 @@ export interface ContextRequest {
   readonly label?: string | undefined;
   readonly anchor?: ContextAnchor | undefined;
   readonly restore?: HTMLElement | (() => void) | undefined;
+  readonly panel?: ContextTool["panel"];
 }
 
 interface Level {
@@ -128,7 +130,7 @@ export function createContextTools(): ContextToolsController {
         focus: undefined,
         request: { ...request, restore: restored },
         levels: [
-          { tools: request.tools, panel: undefined, returnTo: undefined, label: request.label },
+          { tools: request.tools, panel: request.panel, returnTo: undefined, label: request.label },
         ],
       });
       return true;
@@ -244,7 +246,7 @@ function chooseRow(deck: HTMLElement, id: string | undefined): void {
     rows.find((item) => id !== undefined && item.dataset.contextItem === id) ??
     rows.find((item) => item.dataset.contextBack === undefined) ??
     rows[0];
-  const target = row ?? deck;
+  const target = deck.querySelector<HTMLElement>("[data-context-focus]") ?? row ?? deck;
   target.focus({ preventScroll: true });
 }
 
@@ -291,7 +293,7 @@ function ContextSurface(props: Props) {
     if (
       event.key === "ArrowRight" &&
       index >= 0 &&
-      current?.getAttribute("aria-haspopup") === "menu"
+      current?.hasAttribute("aria-haspopup")
     ) {
       event.preventDefault();
       event.stopPropagation();
@@ -359,7 +361,7 @@ function ContextSurface(props: Props) {
     document.addEventListener(
       "keydown",
       (event) => {
-        if (event.key !== "Escape" || event.defaultPrevented || active !== props.controller) return;
+        if (event.key !== "Escape" || event.isComposing || event.defaultPrevented || active !== props.controller) return;
         event.preventDefault();
         event.stopPropagation();
         props.controller.back();
@@ -445,8 +447,8 @@ function ContextSurface(props: Props) {
               data-control="surface"
               onClick={props.controller.back}
             >
-              <Glyph name="go-back" size="sm" />
-              {say(props.lang, "shell_go_back")}
+              <Glyph name={depth() > 1 ? "go-back" : "cross"} size="sm" />
+              {say(props.lang, depth() > 1 ? "shell_go_back" : "refrain_cm_close")}
             </button>
             {panel()(props.controller)}
           </section>

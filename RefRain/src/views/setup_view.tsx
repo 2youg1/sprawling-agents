@@ -25,6 +25,7 @@ import Performance from "./settings/performance_view";
 import Remote from "./settings/remote_view";
 import Rules from "./settings/rules_view";
 import You from "./settings/you_view";
+import WritingView from "./settings/writing_view";
 import AdvancedSection from "./setup/advanced_view";
 import { saveReceipt } from "./setup/appearance";
 import AppearanceSection from "./setup/appearance_view";
@@ -276,6 +277,9 @@ export default function Setup(props: SetupProps) {
           </Match>
           <Match when={shown() === "automation"}>
             <Automation />
+          </Match>
+          <Match when={shown() === "writing"}>
+            <WritingView lang={lang()} />
           </Match>
           <Match when={shown() === "network"}>
             <NetworkCard />

@@ -1,0 +1,80 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+.workspace-edit-panel {
+  display: grid;
+  min-inline-size: min(18rem, var(--context-width, 80vw));
+  gap: var(--spacing-snug);
+  padding: var(--spacing-snug);
+}
+
+.workspace-edit-field,
+.workspace-edit-list {
+  display: grid;
+  gap: var(--spacing-tight);
+}
+
+.workspace-edit-list {
+  max-block-size: min(12rem, 32dvh);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.workspace-edit-choice,
+.workspace-edit-actions,
+.workspace-edit-actions label {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-tight);
+}
+
+.workspace-edit-choice {
+  min-block-size: var(--spacing-control-sm);
+  overflow-wrap: anywhere;
+}
+
+.workspace-edit-actions {
+  flex-wrap: wrap;
+}
+
+.workspace-edit-actions button,
+.workspace-edit-field input {
+  min-block-size: var(--spacing-control);
+  border: var(--spacing-hair) solid var(--color-edge-input);
+  border-radius: var(--radius-control);
+  padding-inline: var(--spacing-snug);
+  background: var(--color-page);
+  color: var(--color-text);
+}
+
+.workspace-edit-field input {
+  min-inline-size: 0;
+}
+
+.workspace-edit-actions button:disabled {
+  color: var(--color-text-disabled);
+}
+
+.workspace-edit-diff {
+  padding: var(--spacing-tight);
+  border: var(--spacing-hair) solid var(--color-edge);
+  border-radius: var(--radius-control);
+  overflow-wrap: anywhere;
+}
+
+.workspace-edit-diff > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-tight);
+  white-space: pre-wrap;
+}
+
+.workspace-edit-diff del {
+  color: var(--color-alert);
+}
+
+.workspace-edit-diff ins {
+  color: var(--color-accent);
+}

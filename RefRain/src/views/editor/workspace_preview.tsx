@@ -6,7 +6,7 @@
 import { createEffect, createSignal, Match, Show, Switch } from "solid-js";
 import { say } from "../../core/lang";
 import type { Lang } from "../../core/lang";
-import { drawnAs } from "./formats/format";
+import { drawnAs, markdownFile } from "./formats/format";
 import { framed } from "./formats/framed";
 import { drawMath, formulaOf } from "./formats/math";
 import { drawMermaid } from "./formats/mermaid";
@@ -22,7 +22,7 @@ export function workspaceFormat(name: string): WorkspaceFormat {
   const known = drawnAs(name);
   if (known === "docx" || known === "html") return { kind: known };
   const lower = name.toLowerCase();
-  if (/\.(?:md|markdown|mdown|mkd)$/u.test(lower)) return { kind: "markdown" };
+  if (markdownFile(name)) return { kind: "markdown" };
   if (/\.(?:tex|latex|math)$/u.test(lower)) return { kind: "math" };
   if (/\.(?:mmd|mermaid)$/u.test(lower)) return { kind: "mermaid" };
   return { kind: "text" };

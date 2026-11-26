@@ -60,6 +60,11 @@ export const TREE: readonly Branch[] = [
     more: [],
   },
   {
+    word: "setup_group_writing",
+    entries: [group("writing")],
+    more: [],
+  },
+  {
     word: "settings_branch_extensions",
     entries: [group("skills"), { kind: "page", view: { kind: "mcp" }, word: "nav_mcp" }],
     more: [],
@@ -86,6 +91,8 @@ const BRANCH_MARK: Readonly<Partial<Record<Key, GlyphName>>> = {
   settings_branch_city: "city",
   settings_branch_access: "key",
   settings_branch_running: "pulse",
+  setup_group_writing: "propose",
+  settings_branch_extensions: "puzzle",
   settings_branch_preferences: "setup",
   settings_branch_diagnosis: "search",
 };
@@ -256,6 +263,7 @@ export interface BranchLook {
   readonly key: string;
 
   readonly mark: GlyphName | null;
+  readonly direct: GroupLook | null;
   readonly fold: FoldLook;
   readonly entries: readonly (LeafLook | NestLook)[];
   readonly more: MoreLook | null;
@@ -310,9 +318,15 @@ export function lookOf(state: TreeState, uid: string, hands: TreeHands): TreeLoo
     nav: { "aria-label": hands.words("settings_tree"), onkeydown: hands.walk },
     branches: TREE.map((branch, at) => {
       const list = `${uid}-${String(at)}`;
+      const only = branch.entries[0];
       return {
         key: branch.word,
         mark: BRANCH_MARK[branch.word] ?? null,
+        direct:
+          only?.kind === "group" && branch.entries.length === 1 && branch.more.length === 0 &&
+          branch.word === HEADING[only.group]
+            ? groupOf(only.group, state.group, hands)
+            : null,
         fold: foldOf(branch.word, state.folds.branch === at, list, { kind: "branch", at }),
         entries: branch.entries.map((entry) =>
           entry.kind === "nest" ? nestLookOf(entry.nest, entry.word) : leafOf(entry),
