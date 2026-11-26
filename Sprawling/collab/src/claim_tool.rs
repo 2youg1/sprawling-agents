@@ -3,11 +3,13 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
+use std::collections::BTreeMap;
+
 use crate::claim_effect::ClaimEffect;
 use kernel::spine::check_roadmap_shape;
 use kernel::{
-    Address, AxCode, AxError, Held, Locator, NewChild, NodeId, Payload, PlanExit, PlanTree,
-    RoadmapShape, RoadmapStatus, StopCause,
+    Address, AxCode, AxError, EvidenceCell, Held, Locator, NewChild, NodeId, Payload, PlanExit,
+    PlanTree, RoadmapShape, RoadmapStatus, StopCause,
 };
 use serde_json::{Map, Value};
 
@@ -16,6 +18,7 @@ pub struct ClaimDesk {
     who: String,
     room: Address,
     text: String,
+    dispatched: String,
     changed: bool,
 
     held: Option<Held>,
@@ -75,6 +78,7 @@ impl ClaimDesk {
         ClaimDesk {
             who,
             room,
+            dispatched: roadmap.clone(),
             text: roadmap,
             changed: false,
             held: None,
@@ -148,6 +152,7 @@ impl ClaimDesk {
         let mut ready = Vec::new();
         let mut working = Vec::new();
         let mut red = Vec::new();
+        let mut done = Vec::new();
         for node in tree.nodes() {
             let mut entry = Map::new();
             entry.insert("node".to_owned(), Value::String(node.row.id.to_string()));
@@ -158,7 +163,13 @@ impl ClaimDesk {
                     red.push(Value::Object(entry));
                 }
 
-                RoadmapStatus::InProgress | RoadmapStatus::NotStarted | RoadmapStatus::Done => {}
+                RoadmapStatus::Done => {
+                    if let EvidenceCell::Present(evidence) = &node.row.evidence {
+                        entry.insert("evidence".to_owned(), Value::String(evidence.to_string()));
+                    }
+                    done.push(Value::Object(entry));
+                }
+                RoadmapStatus::InProgress | RoadmapStatus::NotStarted => {}
             }
         }
         for id in tree.ready() {
@@ -174,12 +185,28 @@ impl ClaimDesk {
         result.insert("ready".to_owned(), Value::Array(ready));
         result.insert("in_progress".to_owned(), Value::Array(working));
         result.insert("blocked".to_owned(), Value::Array(red));
+        result.insert("done".to_owned(), Value::Array(done));
+        result.insert("pending".to_owned(), Value::Array(self.pending(&tree)));
 
         result.insert(
             "nodes_total".to_owned(),
             Value::Number(u64::try_from(tree.len()).unwrap_or(u64::MAX).into()),
         );
         Payload::new(result)
+    }
+
+    fn pending(&self, tree: &PlanTree) -> Vec<Value> {
+        if !self.changed {
+            return Vec::new();
+        }
+        let RoadmapShape::WellFormed { rows } = check_roadmap_shape(&self.dispatched) else {
+            return Vec::new();
+        };
+        let before: BTreeMap<_, _> = rows.iter().map(|row| (&row.id, row)).collect();
+        tree.nodes()
+            .filter(|node| before.get(&node.row.id).copied() != Some(&node.row))
+            .map(|node| Value::String(node.row.id.to_string()))
+            .collect()
     }
 
     fn claim(&mut self, id: &NodeId) -> Result<Payload, AxError> {
@@ -243,6 +270,7 @@ impl ClaimDesk {
                 .map(|child| NewChild {
                     item: child.item.trim().to_owned(),
                     weight: child.weight,
+                    needs: child.needs.clone(),
                 })
                 .collect(),
         };

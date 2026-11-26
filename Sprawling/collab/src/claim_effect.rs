@@ -3,10 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
+use std::collections::BTreeSet;
+
 use kernel::event::record::{RoadmapMoved, RoadmapStep};
 use kernel::spine::{append_top_level, check_roadmap_shape, insert_children, set_roadmap_status};
+use kernel::{AxCode, PlanTree, RoadmapShape, RoadmapStatus};
 use kernel::{AxError, NewChild, NodeId, Payload, PlanExit};
-use kernel::{RoadmapShape, RoadmapStatus};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ClaimEffect {
@@ -51,7 +53,11 @@ impl ClaimEffect {
             ClaimEffect::PutDown { id, exit, .. } => {
                 set_roadmap_status(text, id, exit.status(), exit.evidence())
             }
-            ClaimEffect::Split { parent, children } => insert_children(text, parent, children),
+            ClaimEffect::Split { parent, children } => {
+                let grown = insert_children(text, parent, children)?;
+                check_split_dependencies(text, parent, children)?;
+                Ok(grown)
+            }
             ClaimEffect::Added { id, child } => append_top_level(text, id, child),
         }
     }
@@ -117,6 +123,52 @@ impl ClaimEffect {
             step,
         })
     }
+}
+
+fn check_split_dependencies(
+    base: &str,
+    parent: &NodeId,
+    children: &[NewChild],
+) -> Result<(), AxError> {
+    if children.iter().all(|child| child.needs.is_empty()) {
+        return Ok(());
+    }
+    let RoadmapShape::WellFormed { rows } = check_roadmap_shape(base) else {
+        return Ok(());
+    };
+    let tree = PlanTree::build(rows)?;
+    for need in children.iter().flat_map(|child| &child.needs) {
+        if reaches_unfinished_parent(&tree, need, parent) {
+            return Err(AxError::failure(
+                AxCode::InvalidArgs,
+                "split a plan node",
+                format!("a child of {parent} would wait for {need}, which waits for {parent}"),
+            )
+            .with_recovery("choose a prerequisite that can finish before this branch"));
+        }
+    }
+    Ok(())
+}
+
+fn reaches_unfinished_parent(tree: &PlanTree, start: &NodeId, parent: &NodeId) -> bool {
+    let mut seen = BTreeSet::new();
+    let mut next = vec![start.clone()];
+    while let Some(id) = next.pop() {
+        if &id == parent {
+            return true;
+        }
+        if !seen.insert(id.clone()) {
+            continue;
+        }
+        if let Some(node) = tree
+            .get(&id)
+            .filter(|node| node.row.status != RoadmapStatus::Done)
+        {
+            next.extend(node.children.iter().cloned());
+            next.extend(tree.needs_of(&id));
+        }
+    }
+    false
 }
 
 #[must_use]

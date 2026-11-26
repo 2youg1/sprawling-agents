@@ -53,10 +53,12 @@ fn children_land_below_their_parent_and_number_on_from_the_last() {
             NewChild {
                 item: "design".to_owned(),
                 weight: 1,
+                needs: Vec::new(),
             },
             NewChild {
                 item: "code".to_owned(),
                 weight: 3,
+                needs: Vec::new(),
             },
         ],
     )
@@ -72,6 +74,7 @@ fn children_land_below_their_parent_and_number_on_from_the_last() {
         &[NewChild {
             item: "test".to_owned(),
             weight: 1,
+            needs: Vec::new(),
         }],
     )
     .unwrap();
@@ -100,6 +103,7 @@ fn splitting_a_deep_branch_puts_the_children_after_the_whole_branch() {
         &[NewChild {
             item: "code".to_owned(),
             weight: 1,
+            needs: Vec::new(),
         }],
     )
     .unwrap();
@@ -122,7 +126,8 @@ fn a_split_that_would_delete_or_hide_work_is_refused() {
             &node("1"),
             &[NewChild {
                 item: "  ".to_owned(),
-                weight: 1
+                weight: 1,
+                needs: Vec::new(),
             }]
         )
         .is_err()
@@ -133,6 +138,7 @@ fn a_split_that_would_delete_or_hide_work_is_refused() {
         &[NewChild {
             item: "x".to_owned(),
             weight: 0,
+            needs: Vec::new(),
         }],
     )
     .unwrap_err();
@@ -143,6 +149,7 @@ fn a_split_that_would_delete_or_hide_work_is_refused() {
         &[NewChild {
             item: "a | b".to_owned(),
             weight: 1,
+            needs: Vec::new(),
         }],
     )
     .unwrap_err();
@@ -153,15 +160,14 @@ fn a_split_that_would_delete_or_hide_work_is_refused() {
             &node("9"),
             &[NewChild {
                 item: "x".to_owned(),
-                weight: 1
+                weight: 1,
+                needs: Vec::new(),
             }]
         )
         .is_err()
     );
 }
 
-/// A status edit rewrites the row it names and leaves every other row as
-/// it was, whole.
 #[test]
 fn a_status_edit_changes_the_named_row_and_no_other() {
     let edited = set_roadmap_status(GOOD, &node("2"), RoadmapStatus::Blocked, None).unwrap();
@@ -172,10 +178,6 @@ fn a_status_edit_changes_the_named_row_and_no_other() {
     assert_eq!(rows_of(&edited), expected);
 }
 
-/// Children land in the plan's own table, after the parent's last
-/// descendant even when that descendant is the table's last line, and a
-/// second table further down the document is not the plan, whatever its
-/// rows look like.
 #[test]
 fn children_land_in_the_plan_s_table_after_its_last_line_of_the_branch() {
     let notes = "\
@@ -198,6 +200,7 @@ fn children_land_in_the_plan_s_table_after_its_last_line_of_the_branch() {
         &[NewChild {
             item: "code".to_owned(),
             weight: 1,
+            needs: Vec::new(),
         }],
     )
     .unwrap();
@@ -209,9 +212,6 @@ fn children_land_in_the_plan_s_table_after_its_last_line_of_the_branch() {
     assert!(split.ends_with(&format!("\n\n{notes}")), "{split}");
 }
 
-/// A top-level row is added after the plan's last row under the index the
-/// caller chose; an index a row already carries, or one that is not
-/// top-level, is refused rather than renumbered.
 #[test]
 fn a_top_level_row_is_added_last_under_the_index_the_caller_chose() {
     let text = "\
@@ -223,6 +223,7 @@ fn a_top_level_row_is_added_last_under_the_index_the_caller_chose() {
     let child = NewChild {
         item: "ship".to_owned(),
         weight: 2,
+        needs: Vec::new(),
     };
     let added = append_top_level(text, &node("2"), &child).unwrap();
     let rows = rows_of(&added);
@@ -246,9 +247,6 @@ fn a_top_level_row_is_added_last_under_the_index_the_caller_chose() {
     );
 }
 
-/// The separator is the row of dashes, with or without the colons that
-/// align a column, and a body row with every cell filled is a row of the
-/// plan, never mistaken for the separator.
 #[test]
 fn an_aligned_separator_is_the_separator_and_a_full_row_is_a_row() {
     let text = format!(

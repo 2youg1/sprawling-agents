@@ -94,6 +94,7 @@ pub fn insert_children(
         drawn.push(draw_child(
             &parent.child(next)?,
             child,
+            &rows,
             "split a plan node",
         )?);
     }
@@ -143,7 +144,7 @@ pub fn append_top_level(text: &str, id: &NodeId, child: &NewChild) -> Result<Str
             "read the plan again and add after its last top-level row",
         ));
     }
-    let drawn = draw_child(id, child, "add a plan row")?;
+    let drawn = draw_child(id, child, &rows, "add a plan row")?;
     let Some((_, last)) = locate_table(text) else {
         return Err(refuse(
             "the roadmap table is not there".to_owned(),
@@ -153,7 +154,12 @@ pub fn append_top_level(text: &str, id: &NodeId, child: &NewChild) -> Result<Str
     Ok(insert_after(text, last, &[drawn]))
 }
 
-fn draw_child(id: &NodeId, child: &NewChild, action: &'static str) -> Result<String, AxError> {
+fn draw_child(
+    id: &NodeId,
+    child: &NewChild,
+    rows: &[RoadmapRow],
+    action: &'static str,
+) -> Result<String, AxError> {
     let refuse = |subject: String, recovery: &str| {
         AxError::failure(AxCode::InvalidArgs, action, subject).with_recovery(recovery.to_owned())
     };
@@ -176,8 +182,24 @@ fn draw_child(id: &NodeId, child: &NewChild, action: &'static str) -> Result<Str
              anybody",
         ));
     }
+    if let Some(missing) = child
+        .needs
+        .iter()
+        .find(|need| !rows.iter().any(|row| &row.id == *need))
+    {
+        return Err(refuse(
+            format!("{id} needs {missing}, which the table does not carry"),
+            "name a row the plan already holds, or drop the dependency",
+        ));
+    }
+    let needs = child
+        .needs
+        .iter()
+        .map(NodeId::as_str)
+        .collect::<Vec<_>>()
+        .join(", ");
     Ok(format!(
-        "| {id} | {} | {} |  | {} |  |",
+        "| {id} | {} | {} | {needs} | {} |  |",
         child.item.trim(),
         child.weight,
         RoadmapStatus::NotStarted.spelling()
