@@ -23,12 +23,6 @@ export type Standing =
       readonly busy: boolean;
     }
   | {
-      readonly kind: "seed";
-      readonly seed: string;
-      readonly device: Device;
-      readonly persisted: boolean;
-    }
-  | {
       readonly kind: "paired";
       readonly device: Device;
       readonly told: Told | null;
@@ -38,7 +32,8 @@ export type Standing =
 export type Told =
   | { readonly kind: "refusal"; readonly refusal: Refusal }
   | { readonly kind: "unkept" }
-  | { readonly kind: "locked" };
+  | { readonly kind: "unpersisted" }
+  | { readonly kind: "locked" | "lock_unconfirmed" };
 
 const OPEN = "/remote open [--for 12h]";
 const PAIR = "/remote pair <name> [--watch]";
@@ -64,7 +59,6 @@ export const STEPS: readonly Step[] = [
   { key: "remote_step_open", spelling: OPEN },
   { key: "remote_step_pair", spelling: PAIR },
   { key: "remote_step_device", spelling: INVITATION },
-  { key: "remote_step_seed", spelling: null },
 ];
 
 export function restartOf(keeps: DoctorCustodyLifetime | null): Key {
@@ -91,6 +85,10 @@ export function toldKey(told: Told): { readonly key: Key; readonly code: string 
   switch (told.kind) {
     case "unkept":
       return { key: "remote_unkept", code: null };
+    case "unpersisted":
+      return { key: "remote_persist_refused", code: null };
+    case "lock_unconfirmed":
+      return { key: "remote_lock_unconfirmed", code: null };
     case "locked":
       return { key: "remote_locked", code: null };
     case "refusal":

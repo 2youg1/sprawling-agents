@@ -7023,18 +7023,6 @@
     "en": "This browser keeps no IndexedDB for this page, so a paired key would be lost at once.",
     "zh": "这个浏览器不给这一页 IndexedDB，配对得到的钥匙会立刻丢掉。"
   },
-  "remote_seed": {
-    "en": "Your device seed",
-    "zh": "你的设备种子"
-  },
-  "remote_seed_about": {
-    "en": "Shown once and kept nowhere. Reinstalling this page means pairing again.",
-    "zh": "只显示这一次，哪里都不保存。重装这一页就要重新配对。"
-  },
-  "remote_seed_seen": {
-    "en": "I have written it down",
-    "zh": "我记下了"
-  },
   "remote_persist_refused": {
     "en": "The browser did not promise to keep this page's storage. It may clear it when space runs short, and then this device pairs again.",
     "zh": "浏览器没有答应保留这一页的存储。空间吃紧时它可能清掉，那时这台设备要重新配对。"
@@ -7062,6 +7050,10 @@
   "remote_locking": {
     "en": "locking…",
     "zh": "正在锁门…"
+  },
+  "remote_lock_unconfirmed": {
+    "en": "The connection ended before the browser could confirm the door closed. Check the city's console.",
+    "zh": "连接已结束，浏览器未收到关门确认。请在城的控制台确认。"
   },
   "remote_locked": {
     "en": "The door is locked. Paired devices stay paired; the console opens it again.",
@@ -11763,10 +11755,6 @@
     "en": "On the other device, scan the code or open the link. The link looks like this; the page it opens says Pair this device.",
     "zh": "在另一台设备上扫码或打开链接。链接长这样；打开的页面写着「配对这台设备」。"
   },
-  "remote_step_seed": {
-    "en": "Press Pair on the device. It shows a seed once, in groups of four letters; write it down, then press the button under it.",
-    "zh": "在设备上按「配对」。它只显示一次种子，四个字母一组；抄下来，再按它下面的按钮。"
-  },
   "remote_restart_unknown": {
     "en": "When the city's computer restarts: on Windows and macOS the pairing stays, kept by Credential Manager or the Keychain; on Linux it lasts until the computer reboots, unless the city uses the encrypted vault file. Open the dependencies page to see which this city has.",
     "zh": "城市所在的电脑重启时：Windows 与 macOS 上配对仍在，由凭据管理器或钥匙串保管；Linux 上只到这次开机结束，除非这座城市用加密的 vault 文件。打开依赖项页能看到这座城市是哪一种。"
@@ -12616,8 +12604,8 @@
     "zh": "配对这个浏览器"
   },
   "pair_where": {
-    "en": "The pairing code is in the terminal of the computer that runs sprawling.",
-    "zh": "配对码在运行 sprawling 的那台电脑的终端里。"
+    "en": "Press C in sprawling’s quiet host on this computer, then copy and paste the pairing code.",
+    "zh": "在这台电脑的 sprawling 安静宿主中按 C，复制并粘贴配对码。"
   },
   "pair_code": {
     "en": "pairing code",
@@ -12688,8 +12676,8 @@
     "zh": "状态核对未找到这个浏览器密钥的配对记录。"
   },
   "pair_open_used": {
-    "en": "This link has been used. Enter the pairing code from the terminal instead.",
-    "zh": "这个链接已经用过。改为输入终端里的配对码。"
+    "en": "This link has expired or has been used. Copy a fresh pairing code from the terminal.",
+    "zh": "这个链接已过期或已用过。请从终端复制新的配对码。"
   },
   "pair_session_lost": {
     "en": "The city no longer knows this browser. Pair it again.",
@@ -12704,8 +12692,8 @@
     "zh": "配对被拒绝了"
   },
   "recover_e_pairing_refused": {
-    "en": "The code was wrong, already used, or tried too often. Read the current code in the terminal where sprawling runs, wait a little after several wrong tries, and enter it again.",
-    "zh": "码不对、已用过，或试得太频繁。到运行 sprawling 的终端里看当前的码；连续输错几次后稍等一会儿，再输入一次。"
+    "en": "The code was wrong, expired, or already used. Press C in sprawling’s quiet host to copy a fresh code.",
+    "zh": "配对码不对、已过期或已用过。请在 sprawling 的安静宿主中按 C，复制新码。"
   },
   "devices_title": {
     "en": "paired browsers",

@@ -20,7 +20,6 @@ interface RemoteStateProps {
   readonly standing: Standing;
   readonly keeps: DoctorCustodyLifetime | null;
   readonly onPair: () => void;
-  readonly onSeen: () => void;
   readonly onLock: () => void;
   readonly onForget: () => void;
 }
@@ -38,7 +37,8 @@ export default function RemoteState(props: RemoteStateProps) {
   createEffect(
     () => props.standing.kind,
     (now) => {
-      if (was === "seed" && now === "paired") requestAnimationFrame(() => deviceHeading?.focus());
+      if (was === "invited" && now === "paired")
+        requestAnimationFrame(() => deviceHeading?.focus());
       was = now;
     },
   );
@@ -53,7 +53,6 @@ export default function RemoteState(props: RemoteStateProps) {
 
   const word = (key: Key) => say(lang(), key);
   const invited = () => (props.standing.kind === "invited" ? props.standing : undefined);
-  const shown = () => (props.standing.kind === "seed" ? props.standing : undefined);
   const paired = () => (props.standing.kind === "paired" ? props.standing : undefined);
   const absent = () =>
     props.standing.kind === "unpaired" ||
@@ -151,33 +150,6 @@ export default function RemoteState(props: RemoteStateProps) {
                     glyph="key"
                     loading={invite().busy}
                     onPress={props.onPair}
-                  />
-                </div>
-              </section>
-            )}
-          </Match>
-          <Match when={shown()}>
-            {(seed) => (
-              <section class="flex flex-col gap-base" aria-labelledby={`${uid}-seed`}>
-                <h3 id={`${uid}-seed`} class="text-label font-label text-text">
-                  {word("remote_seed")}
-                </h3>
-                <output
-                  class="asks rounded-card px-base py-snug font-mono text-heading text-text"
-                  aria-label={word("remote_seed")}
-                >
-                  {grouped(seed().seed)}
-                </output>
-                <p class="text-body text-text-quiet">{word("remote_seed_about")}</p>
-                <Show when={!seed().persisted}>
-                  <p class="text-note text-text-faint">{word("remote_persist_refused")}</p>
-                </Show>
-                <div>
-                  <Button
-                    label={word("remote_seed_seen")}
-                    tone="primary"
-                    glyph="check"
-                    onPress={props.onSeen}
                   />
                 </div>
               </section>

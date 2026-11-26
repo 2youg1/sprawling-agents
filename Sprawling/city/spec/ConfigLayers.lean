@@ -495,6 +495,11 @@ settings-reason ModelSection.name `[model] name` 是城在会话第一次 run �
 settings-reason ModelSection.endpoint `[model] endpoint` 与 `name` 一起标识会话冻结的模型引用，由 `write_session` 写入、`Forget` 清除；它是会话记录，设置里没有控件。
 settings-control ModelSection.effort RefRain/src/views/settings/city_layer_view.tsx
 settings-reason ConfigFile.remote 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在它所在的机器上执行任意程序，所以只在城的 CONFIG.toml 里手写，楼与房间写它即拒。
+settings-reason RemoteRoute.H3.certificate 指定公网 TLS 证书的文件路径，证书与私钥由城的操作者配好，在城的 CONFIG.toml 里手写。
+settings-reason RemoteRoute.H3.command 指定城所在机器执行的网关程序，修改程序能在城上直接执行代码，在城的 CONFIG.toml 里手写。
+settings-reason RemoteRoute.H3.listen 指定对外监听的地址和端口，改变它会改变城的网络暴露面，在城的 CONFIG.toml 里手写。
+settings-reason RemoteRoute.H3.private_key 指定公网 TLS 私钥的文件路径，只让城的操作者在 CONFIG.toml 中选择该路径。
+settings-reason RemoteRoute.H3.url 固定浏览器持有配对身份的公网源，改变它需要重新配对，在城的 CONFIG.toml 里手写。
 settings-reason RemoteRoute.Cloudflare.command 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在它所在的机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
 settings-reason RemoteRoute.Cloudflare.tunnel 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在它所在的机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。
 settings-reason RemoteRoute.Cloudflare.url 通路点名城所在机器上要执行的程序与参数；一个经远程门连进来的设备若能写它，就能让城在它所在的机器上执行任意程序，所以只在城的 CONFIG.toml 里手写。

@@ -3,10 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
+use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::Json;
-use axum::extract::State;
+use axum::extract::{ConnectInfo, State};
 use axum::http::header::ORIGIN;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
@@ -17,20 +18,12 @@ use crate::answer::DeviceId;
 
 use super::config::{ShellState, refusal_text};
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PairBody {
-    #[serde(flatten)]
-    pub proof: PairProof,
+    pub open: String,
     pub public_key: String,
     pub label: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum PairProof {
-    Open(String),
-
-    Code(String),
 }
 
 #[derive(Debug, Serialize)]
@@ -77,9 +70,22 @@ struct RecoveredSessionAnswer {
 
 pub(super) async fn accept_pairing(
     State(state): State<Arc<ShellState>>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
     Json(body): Json<PairBody>,
 ) -> Response {
-    match state.door.pair(&body.proof, &body.public_key, &body.label) {
+    if !peer.ip().to_canonical().is_loopback() {
+        return refusal(
+            &AxError::failure(
+                AxCode::GateDenied,
+                "pair a browser",
+                "the connection did not come from this machine's loopback address",
+            )
+            .with_recovery(
+                "open the city in a browser on this machine, or use the remote invitation",
+            ),
+        );
+    }
+    match state.door.pair(&body.open, &body.public_key, &body.label) {
         Ok(device) => (StatusCode::OK, Json(PairAnswer { device })).into_response(),
         Err(err) => refusal(&err),
     }

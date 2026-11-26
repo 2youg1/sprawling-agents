@@ -67,7 +67,7 @@ if (root !== null) {
       check: entry.check,
       lang,
       label,
-      pair: (code: string, named: string) => pairWith(origin, { code }, named),
+      pair: (code: string, named: string) => pairWith(origin, code, named),
       onPaired: (credential: Credential) => {
         page.dispose();
         openCity(root, prefs, credential);

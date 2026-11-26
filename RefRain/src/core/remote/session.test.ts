@@ -3,14 +3,12 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The link's line over a remote session (RefRain/Spec.lean §4-64), against a
-// city half written here from `seal.ts`: the city opens frames by count,
-// so a frame sealed or opened out of turn is a frame that never opens.
-
 import { describe, expect, test } from "bun:test";
 
+import type { Line } from "../line";
 import type { Door, Refusal } from "./connect";
 import type { Session } from "./handshake";
+import { reach } from "./pipe";
 import { opener, payloadBytes, payloadOf, sealer } from "./seal";
 import { talk } from "./session";
 
@@ -18,8 +16,6 @@ const TO_CITY = new Uint8Array(32).fill(1);
 const TO_DEVICE = new Uint8Array(32).fill(2);
 const FRAMES = 24;
 
-// The connection a session runs on, driven by the test: what the device
-// sent, what the city sends next, and whether it was closed.
 interface Wire {
   readonly door: Door;
   readonly sent: Uint8Array<ArrayBuffer>[];
@@ -95,6 +91,56 @@ async function settled(until: () => boolean): Promise<void> {
 const texts = Array.from({ length: FRAMES }, (_, at) => `{"frame":${String(at)}}`);
 
 describe("a line over a remote session", () => {
+  test("streams a batch bigger than the buffer without closing the pipe", async () => {
+    const previous = Object.getOwnPropertyDescriptor(globalThis, "location");
+    const fetch = globalThis.fetch;
+    const origin = "https://city.example";
+    Object.defineProperty(globalThis, "location", { configurable: true, value: new URL(origin) });
+    const frames = Array.from({ length: 12 }, (_, value) => value);
+    const bytes = new Uint8Array([
+      ...frames.flatMap((value) => [0, 0, 0, 0, 1, value]),
+      1,
+      0,
+      0,
+      0,
+      0,
+    ]);
+    globalThis.fetch = Object.assign(
+      () => Promise.resolve(new Response(bytes, { headers: { "x-sprawling-pipe": "test" } })),
+      { preconnect: fetch.preconnect },
+    );
+    await (async () => {
+      const pipe = await reach(origin + "/remote/session", new Uint8Array());
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const received = [];
+      for (const _frame of frames) received.push((await pipe?.next())?.[0]);
+      expect(received).toEqual(frames);
+      expect(await pipe?.closed).toBeNull();
+    })().finally(() => {
+      globalThis.fetch = fetch;
+      if (previous === undefined) Reflect.deleteProperty(globalThis, "location");
+      else Object.defineProperty(globalThis, "location", previous);
+    });
+  });
+
+  test("lets the link send its greeting from the opened callback", async () => {
+    const { door, sent } = wire();
+    let line: Line | undefined;
+    let accepted = false;
+    const hearing = listener().hearing;
+    line = talk(door, device(), {
+      ...hearing,
+      opened: () => {
+        accepted = line?.send("greeting") === true;
+      },
+    });
+    await Promise.resolve();
+    expect(accepted).toBe(true);
+    await settled(() => sent.length === 1);
+    expect(sent).toHaveLength(1);
+    line.close();
+  });
+
   test("sends every frame the link sends, sealed in the order it sent them", async () => {
     const { door, sent } = wire();
     const line = talk(door, device(), listener().hearing);

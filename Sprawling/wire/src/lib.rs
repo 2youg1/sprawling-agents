@@ -146,7 +146,7 @@ pub use server::{AcpSink, Answering, MonitorFeed, TranscribeSink};
 #[cfg(feature = "server")]
 pub use server::{Bound, Committed, LedgerHead, ServeConfig};
 #[cfg(feature = "server")]
-pub use server::{ChallengeAnswer, PairAnswer, PairBody, PairProof, SessionAnswer, SessionBody};
+pub use server::{ChallengeAnswer, PairAnswer, PairBody, SessionAnswer, SessionBody};
 #[cfg(feature = "server")]
 pub use server::{DROP_BYTES_MAX, DropSink};
 #[cfg(feature = "server")]

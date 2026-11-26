@@ -59,6 +59,7 @@ pub(super) fn wired(
         crate::serving::browsers::load(&table)?,
         wire::DoorSenses {
             clock: Arc::new(|| accounting::Clock::now(&super::super::SystemClock)),
+            monotonic: Arc::new(crate::serving::standing::monotonic_now),
             entropy: Arc::new(|bytes: &mut [u8]| {
                 getrandom::fill(bytes).map_err(|refused| {
                     AxError::failure(

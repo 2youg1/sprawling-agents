@@ -9,6 +9,7 @@ pub(crate) mod console;
 mod devices;
 pub(crate) mod keeper;
 pub(crate) mod listener;
+mod pipe;
 mod verbs;
 
 #[cfg(test)]

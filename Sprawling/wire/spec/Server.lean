@@ -261,9 +261,8 @@ pub enum Door { Transcribe, Enroll, Acp, Drop }
 ### 8-93 本地门的配对与会话：三条路由的形状
 
 ```rust
-// POST /pair                  { "open": "<开页码>" | "code": "<配对码>", "public_key": "<设备公钥>", "label": "<名字>" }
-pub struct PairBody { #[serde(flatten)] pub proof: PairProof, pub public_key: String, pub label: String }
-pub enum PairProof { Open(String), Code(String) }            // 线上 snake_case：二者恰有其一
+// POST /pair                  { "open": "<开页码>", "public_key": "<设备公钥>", "label": "<名字>" }
+pub struct PairBody { pub open: String, pub public_key: String, pub label: String }
 pub struct PairAnswer { pub device: DeviceId }               // §8-91
 
 // POST /session/challenge     无请求体
@@ -276,21 +275,22 @@ pub struct SessionAnswer { pub token: String }               // 页面只把它�
 ```
 
 - **会话令牌是凭据**：页面以 hello 的 `token` 或 POST 的 `Authorization: Bearer` 出示它；`/ws`、`/transcribe`、`/enroll`、`/drop`、`/acp` 对每一个调用方都要求一份凭据——浏览器的会话令牌，或同一台机器上的原生客户端的native key（§8-40）。
-- **两种码，一个入口**：`open` 是 `/web` 经只给本用户读的跳转文件交给浏览器的开页码，`code` 是终端上显示的配对码；错、用过或太早一律 `E_PAIRING_REFUSED`，403。状态与它的规则在 `spec/Reception/Pairing.lean` §8-95。
-- **字节怎么写**：`public_key` 是 Ed25519 公钥的 32 字节，`nonce` 是 32 字节，`signature` 是 64 字节，`token` 是 32 字节，线上一律写成小写十六进制；`label` 至多 `LABEL_MAX`（64）个字符，空或含控制字符即 422。页面用 `crypto.subtle.exportKey("raw", publicKey)` 得到公钥。签的字节是 `sprawling local session v1
+- **开页码**：`open` 是终端按需绘制或 `/web` 经私有文件交出的同一种凭据。码错、过期或用过答 403 `E_PAIRING_REFUSED`。状态与它的规则在 `spec/Reception/Pairing.lean` §8-95。
+- **字节怎么写**：`public_key` 是 Ed25519 公钥的 32 字节，`nonce` 是 §8-95 的 72 字节，`signature` 是 64 字节，`token` 是 32 字节，线上一律写成小写十六进制；`label` 至多 `LABEL_MAX`（64）个字符，空或含控制字符即 422。页面用 `crypto.subtle.exportKey("raw", publicKey)` 得到公钥。签的字节是 `sprawling local session v1
 <nonce>
 <origin>`，`origin` 是页面自己的 `location.origin`，服务端取这次请求过了入口判定的 Origin 头去验。
-- **答复**：`/pair` 200 `{ device }`；`/session/challenge` 200 `{ nonce }`；`/session` 的设备 ID 写法答 200 `{ token }`。配对回执未知时，浏览器用预存设备钥签新 nonce，按公钥写法查询配对状态，城从公钥推出设备 ID 并验证该已登记设备的签名，成功答 200 `{ device, token }`。此查证沿用原配对记录。nonce 过期或用过、设备不认识、签名不对都是 403 `E_GATE_DENIED`。三条路只收浏览器（§8-94 第 6 步），由握手发放凭据。
+- **答复**：`/pair` 200 `{ device }`；`/session/challenge` 200 `{ nonce }`；`/session` 的设备 ID 写法答 200 `{ token }`。配对回执未知时，浏览器用预存设备钥签新 nonce，按公钥写法查询配对状态，城从公钥推出设备 ID 并验证该已登记设备的签名，成功答 200 `{ device, token }`。此查证沿用原配对记录。挑战按 §8-95 作无状态 HMAC 签发。nonce 过期或用过、设备不认识、签名不对都是 403 `E_GATE_DENIED`。三条路只收浏览器（§8-94 第 6 步），`/pair` 还核对实际对端是回环地址。
 
 ```rust
 // 这台电脑上的这扇门的句柄：装配层建一次，交给 ServeConfig，也交给控制台与开浏览器的那一方。
 pub struct LocalDoor { … }                                        // Clone，内部一把锁
 pub struct DoorSenses { pub clock: Arc<dyn Fn() -> Result<TimeMs, AxError> + Send + Sync>,
+  pub monotonic: Arc<dyn Fn() -> Instant + Send + Sync>,
                         pub entropy: Arc<dyn Fn(&mut [u8]) -> Result<(), AxError> + Send + Sync> }
 pub type KeepBrowsers = Arc<dyn Fn(&[PairedBrowser]) -> Result<(), AxError> + Send + Sync>;
 impl LocalDoor {
     pub fn new(browsers: Vec<PairedBrowser>, senses: DoorSenses, keep: KeepBrowsers) -> Result<Self, AxError>;
-    pub fn pairing_code(&self) -> tokio::sync::watch::Receiver<String>;   // 换码时推一次，控制台据此原地刷新
+    pub fn issue_display_code(&self) -> Result<String, AxError>;           // 只给可信的终端备用屏
     pub fn issue_open_code(&self) -> Result<OpenCode, AxError>;           // OpenCode { code, redeemed: mpsc::Receiver<()> }
     pub fn devices(&self) -> DevicesAnswer;
     pub fn forget(&self, device: &DeviceId) -> Result<bool, AxError>;

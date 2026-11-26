@@ -304,7 +304,7 @@ The version line comes from the binary. A checkout built without release provena
 sprawling up ./cities/first
 ```
 
-When the directory holds no city yet, this command raises one, serves it on `127.0.0.1:2501`, and opens the page in the browser your operating system uses for links — already paired. The terminal becomes the **quiet host**: two lines, the serving address and a pairing code, and not one more word however much the city does.
+When the directory holds no city yet, this command raises one, serves it on `127.0.0.1:2501`, and opens the page in the browser your operating system uses for links — already paired. The terminal becomes the **quiet host**: two lines with the serving address and the key to show a pairing code.
 
 Closing the browser stops no work. The city keeps the port, so open the address again, or press Enter in the quiet host, and you are back on the page.
 
@@ -316,7 +316,7 @@ The CLI shows the room you are speaking to: what you said, each run's model, how
 
 See [Calyx](../../Calyx/README.md#city-vs-mei) for the terminal interface and a command completion example.
 
-The browser `/web` opens is paired without typing: `/web` hands it a one-time open code through a file only your account can read, and the page keeps a device key in that browser's own storage, so the plain address opens the city from then on. A second browser, or one whose storage was cleared, asks for the pairing code — the one the terminal shows. Each code takes one try, right or wrong, and the terminal then shows a new one. **settings** lists the paired browsers, and can make the city forget any of them.
+The browser `/web` opens is paired without typing: `/web` hands it a one-time open code through a file only your account can read, and the page keeps a device key in that browser's own storage, so the plain address opens the city from then on. A second browser, or one whose storage was cleared, asks for a pairing code. Press C in the quiet host, copy the code, and paste it into the browser within two minutes. Each code enrolls one browser. **settings** lists the paired browsers, and can make the city forget any of them.
 
 `/quit` closes the city in order, typed in the CLI or on a page this computer opened. With runs going, it asks once: Enter waits for them to finish, `n` stops them now, and Esc keeps the city serving. Stopping now waits at most four seconds for the runs to reach a safe point; after that the city closes without writing its handoff, and the next start freezes the runs it left open.
 

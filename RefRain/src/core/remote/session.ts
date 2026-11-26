@@ -26,15 +26,20 @@ export function dialFor(
     let dropped = false;
 
     const gone = (): boolean => dropped;
+    const closeUnopened = (): void => {
+      if (dropped) return;
+      dropped = true;
+      hearing.closed();
+    };
     void kept().then(async (device) => {
       if (gone()) return;
       if (device === null) {
-        line = plain(hearing);
+        closeUnopened();
         return;
       }
       const opened = await sessionOver(url, device);
       if (opened.kind !== "opened") {
-        if (!gone()) hearing.closed();
+        closeUnopened();
         return;
       }
       if (gone()) {
@@ -46,13 +51,8 @@ export function dialFor(
     return {
       send: (text) => line?.send(text) ?? false,
       close: () => {
-        if (line !== null) {
-          line.close();
-          return;
-        }
-        if (dropped) return;
-        dropped = true;
-        hearing.closed();
+        if (line === null) closeUnopened();
+        else line.close();
       },
     };
   };
@@ -69,7 +69,9 @@ export function talk(door: Door, session: Session, hearing: Hearing): Line {
     door.close();
     hearing.closed();
   };
-  hearing.opened(null);
+  queueMicrotask(() => {
+    if (isOpen()) hearing.opened(null);
+  });
   void (async () => {
     for (let sealed = await door.next(); sealed !== null && isOpen(); sealed = await door.next()) {
       const bytes = await session.opener.open(sealed);
