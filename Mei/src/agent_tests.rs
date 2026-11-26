@@ -49,7 +49,7 @@ impl Script {
 }
 
 impl Ports for Script {
-    fn post(&mut self, _request: &Value, _pulse: &mut dyn Write) -> Result<Value> {
+    fn post(&mut self, _request: &dyn Transcript, _pulse: &mut dyn Write) -> Result<Value> {
         Ok(self.answers.pop_front().unwrap())
     }
 

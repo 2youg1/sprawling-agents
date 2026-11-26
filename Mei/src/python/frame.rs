@@ -18,8 +18,14 @@ pub struct Image {
     pub(super) data: Vec<u8>,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum Capture {
+    File(String),
+    Text(String),
+}
+
 pub struct Frame {
-    pub capture: String,
+    pub capture: Capture,
     pub images: Vec<Image>,
     pub failed: bool,
 }
@@ -67,13 +73,43 @@ fn image(input: &mut impl Read) -> Result<Image> {
     Ok(Image { media_type, data })
 }
 
+fn capture(input: &mut impl Read, length: u8) -> Result<Capture> {
+    if length == 0 {
+        let mut length = [0; 2];
+        field(input, &mut length, "inline capture length")?;
+        let size = u16::from_le_bytes(length);
+        if u64::from(size) > crate::capture::INLINE_BYTES {
+            return Err(failure(
+                "inline capture exceeds the allowed length",
+                size.to_string(),
+            ));
+        }
+        let mut bytes = vec![0; usize::from(size)];
+        field(input, &mut bytes, "inline capture")?;
+        return String::from_utf8(bytes).map(Capture::Text).map_err(|err| {
+            failure(
+                format!("inline capture is not UTF-8: {err}"),
+                size.to_string(),
+            )
+        });
+    }
+    let mut bytes = vec![0; usize::from(length)];
+    field(input, &mut bytes, "capture file name")?;
+    if !bytes.is_ascii() {
+        return Err(failure(
+            "capture file name is not ASCII",
+            format!("{bytes:?}"),
+        ));
+    }
+    String::from_utf8(bytes)
+        .map(Capture::File)
+        .map_err(|err| failure(format!("read capture file name: {err}"), length.to_string()))
+}
+
 pub fn read(input: &mut impl Read) -> Result<Frame> {
     let mut header = [0; 3];
     field(input, &mut header, "response header")?;
     let [length, failed, count] = header;
-    if length == 0 {
-        return Err(failure("capture file name is empty", "0"));
-    }
     let failed = match failed {
         0 => false,
         1 => true,
@@ -83,16 +119,7 @@ pub fn read(input: &mut impl Read) -> Result<Frame> {
     if count > IMAGE_CALL_LIMIT {
         return Err(failure("too many pictures", count.to_string()));
     }
-    let mut capture = vec![0; usize::from(length)];
-    field(input, &mut capture, "capture file name")?;
-    if !capture.is_ascii() {
-        return Err(failure(
-            "capture file name is not ASCII",
-            format!("{capture:?}"),
-        ));
-    }
-    let capture = String::from_utf8(capture)
-        .map_err(|err| failure(format!("read capture file name: {err}"), length.to_string()))?;
+    let capture = capture(input, length)?;
     let images = (0..count).map(|_| image(input)).collect::<Result<_>>()?;
     Ok(Frame {
         capture,
@@ -139,12 +166,25 @@ mod tests {
     fn text_only_frames_keep_the_legacy_string_result() {
         let mut input = b"\x07\x00\x00out.txt".as_slice();
         let frame = read(&mut input).unwrap();
-        assert_eq!(frame.capture, "out.txt");
+        assert_eq!(frame.capture, Capture::File("out.txt".to_owned()));
         assert!(!frame.failed);
         assert_eq!(
             content("answer".to_owned(), frame.images),
             Value::String("answer".to_owned())
         );
+        assert!(input.is_empty());
+    }
+
+    #[test]
+    fn inline_frames_carry_complete_utf8_and_leave_the_next_frame_aligned() {
+        let mut input = b"\x00\x00\x00\x03\x00a\x00b\x00\x01\x00\x00\x00".as_slice();
+        assert_eq!(
+            read(&mut input).unwrap().capture,
+            Capture::Text("a\0b".to_owned())
+        );
+        let empty = read(&mut input).unwrap();
+        assert!(empty.failed);
+        assert_eq!(empty.capture, Capture::Text(String::new()));
         assert!(input.is_empty());
     }
 
@@ -169,6 +209,9 @@ mod tests {
     fn malformed_frames_and_media_are_refused() {
         let bad: &[&[u8]] = &[
             b"",
+            b"\x00\x00\x00\x01\x40",
+            b"\x00\x00\x00\x02\x00x",
+            b"\x00\x00\x00\x01\x00\xff",
             b"\x01\x00",
             b"\x00\x00\x00",
             b"\x01\x02\x00x",

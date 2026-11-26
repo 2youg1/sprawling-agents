@@ -3173,6 +3173,7 @@ name = "sprawling-mei"
 version = "0.18.2"
 dependencies = [
  "base64 0.23.1",
+ "httparse",
  "image",
  "rustix",
  "serde_json",

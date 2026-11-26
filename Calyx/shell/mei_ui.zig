@@ -57,7 +57,7 @@ pub const Ui = struct {
     environ: *std.process.Environ.Map,
     editor: editor_mod.Editor,
     screen: screen_mod.Screen,
-    log: std.ArrayList(write.Entry) = .empty,
+    log: std.ArrayList(mei_view.LogEntry) = .empty,
     log_arena: std.heap.ArenaAllocator,
     cards: std.ArrayList(mei_view.Card) = .empty,
     focus: usize = 0,
@@ -633,7 +633,7 @@ pub const Ui = struct {
     }
 
     fn pushBanner(self: *Ui) void {
-        self.log.append(self.gpa, .{ .banner = .{ .city = self.session_dir, .address = "", .url = "" } }) catch return;
+        self.log.append(self.gpa, .{ .item = .{ .banner = .{ .city = self.session_dir, .address = "", .url = "" } } }) catch return;
         self.updateBanner();
     }
 
@@ -664,7 +664,7 @@ pub const Ui = struct {
     }
 
     fn updateBanner(self: *Ui) void {
-        if (self.log.items.len == 0 or self.log.items[0] != .banner) return;
+        if (self.log.items.len == 0 or self.log.items[0].item != .banner) return;
         const head = self.git_head orelse "";
         const caption = std.fmt.allocPrint(self.gpa, "{s}{s}{s}", .{
             head,
@@ -674,7 +674,7 @@ pub const Ui = struct {
         if (self.banner_caption) |old| self.gpa.free(old);
         self.banner_caption = caption;
         self.banner_agents = self.seen.agents_loaded;
-        self.log.items[0].banner.address = caption;
+        self.log.items[0].item.banner.address = caption;
     }
 
     fn absorb(self: *Ui, entries: []const write.Entry) void {
@@ -695,7 +695,7 @@ pub const Ui = struct {
             const thought = entry == .reasoning and entry.reasoning.body.len != 0;
             if (paired or thought) self.cards.ensureUnusedCapacity(self.gpa, 1) catch return;
             const owned = present.cloneEntry(self.log_arena.allocator(), entry) catch return;
-            self.log.append(self.gpa, owned) catch return;
+            self.log.append(self.gpa, .{ .item = owned, .card = if (paired or thought) self.cards.items.len else null }) catch return;
             if (entry == .reply and self.seen.draftText().len == 0) self.view.commitDraft(self.log.items.len - 1);
             if (paired) {
                 self.cards.appendAssumeCapacity(.{ .python = .{

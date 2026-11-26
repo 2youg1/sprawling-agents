@@ -10,7 +10,8 @@ use serde_json::{Value, json};
 
 use mei::acp::{self, Outcome, StopReason, Turn};
 use mei::error::{Code, Diagnostic, Error, Result};
-use mei::launch::{self, Task};
+use mei::launch;
+use mei::request::Request;
 use mei::{agent, doctor, observation, python, resume, steer, transport, workspace};
 
 fn main() -> ExitCode {
@@ -159,7 +160,11 @@ fn prompt(argument: Option<String>) -> Result<String> {
 
 fn run_headless(arguments: Arguments) -> Result<String> {
     let prompt = prompt(arguments.prompt)?;
-    let history = arguments.resume.as_deref().map(resume::read).transpose()?;
+    let history = arguments
+        .resume
+        .as_deref()
+        .map(resume::history)
+        .transpose()?;
     let now = launch::current_unix_seconds()?;
     let base = launch::environment_or("ANTHROPIC_BASE_URL", launch::DEFAULT_BASE)?;
     let key = launch::environment_or("ANTHROPIC_API_KEY", "magpie")?;
@@ -178,18 +183,11 @@ fn run_headless(arguments: Arguments) -> Result<String> {
         )?;
     }
     let environment = doctor::ensure(now)?;
-    let mut request = launch::initial_request(
-        Task {
-            model: &model,
-            prompt: &prompt,
-            history,
-            guide: guide.as_deref(),
-        },
-        extra,
-        &environment,
-    )?;
-    trace_model(&request, discovered.as_ref())?;
-    let mut python = python::Py::spawn_in(&environment)?;
+    let fields = launch::request_settings(&model, extra, &environment);
+    trace_model(&fields, discovered.as_ref())?;
+    let mut request = Request::new(fields, history.unwrap_or_default())?;
+    let prompt = workspace::opening_content(guide.as_deref(), &prompt);
+    let mut python = python::Py::prepare_in(&environment)?;
     let mut intake = match launch::optional_environment("MEI_STEER_PATH")? {
         Some(path) => Some(steer::Intake::open(path)?),
         None => None,
@@ -201,7 +199,7 @@ fn run_headless(arguments: Arguments) -> Result<String> {
         cancelled: None,
     };
     let mut trace = std::io::stderr();
-    let result = agent::drive(&mut request, &mut live, &mut trace);
+    let result = agent::turn(&mut request, prompt, &mut live, &mut trace);
     match result {
         Ok(answer) => {
             python.close()?;
@@ -225,7 +223,7 @@ fn run_acp() -> Result<()> {
     let extra = launch::parse_extra(launch::optional_environment("HARNESS_EXTRA")?.as_deref())?;
     let environment = doctor::ensure(now)?;
     let mut python: Option<python::Py> = None;
-    let mut request: Option<Value> = None;
+    let mut request: Option<Request> = None;
     let mut guide_pending = true;
     let mut opened_cwd = None;
     let stdin = std::io::stdin();
@@ -241,57 +239,24 @@ fn run_acp() -> Result<()> {
             });
         }
         let mut trace = std::io::stderr();
-        if turn.first || request.is_none() {
-            let guide = if guide_pending {
-                workspace::read_new_session()?
-            } else {
-                None
-            };
-            guide_pending = false;
-            let built = launch::initial_request(
-                Task {
-                    model: &model,
-                    prompt: &turn.prompt,
-                    history: None,
-                    guide: guide.as_deref(),
-                },
-                extra.clone(),
-                &environment,
-            )?;
-            request = Some(built);
-            if let Some(body) = request.as_ref() {
-                trace_model(body, discovered.as_ref())?;
+        let (body, prompt) = match request.as_mut() {
+            Some(body) if !turn.first => (body, Value::String(turn.prompt)),
+            _ => {
+                let guide = if guide_pending {
+                    workspace::read_new_session()?
+                } else {
+                    None
+                };
+                guide_pending = false;
+                let fields = launch::request_settings(&model, extra.clone(), &environment);
+                trace_model(&fields, discovered.as_ref())?;
+                let body = request.insert(Request::new(fields, Default::default())?);
+                (
+                    body,
+                    workspace::opening_content(guide.as_deref(), &turn.prompt),
+                )
             }
-        } else {
-            let body = request.as_mut().ok_or_else(|| {
-                Error::Diagnostic(Diagnostic::new(
-                    Code::Protocol,
-                    "continue an ACP session",
-                    "no Messages request exists for this session",
-                    "open a new ACP session with session/new before another prompt",
-                ))
-            })?;
-            let messages = body
-                .get_mut("messages")
-                .and_then(Value::as_array_mut)
-                .ok_or_else(|| {
-                    Error::Diagnostic(Diagnostic::new(
-                        Code::Protocol,
-                        "append an ACP prompt",
-                        "the Messages request has no messages array",
-                        "restart `mei --acp` and open a new session",
-                    ))
-                })?;
-            messages.push(json!({"role": "user", "content": turn.prompt}));
-        }
-        let body = request.as_mut().ok_or_else(|| {
-            Error::Diagnostic(Diagnostic::new(
-                Code::Protocol,
-                "run an ACP turn",
-                "the Messages request is missing",
-                "restart `mei --acp` and open a new session",
-            ))
-        })?;
+        };
         let run_result = {
             let interpreter = python.as_mut().ok_or_else(|| {
                 Error::Diagnostic(Diagnostic::new(
@@ -308,7 +273,7 @@ fn run_acp() -> Result<()> {
                 intake: &mut intake,
                 cancelled: Some(turn.cancelled.as_ref()),
             };
-            agent::drive(body, &mut live, &mut trace)
+            agent::turn(body, prompt, &mut live, &mut trace)
         };
         let answer = match run_result {
             Ok(answer) => answer,
@@ -362,7 +327,10 @@ fn describe_model() -> Result<()> {
         .and_then(|fields| fields.get("output_config"))
         .cloned()
         .unwrap_or_else(|| json!({"effort": launch::DEFAULT_EFFORT}));
-    let request = json!({"model": catalog.model, "output_config": output});
+    let request = serde_json::Map::from_iter([
+        ("model".to_owned(), Value::from(catalog.model.as_str())),
+        ("output_config".to_owned(), output),
+    ]);
     let model = model_observation(&request, Some(&catalog))?;
     observation::write(
         &mut std::io::stdout(),
@@ -371,7 +339,10 @@ fn describe_model() -> Result<()> {
     )
 }
 
-fn trace_model(request: &Value, discovered: Option<&mei::catalog::Selection>) -> Result<()> {
+fn trace_model(
+    request: &serde_json::Map<String, Value>,
+    discovered: Option<&mei::catalog::Selection>,
+) -> Result<()> {
     let model = model_observation(request, discovered)?;
     observation::write(
         &mut std::io::stderr(),
@@ -381,7 +352,7 @@ fn trace_model(request: &Value, discovered: Option<&mei::catalog::Selection>) ->
 }
 
 fn model_observation(
-    request: &Value,
+    request: &serde_json::Map<String, Value>,
     discovered: Option<&mei::catalog::Selection>,
 ) -> Result<Value> {
     let sent = request
@@ -405,7 +376,8 @@ fn model_observation(
         _ => (None, Vec::new()),
     };
     let effort = request
-        .pointer("/output_config/effort")
+        .get("output_config")
+        .and_then(|config| config.get("effort"))
         .and_then(Value::as_str)
         .unwrap_or("default");
     Ok(json!({

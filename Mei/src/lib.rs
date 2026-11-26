@@ -13,6 +13,7 @@ pub mod error;
 pub mod launch;
 pub mod observation;
 pub mod python;
+pub mod request;
 pub mod resume;
 pub mod steer;
 pub mod transport;

@@ -153,7 +153,7 @@ impl Store {
         Ok(self.root.join(identifier))
     }
 
-    fn reclaim_inline(&mut self) -> Result<()> {
+    pub(crate) fn reclaim_inline(&mut self) -> Result<()> {
         while let Some(path) = self.inline.last() {
             match std::fs::remove_file(path) {
                 Ok(()) => {}

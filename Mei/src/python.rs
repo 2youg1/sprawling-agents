@@ -3,8 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use std::io::{BufRead, BufReader, Write};
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::process::{Command, Stdio};
 use std::time::Duration;
 
 use crate::capture::Store as CaptureStore;
@@ -13,6 +12,9 @@ use crate::error::{Code, Diagnostic, Error, Result};
 
 mod frame;
 mod preview;
+mod process;
+
+use process::Interpreter;
 
 pub use crate::capture::INLINE_BYTES;
 
@@ -27,6 +29,8 @@ pub fn tool_description(environment: &Environment) -> String {
     format!(
         concat!(
             "<python version=\"{}\" uv_version=\"{}\">\nA persistent python interpreter. Variables, imports, and the working directory (cwd) persist across calls. ",
+            "Send calls you can already specify together in one response. They run in order and each returns its own result. ",
+            "Wait for a result when it determines the next call. ",
             "An exception prints its traceback without ending the session, so you can recover and continue without rebuilding state. ",
             "Expressions do not auto-echo, so explicitly print any values you need to inspect. ",
             "If combined UTF-8 stdout/stderr is up to {} KiB, the tool returns it inline. ",
@@ -60,26 +64,32 @@ pub(crate) struct Execution {
 }
 
 pub struct Py {
-    child: Child,
-    input: Option<ChildStdin>,
-    output: BufReader<ChildStdout>,
+    interpreter: Interpreter,
     captures: CaptureStore,
 }
 
 impl Py {
     pub fn spawn() -> Result<Py> {
-        Py::with_boot(BOOT, None)
+        let mut python = Py::prepare(None)?;
+        python.interpreter.start()?;
+        Ok(python)
     }
 
     pub fn spawn_in(environment: &Environment) -> Result<Py> {
-        Py::with_boot(BOOT, Some(environment))
+        let mut python = Py::prepare_in(environment)?;
+        python.interpreter.start()?;
+        Ok(python)
+    }
+
+    pub fn prepare_in(environment: &Environment) -> Result<Py> {
+        Py::prepare(Some(environment))
     }
 
     #[expect(
         clippy::disallowed_methods,
-        reason = "an independent harness process starts its own interpreter, not a city child"
+        reason = "Mei prepares its independent interpreter command"
     )]
-    fn with_boot(boot: &str, environment: Option<&Environment>) -> Result<Py> {
+    fn prepare(environment: Option<&Environment>) -> Result<Py> {
         let mut command = match environment {
             Some(environment) => Command::new(&environment.python.executable),
             None => Command::new(python_program()),
@@ -87,7 +97,16 @@ impl Py {
         if let Some(environment) = environment {
             command.env("PATH", environment.child_path()?);
         }
-        command.args(["-u", "-c", boot]);
+        command.current_dir(std::env::current_dir().map_err(|err| {
+            failure(
+                "bind the Python working directory",
+                err.to_string(),
+                "keep the session working directory accessible before starting Mei",
+            )
+        })?);
+        command
+            .args(["-u", "-c", BOOT])
+            .arg(INLINE_BYTES.to_string());
         command.stdin(Stdio::piped());
         command.stdout(Stdio::piped());
         command.stderr(Stdio::inherit());
@@ -105,38 +124,8 @@ impl Py {
         command.env("LC_ALL", "C").env("PYTHONUTF8", "0");
         let captures = CaptureStore::create()?;
         command.env("MEI_CAPTURE_DIR", captures.root());
-        let mut child = match command.spawn() {
-            Ok(child) => child,
-            Err(err) => {
-                let mut captures = captures;
-                if let Err(cleanup) = captures.discard() {
-                    eprintln!("{cleanup}");
-                }
-                return Err(failure(
-                    "start Python for Mei",
-                    err.to_string(),
-                    "install Python 3 on PATH as python3 or python",
-                ));
-            }
-        };
-        let input = child.stdin.take().ok_or_else(|| {
-            failure(
-                "open the Python control input",
-                "stdin was not piped",
-                "keep the Python control channel piped",
-            )
-        })?;
-        let output = child.stdout.take().ok_or_else(|| {
-            failure(
-                "open the Python control output",
-                "stdout was not piped",
-                "keep the Python control channel piped",
-            )
-        })?;
         Ok(Py {
-            child,
-            input: Some(input),
-            output: BufReader::new(output),
+            interpreter: Interpreter::Ready(command),
             captures,
         })
     }
@@ -158,9 +147,16 @@ impl Py {
         let mut frame = Vec::with_capacity(length.len().saturating_add(code.len()));
         frame.extend_from_slice(&length);
         frame.extend_from_slice(code.as_bytes());
-        self.write_frame(&frame)?;
-        let frame = self.read_frame()?;
-        let text = self.captures.observe(frame.capture)?;
+        let process = self.interpreter.start()?;
+        process.write_frame(&frame)?;
+        let frame = process.read_frame()?;
+        let text = match frame.capture {
+            frame::Capture::Text(text) => {
+                self.captures.reclaim_inline()?;
+                text
+            }
+            frame::Capture::File(identifier) => self.captures.observe(identifier)?,
+        };
         let previews = if std::env::var_os("MEI_CAPTURE_CREATED").is_some_and(|value| value == "1")
         {
             frame
@@ -178,74 +174,16 @@ impl Py {
         })
     }
 
-    fn write_frame(&mut self, frame: &[u8]) -> Result<()> {
-        let input = self.input.as_mut().ok_or_else(|| {
-            failure(
-                "write a Python control frame",
-                "the control input is closed",
-                "start a new Mei process instead of reusing a closed interpreter",
-            )
-        })?;
-        input
-            .write_all(frame)
-            .and_then(|()| input.flush())
-            .map_err(|err| {
-                failure(
-                    "write a Python control frame",
-                    err.to_string(),
-                    "the interpreter or private input channel died; start a new Mei process",
-                )
-            })
-    }
-
-    fn read_frame(&mut self) -> Result<frame::Frame> {
-        let available = self.output.fill_buf().map_err(|err| {
-            failure(
-                "read a Python response frame",
-                err.to_string(),
-                "keep the private output channel connected to the embedded interpreter",
-            )
-        })?;
-        if available.is_empty() {
-            let status = self.child.try_wait().map_err(|err| {
-                failure(
-                    "reap Python after a closed channel",
-                    err.to_string(),
-                    "inspect the interpreter failure before starting a new process",
-                )
-            })?;
-            return Err(failure(
-                "read a Python response frame",
-                format!("the private channel closed; interpreter status: {status:?}"),
-                "the interpreter or private channel died; start a new Mei process",
-            ));
-        }
-        frame::read(&mut self.output)
-    }
-
     pub fn close(&mut self) -> Result<()> {
-        self.close_within(CLOSE_GRACE)?;
+        self.interpreter.close_within(CLOSE_GRACE)?;
         if let Err(err) = self.captures.complete() {
             eprintln!("{err}");
         }
         Ok(())
     }
 
-    fn close_within(&mut self, grace: Duration) -> Result<()> {
-        drop(self.input.take());
-        match crate::child_exit::wait(&mut self.child, grace) {
-            Ok(Some(_)) => Ok(()),
-            Ok(None) => self.terminate_process(),
-            Err(err) => Err(failure(
-                "close and wait for Python",
-                err.to_string(),
-                "if the interpreter does not exit, kill it and wait again",
-            )),
-        }
-    }
-
     pub fn kill_and_wait(&mut self) -> Result<()> {
-        let process = self.terminate_process();
+        let process = self.interpreter.terminate();
         let captures = self.captures.discard();
         match (process, captures) {
             (Ok(()), Ok(())) => Ok(()),
@@ -257,22 +195,6 @@ impl Py {
             )),
         }
     }
-
-    fn terminate_process(&mut self) -> Result<()> {
-        use crate::child_exit::TerminateError;
-
-        crate::child_exit::terminate(&mut self.child).map_err(|error| {
-            let (action, err) = match error {
-                TerminateError::Kill(err) => ("kill Python", err),
-                TerminateError::Wait(err) => ("wait for killed Python", err),
-            };
-            failure(
-                action,
-                err.to_string(),
-                "reap the process before starting another Mei run",
-            )
-        })
-    }
 }
 
 fn python_program() -> &'static str {
@@ -281,17 +203,8 @@ fn python_program() -> &'static str {
 
 impl Drop for Py {
     fn drop(&mut self) {
-        match self.child.try_wait() {
-            Ok(Some(_)) => {
-                if let Err(err) = self.captures.abandon() {
-                    eprintln!("{err}");
-                }
-            }
-            Ok(None) | Err(_) => {
-                if let Err(err) = self.kill_and_wait() {
-                    eprintln!("{err}");
-                }
-            }
+        if let Err(err) = self.kill_and_wait() {
+            eprintln!("{err}");
         }
     }
 }
@@ -346,13 +259,14 @@ mod tests {
         let mut python = Py::spawn().unwrap();
         let captures = python.captures.root().to_path_buf();
         assert!(python.run("import os\nos._exit(0)").is_err());
+        let child = &mut python.interpreter.start().unwrap().child;
         for _ in 0..500 {
-            if python.child.try_wait().unwrap().is_some() {
+            if child.try_wait().unwrap().is_some() {
                 break;
             }
             std::thread::sleep(Duration::from_millis(10));
         }
-        assert!(python.child.try_wait().unwrap().is_some());
+        assert!(child.try_wait().unwrap().is_some());
         drop(python);
         assert!(!captures.exists());
     }
@@ -427,6 +341,32 @@ mod tests {
     }
 
     #[test]
+    fn retained_output_descriptors_still_write_only_their_own_capture() {
+        let mut python = Py::spawn().unwrap();
+        python.run("import os").unwrap();
+        assert_eq!(
+            python
+                .run("inline = os.dup(1); print('seen', end='')")
+                .unwrap(),
+            "seen"
+        );
+        let notice = text(python.run("os.write(inline, b'late'); os.close(inline); spilled = os.dup(2); os.write(2, b'x' * 16385)").unwrap());
+        let path = notice.lines().last().unwrap();
+        assert_eq!(
+            python
+                .run("os.write(spilled, b'after'); os.close(spilled); print('next', end='')")
+                .unwrap(),
+            "next"
+        );
+        python.close().unwrap();
+        let output = std::fs::read(path).unwrap();
+        assert_eq!(output.len(), 16390);
+        assert!(output.ends_with(b"after"));
+        std::fs::remove_file(path).unwrap();
+        std::fs::remove_dir(std::path::Path::new(path).parent().unwrap()).unwrap();
+    }
+
+    #[test]
     fn non_utf8_output_is_a_notice_and_full_file_path() {
         let mut python = Py::spawn().unwrap();
         let notice = text(python.run("import os\nos.write(1, b'\\xff')").unwrap());
@@ -439,10 +379,11 @@ mod tests {
     #[test]
     fn an_invalid_control_frame_is_fatal() {
         let mut python = Py::spawn().unwrap();
-        python
+        let process = python.interpreter.start().unwrap();
+        process
             .write_frame(b"\x01\x00\x00\x00\x00\x00\x00\x00\xff")
             .unwrap();
-        assert!(python.read_frame().is_err());
+        assert!(process.read_frame().is_err());
         python.kill_and_wait().unwrap();
     }
 
@@ -461,6 +402,7 @@ mod tests {
             .unwrap());
         assert_eq!(output.replace("\r\n", "\n"), "answered\n");
         python
+            .interpreter
             .close_within(Duration::from_millis(200))
             .expect("the close escalates instead of hanging");
     }

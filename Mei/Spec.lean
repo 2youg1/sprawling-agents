@@ -31,6 +31,7 @@ import Mei.spec.Session
 | `main` | 装配环境、参数、stdin/stdout、退出与解释器收口 |
 | `agent` | 唯一反馈循环；只读 JSON 与 `std::io::Write`；工具波边界消费 Steer |
 | `steer` | 把 Face 追加文本接到最新 tool_result；`MEI_STEER_PATH` JSONL 投递 |
+| `request` | 完整消息的只追加编码、固定请求设置与 JSON 调用接口 |
 | `transport` | 非流式 Anthropic Messages 与 Magpie catalog/route HTTP/1.0；阻塞读时可写存活观测 |
 | `catalog` | Magpie 首选模型、上下文窗口与 effort 列表的纯 JSON 解析选择 |
 | `observation` | `mei.obs` 单行 JSON 的唯一写出接口 |
@@ -58,7 +59,7 @@ LLM compaction、验真门、Skills/MCP 自动暴露、Mei 自动更新、为弱
 - `spec/Agent.lean` 与 `agent::run` 闭包测试：整波预检、顺序执行、thinking 保真、
   pause、max_tokens、异常 stop、执行失败不伪造 tool_result、Steer 只在 exec 之后接到
   最新 tool_result 且不改变更早结果。
-- TCP 工装：HTTP/1.0、EOF、非 200 原文、chunked 拒绝、停滞返回 `E_MEI_TRANSPORT`。
+- TCP 工装：HTTP/1.0、协商长连接、EOF、非 200 原文、chunked 拒绝、停滞返回 `E_MEI_TRANSPORT`。
 - 真实 python：变量、imports 与 cwd 跨调用保留；异常打印 traceback 后不结束会话，
   下一调用可继续使用既有状态；表达式不自动回显；每次 `run` 的 tool_result 是完整的小型 UTF-8 捕获；
   文件字节等于该次捕获的 stdout+stderr；空输出返回空字符串；
@@ -120,7 +121,7 @@ Mei 补齐 ACP **agent** stdio 面后，可被粘贴/入座为 `mei --acp` 而�
 
 /-! ## 6 命名统一
 
-状态只有 `request: serde_json::Value`。`python` 是唯一本地客户端工具。
+会话请求由固定设置与只追加的完整 JSON 消息字节组成。`python` 是唯一本地客户端工具。
 tool_result 的 `content` 是小型完整文本，或“提示 + 完整结果路径”；有图片时是文本与 base64 image 块；不含 BLAKE3。
 `pause_turn` 不是取消或持久化。观测行 `type=mei.obs` 不是 Messages role。
 `python` 是有状态执行器而非 REPL：表达式不自动回显，`print` 是主动观察。
@@ -150,7 +151,7 @@ ACP client（城 harness、编辑器或其他）spawn `mei --acp`；`acp` 不依
 
 ```rust
 pub(crate) trait Ports {
-    fn post(&mut self, request: &Value, pulse: &mut dyn Write) -> Result<Value>;
+    fn post(&mut self, request: &dyn Transcript, pulse: &mut dyn Write) -> Result<Value>;
     fn exec(&mut self, code: &str) -> Result<Execution>;
     fn steer(&mut self) -> Result<Vec<String>>;
 }
@@ -162,7 +163,7 @@ pub(crate) struct Execution {
 }
 
 pub(crate) fn run(
-    request: &mut Value,
+    request: &mut dyn Transcript,
     ports: &mut dyn Ports,
     trace: &mut dyn Write,
 ) -> Result<String>;
@@ -174,8 +175,11 @@ pub struct Live<'a> {
     pub cancelled: Option<&'a AtomicBool>,
 }
 
-pub fn drive(
-    request: &mut Value,
+pub fn drive(request: &mut Value, live: &mut Live<'_>, trace: &mut dyn Write) -> Result<String>;
+
+pub fn turn(
+    request: &mut Request,
+    prompt: Value,
     live: &mut Live<'_>,
     trace: &mut dyn Write,
 ) -> Result<String>;
@@ -194,6 +198,7 @@ impl Client {
 }
 
 impl Py {
+    pub fn prepare_in(environment: &Environment) -> Result<Py>;
     pub fn spawn_in(environment: &Environment) -> Result<Py>;
     pub fn run(&mut self, code: &str) -> Result<Value>; // string，或 text + image blocks
     pub fn close(&mut self) -> Result<()>;
@@ -224,6 +229,7 @@ run 创建、结果分类、成功收口与未提交回收。
 `HARNESS_EXTRA` 最后浅合并，因此 Calyx `/e` 可覆盖 thinking 与 effort；最终请求中的 effort 是 requested 事实。
 新会话且顶层 AGENTS 存在时，首个 user content 依次是指令文本块与 prompt 文本块；否则仍为字符串。
 resume 只重放日志已有消息，不读取或补注当前 AGENTS。工具描述以 `<python version="…" uv_version="…">`
+说明已能确定的多个调用可以在同一响应内提交，按顺序执行并分别返回结果；下一步取决于反馈时等待下一轮。
 携带精确版本，与持久变量/imports/cwd、异常后恢复、主动打印、16 KiB 内联预算、完整捕获路径、
 subprocess、`sys.executable` 和 `show_image(path)` 一致；内联数字由 `INLINE_BYTES` 生成；不写 REPL 或核内超时。
 `show_image` 是 python 命名空间内的展示原语，不是第二工具；按文件魔数只接受 PNG/JPEG/GIF/WebP，
@@ -232,8 +238,9 @@ subprocess、`sys.executable` 和 `show_image(path)` 一致；内联数字由 `I
 `MEI_CAPTURE_DIR` 是 Face 分配当前 run 目录的内部环境接口；缺席时无头核创建临时 run 目录。
 Calyx 先独占创建空目录，再以 `MEI_CAPTURE_CREATED=1` 让 Mei 接管；没有这个标记时既有目录一律拒绝。
 私有控制信道请求为 8 字节小端无符号长度和等长 UTF-8 代码。响应依次携带 1 字节捕获文件名长度、
-1 字节失败标志（0 或 1）、1 字节图片数量、等长 ASCII 捕获文件名和图片。每张图片由 1 字节
-格式（PNG/JPEG/GIF/WebP 依次为 1–4）、4 字节小端长度和等长原始字节组成。文件名不得为空，
+1 字节失败标志（0 或 1）、1 字节图片数量、捕获结果和图片。文件名长度非零时，捕获结果为等长 ASCII 文件名；
+长度为零时，捕获结果为 2 字节小端长度和等长完整 UTF-8 文本，长度超过 16384 拒绝。每张图片由 1 字节
+格式（PNG/JPEG/GIF/WebP 依次为 1–4）、4 字节小端长度和等长原始字节组成。
 图片数量至多 2、单图长度为 1 到 5 MiB，非法标志、格式、长度或截断为核错误。
 `Store` 在捕获 root 下拼接原生路径；spilled 提示给完整 Unicode 路径，
 或给能在 Python 中无损还原非 Unicode 原生路径的表达式。
@@ -281,7 +288,7 @@ pub struct Outcome {
 内多次 prompt 共享 Messages 与 python 进程；进程退出时收口解释器。
 python 在获知 `session/new` 的 cwd 并 `enter_cwd` 之后才 spawn，使 sole tool 的工作目录与
 AGENTS 读取的同一工作树一致；cwd 变更时先收口旧解释器再于新目录重生。
-回合若在 `agent::drive` 中失败：丢弃当前 Messages 请求并以 `close` 收口解释器（完成 spilled 交接，
+回合若在反馈循环中失败：丢弃当前 Messages 请求并以 `close` 收口解释器（完成 spilled 交接，
 D17），下一 prompt 以无 guide 的新请求重建；stdin 断开只结束排空，不标 `cancelled`。
 新会话仅第一次构建请求时注入 AGENTS；失败重建不再注入。
 
@@ -316,7 +323,7 @@ Steer：任务进行中 Face 追加的指示。不打断当前 `exec` / `post`�
 
 /-! ## 10 实现逻辑
 
-- 传输：HTTP/1.0、Connection: close、读至 EOF；CONNECT 10s、IO 600s；
+- 传输：HTTP/1.0 请求协商 keep-alive。网关明确允许复用且提供唯一有效的 Content-Length 时按长度收取。关闭连接或省略长度时读至 EOF；复用响应的长度矛盾、溢出或截断均拒绝；CONNECT 10s、IO 600s；
   阻塞读期间可按固定间隔写 `mei.obs` pulse，不改 messages。自动模型路径把目录选择与路由观测作为
   独立 GET，不为自定义 `HARNESS_MODEL` 的旧网关增加前置目录请求；路由观测失败只写 unavailable。
   路由观测是答案到达后的辅助观测，用它自己的短预算（连接与读各不超过 2 s）：网关接受后不再发字节时，
@@ -324,10 +331,11 @@ Steer：任务进行中 Face 追加的指示。不打断当前 `exec` / `post`�
 - `boot.py`：请求与响应使用 §8 的定长前缀；stdout/stderr 重定向到当前 run 内独占新建的捕获文件；同一执行命名空间保留
   变量与 imports，解释器进程保留 cwd；异常只形成 traceback 反馈，循环继续；
   `show_image` 只把图片的格式与原始字节加入本次调用。Rust 在构造模型工具结果时编码 base64，
-  交互预览直接读取原始字节。捕获文件的 ASCII basename 在调用结束后经控制信道回传。
+  交互预览直接读取原始字节。捕获结果随控制帧回传。
   不改写文件、无 alarm。
   `MEI_CAPTURE_DIR`、`MEI_CAPTURE_CREATED` 与 `MEI_STEER_PATH` 在模型代码运行前由 `boot.py` 移出环境，递归子 Mei 不会误继承父 run 目录或 steer 文件。
-- `Py::run` 先读文件元数据；仅不超过 16 KiB 时做有界读取。完整 UTF-8 文本直接作为
+- 支持创建无名文件并为其建立硬链接的 Linux 捕获目录，按本次无名文件的长度从偏移零读取至多 16 KiB。
+  短 UTF-8 文本随帧返回，其余输出把同一文件链接到 run 目录。已命名文件由核读取元数据并在预算内有界读取。完整 UTF-8 文本直接作为
   tool_result；更大或非 UTF-8 时只给提示与路径。下一响应已把 fd 1/2 移到新文件，
   此时回收此前的 inline 文件；当前 inline 文件在解释器收口后回收。
 - 空输出：仍创建零字节文件，tool_result 为空字符串，文件按 inline 回收。
@@ -368,7 +376,7 @@ inline 文件占用、spilled 跨进程读取、失败/取消 run、宿主崩溃
 
 /-! ## 13 依赖选型
 
-`serde_json` 处理网关与 JSONL；`base64` 编码工具图像，`image` 只启用 PNG/JPEG 解码以生成有界字符预览。保留原始工具结果给模型，Face 可直接显示预览，无需再实现格式解码。TCP、进程和回调使用标准库，有限时退出等待在 Windows 用 `wait-timeout`、Linux 用 `rustix`。被否：reqwest、clap、Model/Tool trait、
+`serde_json` 处理网关与 JSONL；`base64` 编码工具图像，`image` 只启用 PNG/JPEG 解码以生成有界字符预览。保留原始工具结果给模型，Face 可直接显示预览，无需再实现格式解码。`httparse` 解析响应头，TCP、进程和回调使用标准库，有限时退出等待在 Windows 用 `wait-timeout`、Linux 用 `rustix`。被否：reqwest、clap、Model/Tool trait、
 Mei 自更新器、为输出捕获引入异步 runtime。uv 官方 installer、`uv python install` 与
 `UV_UNMANAGED_INSTALL` / `UV_PYTHON_INSTALL_DIR` / `UV_PYTHON_BIN_DIR` 的合同见官方文档，
 跟踪关系记入 `docs/third-party.md`。
@@ -419,8 +427,11 @@ doctor 测试用假探测/安装闭包和隔离缓存，不执行真实下载；
 城 harness client 合同以 `Sprawling/agent_protocols/Spec.lean` §8-19 为准，本文件不复制。
 -/
 
-/-! D1 请求 JSON 唯一状态；闭包替代单实现 trait。 -/
-/-! D2 非流式 HTTP/1.0 读至 EOF；被否 reqwest/SSE/chunked/重试。 -/
+/-! D1 请求 JSON 是唯一历史。恢复逐条验证并追加模型可见字段，ACP 下一轮与工具波复用这些字节。
+Messages 接口每次接收完整历史；重新构造历史对象树会使每波的本地编码成本随旧历史增长。 -/
+/-! D28 启动时验证环境并取得捕获目录，首个通过预检的 Python 调用才启动解释器。
+纯文本回答只需交还空目录。按调用创建解释器会丢失变量，按回合预启动则让纯会话等待无用进程退出。 -/
+/-! D2 同一网关的串行请求协商连接复用，旧网关以 EOF 分隔响应。自描述长度和显式 keep-alive 同时成立才保留一个空闲连接。使用前丢弃已关闭或已有额外字节的连接；开始写入后失败即返回，避免重复执行模型请求。工具波与路由观测可共用已建立的连接，节省每轮重新握手。被否 SSE、chunked、流水线与自动重发。 -/
 /-! D3 完整输出永远落盘；不超过 16 KiB 的 UTF-8 输出直接作为 tool_result，更大或非 UTF-8 输出只给提示与路径。理由：模型必须看见主动打印的小结果，而巨大输出会成为上下文 DoS；下一次仍用 python 读取、筛选或切片。被否：纯路径（没有观察通道）、全量内联（上下文 DoS）、头尾截断（伪造完整观察）、第二读取工具（小输出多一轮）。不加 BLAKE3：当前没有校验、缓存或内容寻址需求。 -/
 /-! D4 核不知 TUI；终端属 Calyx；被否核内 Entry 类型。 -/
 /-! D5 删除 `MEI_TOOLS`；透明服务端工具不由 Mei 声明；`pause_turn` 续跑。 -/
@@ -460,7 +471,9 @@ doctor 测试用假探测/安装闭包和隔离缓存，不执行真实下载；
 
 /-! D23 Python 的私有帧传回异常标志，Mei 把异常标到 `tool_result.is_error`，仍将完整捕获内容送回模型。每个已经验证的调用执行前发 `mei.obs tool_start`。工作区指令成功读取时发 `mei.obs workspace`，只携带加载标志。交互运行把 PNG/JPEG 解码为有界灰阶字符预览，经 `mei.obs image` 发给 Calyx。原图片完整保留在工具结果里。理由：前端以真实运行结果识别状态，避免从 traceback 文本或普通 stderr 猜测；灰阶预览可在备用屏重排，不依赖宿主图形扩展。 -/
 /-! D25 Rust 和内嵌 Python 共同构建，私有控制信道使用有长度的二进制帧。引导器可省去 JSON 和 base64
-导入，图片经过管道时保持原始大小，Rust 只在模型边界做一次 base64 编码。被否：在私有信道发送 JSON
+导入。定位读取保留子孙共享的写偏移，小输出随同已有响应传回，减少每次工具调用重新打开文件的开销。
+无名捕获首次以硬链接验证交接能力；无法创建或交接无名文件的环境使用独占命名文件。
+无需交接的无名文件随最后一个 fd 关闭自动回收；超预算或非 UTF-8 的输出交接原 inode，使后续写入仍到达同一路径。图片经过管道时保持原始大小，Rust 只在模型边界做一次 base64 编码。被否：在私有信道发送 JSON
 及 base64，那会增加启动导入、管道传输量，并让交互预览重复解码。 -/
 /-! D26 ACP 排空者由输入与回合完成事件唤醒。EOF 结束输入，但已排队的回合仍可结束；
 完成前已经到达的匹配取消仍参与结束判定。被否：两条独立通知通道加定时检查，由定时间隔拖延回合结束。 -/
