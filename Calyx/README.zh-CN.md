@@ -10,10 +10,15 @@
 
 ## 快速上手
 
-先打开 [Magpie](https://usemagpie.ai) 并配好模型路由。已有 Bun 时，装好 Mei 后在新终端启动：
+先打开 [Magpie](https://usemagpie.ai) 并配好模型路由。已有 Bun 时，先安装 Mei：
 
 ```sh
 bun install --global @sprawling/mei@latest
+```
+
+安装后打开新终端。如果找不到 `calyx`，运行 `bun pm bin --global`，并把返回的目录加入 `PATH`，再运行：
+
+```sh
 calyx
 ```
 

@@ -10,7 +10,7 @@ Copyright (c) 2026 2youg1 and the sprawling contributors
 
 **Read the source, write the draft, and keep the agent's work in view.** RefRain is both a document workspace and the browser face of the Sprawling agent harness. You can read and write without asking a model, then pick up a session when you want help.
 
-- **A workspace for your own writing.** Register a local folder, edit Markdown with autosave and undo, and return to the same reading position. Read PDFs with zoom and page previews; when you do involve an agent, attach a selection or an original-pixel region from the page.
+- **A workspace for your own writing.** In File mode, add an existing local folder with **Add workspace**. This registers the folder in place: Markdown autosave writes to that folder, so start with a copy if you want to leave the originals untouched. You can undo edits and return to the same reading position. Read PDFs with zoom and page previews; when you do involve an agent, attach a selection or an original-pixel region from the page.
 - **A workspace for running agents.** Follow a conversation and its tool calls, resume a selected session or branch it explicitly. Review Git commits and project diffs, restore a file from a recorded commit, and trace city commits back to the runs that made them.
 - **One workspace, two jobs.** Open the file a run produced next to the conversation that produced it. The Rust host owns file versions, accepted writes and persistent city state; the browser remembers layout, reading positions and drafts.
 
@@ -21,7 +21,7 @@ Copyright (c) 2026 2youg1 and the sprawling contributors
 In the demo workspace, the conversation shows a run and its tool calls beside the file the run wrote.
 
 ## Quick start
-Start an installed Sprawling host with `sprawling up ./cities/first`. If the page is closed, enter `/web` in the CLI. To try the reader and editor, skip model setup, register a local folder and open Markdown or PDF. To try agent work, connect a model, open a Session and inspect its conversation and project changes.
+Start an installed Sprawling host with `sprawling up ./cities/first`. If the page is closed, press Esc in the host terminal to enter the CLI, then type `/web`. To try the reader and editor, skip model setup, use **Add workspace** with an absolute folder path on the host, then open a Markdown or PDF file. **New / import workspace** in the city is a separate action that copies a host folder into a building. To try agent work, connect a model, open a Session and inspect its conversation and project changes.
 
 ## Run against a city
 

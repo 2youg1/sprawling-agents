@@ -4,16 +4,21 @@
 
 **一个工具，一个持久的 Python 解释器，其余由你决定。** Mei 适合想把 Agent Harness 压到极简、自己掌握工具和运行环境的人，也适合当一个专做小任务的子代理。可以用 [Calyx](../Calyx/README.zh-CN.md) 交互，从脚本调用，或用 `mei --acp` 接到支持 ACP 的主 Agent。要用哪个 Python 库、CLI 或 API，由你明确选择。
 
-Rust 写的无头核心通过 Magpie 接入兼容 Anthropic Messages 的模型路由，一次运行只走一条串行的 Python 工具循环。会话用 JSONL 保存，可以续接。Zig 实现的 Calyx 独立提供终端界面。
+Rust 写的无头核心通过 Magpie 接入兼容 Anthropic Messages 的模型路由，一次运行只走一条串行的 Python 工具循环。会话用 JSONL 保存，可以续接。独立的 Calyx 控制台用 Zig 实现。
 
 > **安全优先：** Mei 没有沙箱、权限提示或撤销。生成的 Python 可以读写文件、访问网络，并以当前账户权限运行命令。只用于一次性项目副本和单独、可撤销且有限额的 API key。不要提供私密数据、重要凭证或项目唯一副本。
 
 ## 快速上手
 
-先打开 [Magpie](https://usemagpie.ai) 并选好模型路由。在一次性目录中试跑：
+先打开 [Magpie](https://usemagpie.ai) 并选好模型路由，然后安装：
 
 ```sh
 bun install --global @sprawling/mei@latest
+```
+
+安装后打开新终端，在一次性目录中试跑。找不到 `mei` 时，见[安装章节的 PATH 设置](#安装)。
+
+```sh
 mei -p "Print hello using Python, without changing files."
 ```
 

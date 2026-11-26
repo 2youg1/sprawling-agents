@@ -16,6 +16,11 @@ With Bun installed:
 
 ```sh
 bun install --global sprawling@latest
+```
+
+Open a new terminal. If `sprawling` is not found, run `bun pm bin --global` and add the reported directory to `PATH`. Then run:
+
+```sh
 sprawling up ./cities/first
 ```
 

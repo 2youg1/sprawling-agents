@@ -10,10 +10,15 @@
 
 ## Try it
 
-Install [Magpie](https://usemagpie.ai), configure a model route and leave it running. With Bun, install Mei and open Calyx in a new terminal:
+Install [Magpie](https://usemagpie.ai), configure a model route and leave it running. With Bun, install Mei:
 
 ```sh
 bun install --global @sprawling/mei@latest
+```
+
+Open a new terminal. If `calyx` is not found, run `bun pm bin --global` and add the reported directory to `PATH`. Then run:
+
+```sh
 calyx
 ```
 

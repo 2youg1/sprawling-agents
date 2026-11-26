@@ -10,10 +10,15 @@ The headless core is Rust. It uses an Anthropic Messages-compatible route throug
 
 ## Quick start
 
-Open [Magpie](https://usemagpie.ai), select a model route, and run this in a disposable workspace:
+Open [Magpie](https://usemagpie.ai), select a model route, then install:
 
 ```sh
 bun install --global @sprawling/mei@latest
+```
+
+Open a new terminal and run the following in a disposable workspace. If `mei` is not found, see [PATH setup under Install](#install).
+
+```sh
 mei -p "Print hello using Python, without changing files."
 ```
 

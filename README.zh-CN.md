@@ -35,6 +35,11 @@
 
 ```sh
 bun install --global sprawling@latest
+```
+
+安装后打开新终端。如果找不到 `sprawling`，运行 `bun pm bin --global`，并把返回的目录加入 `PATH`，再运行：
+
+```sh
 sprawling up ./cities/first
 ```
 
