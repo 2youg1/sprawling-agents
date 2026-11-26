@@ -23,6 +23,8 @@ import {
 import type { PreviewResource } from "./markdown_widgets";
 import type { Chord } from "../../core/keys";
 import type { Key } from "../../core/lang";
+import { missingIndent, ordinaryParagraph } from "./writing_indent";
+import { quoteMarkdown } from "./markdown_quote";
 
 export type MarkdownMode = "source" | "live";
 
@@ -61,8 +63,11 @@ export const MARKDOWN_FORMATS = [
   readonly node: string;
 }[];
 
-export type MarkdownFormat = (typeof MARKDOWN_FORMATS)[number];
-export const markdownShortcut = (format: MarkdownFormat): Chord => ({
+type InlineFormat = (typeof MARKDOWN_FORMATS)[number];
+export const QUOTE_FORMAT = { id: "quote", label: "refrain_quote" } as const;
+export const CONTEXT_FORMATS = [...MARKDOWN_FORMATS, QUOTE_FORMAT];
+export type MarkdownFormat = (typeof CONTEXT_FORMATS)[number];
+export const markdownShortcut = (format: InlineFormat): Chord => ({
   accel: true,
   key: format.key,
   shift: format.shift,
@@ -70,7 +75,7 @@ export const markdownShortcut = (format: MarkdownFormat): Chord => ({
 
 function formatSpan(
   state: EditorState,
-  format: MarkdownFormat,
+  format: InlineFormat,
   from: number,
   content: string,
 ): ChangeSpec[] {
@@ -108,6 +113,7 @@ function formatSpan(
 
 export function formatMarkdown(view: EditorView, format: MarkdownFormat): boolean {
   if (view.state.readOnly || view.compositionStarted) return false;
+  if (format.id === "quote") return quoteMarkdown(view);
   const { state } = view;
   const formatted = state.changeByRange((range) => {
     if (range.empty) {
@@ -312,6 +318,17 @@ function drawNode(
     return;
   }
   if (live) {
+    if (ordinaryParagraph(node)) {
+      const first = state.doc.lineAt(node.from);
+      const missing = missingIndent(first.text).length;
+      if (missing > 0) {
+        out.push(
+          Decoration.line({
+            class: missing === 1 ? "cm-writing-indent-one" : "cm-writing-indent-two",
+          }).range(first.from),
+        );
+      }
+    }
     const widget = renderHere ? terminal(state, node, options) : null;
     if (widget !== null) {
       out.push(widget.range(node.from, node.to));

@@ -53,6 +53,7 @@ import Doc from "./doc.solid";
 import Access from "./access.solid";
 import Tables from "./tables.solid";
 import PartRow from "./parts/row.solid";
+import WritingCases from "./writing.solid";
 
 export const PRODUCT = [
   Hints,
@@ -68,6 +69,7 @@ export const PRODUCT = [
   Mailbox,
   Conversation,
   Md,
+  WritingCases,
   RefusedLine,
   Talking,
   Ring,

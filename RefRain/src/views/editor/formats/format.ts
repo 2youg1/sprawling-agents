@@ -26,3 +26,6 @@ export function drawnAs(path: string): Drawn | null {
   const dot = name.lastIndexOf(".");
   return dot <= 0 ? null : (BY_EXTENSION[name.slice(dot + 1).toLowerCase()] ?? null);
 }
+export function markdownFile(name: string): boolean {
+  return /\.(?:md|markdown|mdown|mkd)$/iu.test(name);
+}
