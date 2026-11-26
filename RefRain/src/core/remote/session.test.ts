@@ -3,12 +3,9 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The link's line over a remote session (RefRain/Spec.lean §4-64), against a
-// city half written here from `seal.ts`: the city opens frames by count,
-// so a frame sealed or opened out of turn is a frame that never opens.
-
 import { describe, expect, test } from "bun:test";
 
+import type { Line } from "../line";
 import type { Door, Refusal } from "./connect";
 import type { Session } from "./handshake";
 import { opener, payloadBytes, payloadOf, sealer } from "./seal";
@@ -18,8 +15,6 @@ const TO_CITY = new Uint8Array(32).fill(1);
 const TO_DEVICE = new Uint8Array(32).fill(2);
 const FRAMES = 24;
 
-// The connection a session runs on, driven by the test: what the device
-// sent, what the city sends next, and whether it was closed.
 interface Wire {
   readonly door: Door;
   readonly sent: Uint8Array<ArrayBuffer>[];
@@ -95,6 +90,24 @@ async function settled(until: () => boolean): Promise<void> {
 const texts = Array.from({ length: FRAMES }, (_, at) => `{"frame":${String(at)}}`);
 
 describe("a line over a remote session", () => {
+  test("lets the link send its greeting from the opened callback", async () => {
+    const { door, sent } = wire();
+    let line: Line | undefined;
+    let accepted = false;
+    const hearing = listener().hearing;
+    line = talk(door, device(), {
+      ...hearing,
+      opened: () => {
+        accepted = line?.send("greeting") === true;
+      },
+    });
+    await Promise.resolve();
+    expect(accepted).toBe(true);
+    await settled(() => sent.length === 1);
+    expect(sent).toHaveLength(1);
+    line.close();
+  });
+
   test("sends every frame the link sends, sealed in the order it sent them", async () => {
     const { door, sent } = wire();
     const line = talk(door, device(), listener().hearing);

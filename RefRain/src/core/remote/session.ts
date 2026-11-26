@@ -69,7 +69,9 @@ export function talk(door: Door, session: Session, hearing: Hearing): Line {
     door.close();
     hearing.closed();
   };
-  hearing.opened(null);
+  queueMicrotask(() => {
+    if (isOpen()) hearing.opened(null);
+  });
   void (async () => {
     for (let sealed = await door.next(); sealed !== null && isOpen(); sealed = await door.next()) {
       const bytes = await session.opener.open(sealed);
