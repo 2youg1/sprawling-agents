@@ -88,7 +88,11 @@ function PageLink(props: { readonly row: PageLook; readonly deep: boolean }) {
   );
 }
 
-function GroupButton(props: { readonly row: GroupLook; readonly deep: boolean }) {
+function GroupButton(props: {
+  readonly row: GroupLook;
+  readonly deep: boolean;
+  readonly mark?: GlyphName | null | undefined;
+}) {
   return (
     <button
       type={props.row.wire.type}
@@ -99,8 +103,10 @@ function GroupButton(props: { readonly row: GroupLook; readonly deep: boolean })
       onClick={() => props.row.wire.onclick()}
       class={[ENTRY, props.row.here && HERE]}
     >
-      <Lead />
-      <span class={props.deep ? DEEPER : DEPTH}>{props.row.label}</span>
+      <Lead mark={props.mark ?? null} />
+      <span class={props.mark ? "min-w-0 flex-1 truncate" : props.deep ? DEEPER : DEPTH}>
+        {props.row.label}
+      </span>
       <span
         class={[
           MARK,
@@ -195,7 +201,11 @@ export default function TreeControls(props: NavProps) {
       class="flex flex-col gap-tight"
     >
       <For each={props.branches} keyed={(branch) => branch.key}>
-        {(branch) => <Branch branch={branch()} />}
+        {(branch) => (
+          <Show when={branch().direct} fallback={<Branch branch={branch()} />}>
+            {(row) => <GroupButton row={row()} mark={branch().mark} deep={false} />}
+          </Show>
+        )}
       </For>
     </nav>
   );

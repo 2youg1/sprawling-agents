@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import { Show } from "solid-js";
+import { onCleanup, Show } from "solid-js";
 import { face, marks, platformOf } from "../../core/keys";
 import type { ContextTool, ContextToolsController } from "./context_tools";
 import Glyph from "./glyph.solid";
@@ -34,6 +34,11 @@ export function ContextRow(props: {
     ].join("+");
   };
   let pointer: number | undefined;
+  let hover: ReturnType<typeof setTimeout> | undefined;
+  const cancelHover = (): void => {
+    clearTimeout(hover);
+  };
+  onCleanup(cancelHover);
   const down = (event: PointerEvent & { currentTarget: HTMLButtonElement }): void => {
     if (!held() || props.disabled || event.button !== 0 || !event.isPrimary) return;
     pointer = event.pointerId;
@@ -79,8 +84,14 @@ export function ContextRow(props: {
       aria-disabled={props.disabled ? "true" : undefined}
       aria-keyshortcuts={spokenShortcut()}
       onClick={() => {
+        cancelHover();
         props.controller.enter(props.tool);
       }}
+      onPointerEnter={(event) => {
+        if (event.pointerType === "mouse" && props.tool.openOnHover && !props.disabled)
+          hover = setTimeout(() => props.controller.enter(props.tool), 150);
+      }}
+      onPointerLeave={cancelHover}
       onPointerDown={down}
       onPointerMove={move}
       onPointerUp={release}

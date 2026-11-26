@@ -8,6 +8,7 @@ import { lazy, Loading, Match, Show, Switch, untrack } from "solid-js";
 import { say, type Lang } from "../../core/lang";
 import type { Stretch } from "../../core/stretches";
 import type { Seq } from "../../wire";
+import { markdownFile } from "../editor/formats/format";
 import { PdfLoading } from "../editor/formats/pdf_loading";
 import { AttachmentTarget } from "./attachment_target";
 import { scopedId } from "./chrome";
@@ -23,7 +24,7 @@ interface FileProps {
   readonly lang: Lang;
 }
 
-function FileHeader(props: FileProps) {
+function FileProperties(props: FileProps) {
   function category(event: SubmitEvent): void {
     event.preventDefault();
     if (!(event.currentTarget instanceof HTMLFormElement)) return;
@@ -31,20 +32,28 @@ function FileHeader(props: FileProps) {
     if (typeof value === "string") props.docs.category(props.file, value.trim() || null);
   }
   return (
+    <div class="workspace-edit-panel">
+      <form class="refrain-files-tools" onSubmit={category}>
+        <label>
+          {say(props.lang, "shell_file_category")}
+          <input name="category" value={props.file.record.category ?? ""} />
+        </label>
+        <button data-control="" class="refrain-nav-button" type="submit">
+          {say(props.lang, "shell_save_category")}
+        </button>
+      </form>
+      <a href={props.docs.link(props.file)}>{say(props.lang, "shell_file_link")}</a>
+    </div>
+  );
+}
+
+function FileHeader(props: FileProps) {
+  return (
     <div class="refrain-file-header">
       <h2>{props.file.record.path}</h2>
       <details>
         <summary>{say(props.lang, "shell_file_details")}</summary>
-        <form class="refrain-files-tools" onSubmit={category}>
-          <label>
-            {say(props.lang, "shell_file_category")}
-            <input name="category" value={props.file.record.category ?? ""} />
-          </label>
-          <button data-control="" class="refrain-nav-button" type="submit">
-            {say(props.lang, "shell_save_category")}
-          </button>
-        </form>
-        <a href={props.docs.link(props.file)}>{say(props.lang, "shell_file_link")}</a>
+        <FileProperties {...props} />
       </details>
       <button
         data-control=""
@@ -108,6 +117,8 @@ function FormatFile(props: FileProps) {
               onProposalDecision={() => props.docs.closeReview()}
               readResource={(relative) => props.docs.readResource(props.file, relative)}
               lang={props.lang}
+              close={() => props.docs.closeFile()}
+              properties={() => <FileProperties {...props} />}
             />
           </Match>
         </Switch>
@@ -177,7 +188,9 @@ export function FileCanvas(props: {
         <Show when={props.docs.opened()}>
           {(file) => (
             <>
-              <FileHeader file={file()} docs={props.docs} lang={props.lang} />
+              <Show when={!markdownFile(file().record.path)}>
+                <FileHeader file={file()} docs={props.docs} lang={props.lang} />
+              </Show>
               <Show when={props.docs.identity()} keyed>
                 <FormatFile file={file()} docs={props.docs} lang={props.lang} />
               </Show>

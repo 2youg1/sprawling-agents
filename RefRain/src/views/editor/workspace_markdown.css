@@ -1,0 +1,229 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ * Copyright (c) 2026 2youg1 and the sprawling contributors */
+
+.workspace-document[data-writing-measure] {
+  --writing-gutter: calc(var(--writing-gutter-digits, 1) * 1ch + 2 * var(--spacing-snug));
+  --workspace-editor-available: calc(100% - 2 * var(--writing-gutter));
+  font-family: var(--font-mono);
+  font-size: var(--text-body);
+}
+
+.workspace-document[data-writing-measure] .workspace-editor-host {
+  inline-size: calc(var(--workspace-editor-width) + var(--writing-gutter));
+  margin-inline-start: calc((100% - var(--workspace-editor-width)) / 2 - var(--writing-gutter));
+}
+
+.workspace-document[data-writing-measure] .cm-lineNumbers {
+  inline-size: calc(var(--writing-gutter) - var(--spacing-hair));
+}
+
+.workspace-document[data-writing-measure] .cm-lineNumbers .cm-gutterElement {
+  padding-inline: var(--spacing-snug);
+  color: var(--file-quiet-ink, var(--color-text-quiet));
+  font-variant-numeric: tabular-nums;
+}
+
+.workspace-document[data-writing-measure] .cm-lineNumbers .cm-activeLineGutter {
+  background: transparent;
+  color: var(--file-ink, var(--color-text));
+  font-weight: var(--font-weight-label);
+}
+
+.workspace-document[data-writing-measure] .cm-gutters {
+  border-inline-end: var(--spacing-hair) solid var(--file-edge, var(--color-edge));
+}
+
+.workspace-document[data-writing-measure] .cm-activeLine {
+  background: transparent;
+}
+
+.workspace-document[data-writing-measure] .cm-panels:has(.workspace-search-anchor) {
+  display: none;
+}
+
+.workspace-document[data-writing-indent="display"] .cm-writing-indent-one {
+  text-indent: 1em;
+  text-indent: 1ic;
+}
+
+.workspace-document[data-writing-indent="display"] .cm-writing-indent-two {
+  text-indent: 2em;
+  text-indent: 2ic;
+}
+
+@container shell (inline-size >= 768px) {
+  .refrain-workspace .workspace-document[data-writing-measure] {
+    --writing-silver: calc(var(--silver-side) * var(--silver) - var(--spacing-gutter));
+    --writing-outer-column: calc(
+      (2 * var(--silver-side) - 2 * var(--spacing-margin) + var(--spacing-gutter)) / 6
+    );
+    --workspace-editor-width: min(var(--workspace-editor-available), var(--writing-measure));
+    --writing-measure: var(--writing-silver);
+  }
+
+  .refrain-workspace .workspace-document[data-writing-measure="gold"] {
+    --writing-measure: calc(
+      (2 + var(--silver)) * var(--silver-side) * (3 - sqrt(5)) / 2 - var(--spacing-gutter)
+    );
+  }
+
+  .refrain-workspace .workspace-document[data-writing-measure="wide"] {
+    --writing-measure: calc(var(--writing-silver) + 2 * var(--writing-outer-column));
+  }
+}
+
+.workspace-markdown-header.refrain-file-header {
+  flex: none;
+  flex-wrap: nowrap;
+  min-block-size: calc(var(--spacing-control) + 2 * var(--spacing-pane) + var(--spacing-hair));
+}
+
+.workspace-file-name {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-inline-size: 0;
+  gap: var(--spacing-snug);
+}
+
+.workspace-file-name h2 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-file-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-tight);
+  color: var(--color-text-quiet);
+  font-size: var(--text-note);
+}
+
+.workspace-file-status[data-draft] {
+  color: var(--color-alert);
+}
+
+.workspace-live-switch {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--spacing-tight);
+  min-block-size: var(--spacing-control);
+  font-size: var(--text-note);
+}
+
+.workspace-live-switch input {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  opacity: 0;
+}
+
+.workspace-live-track {
+  --track-size: calc(var(--spacing-glyph) + var(--spacing-snug));
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  inline-size: calc(2 * var(--track-size) - var(--spacing-tight));
+  block-size: var(--track-size);
+  padding-inline: var(--spacing-hair);
+  border: var(--spacing-hair) solid var(--color-edge-input);
+  border-radius: var(--radius-pill);
+  background: var(--color-raised);
+  transition: background-color var(--transition-duration-short) var(--ease-arrive);
+}
+
+.workspace-live-track::before {
+  inline-size: calc(var(--track-size) - var(--spacing-tight));
+  block-size: calc(var(--track-size) - var(--spacing-tight));
+  border-radius: var(--radius-pill);
+  background: var(--color-text-quiet);
+  content: "";
+  transition:
+    transform var(--transition-duration-short) var(--ease-arrive),
+    background-color var(--transition-duration-short) var(--ease-arrive);
+}
+
+.workspace-live-switch input:checked + .workspace-live-track {
+  background: var(--color-accent);
+}
+
+.workspace-live-switch input:checked + .workspace-live-track::before {
+  background: var(--color-page);
+  transform: translateX(calc(var(--track-size) - 4 * var(--spacing-hair)));
+}
+
+.workspace-live-switch input:focus-visible + .workspace-live-track {
+  outline: var(--spacing-hair) solid var(--color-accent);
+  outline-offset: var(--spacing-tight);
+}
+
+.workspace-writing-readout {
+  display: grid;
+  flex: none;
+  padding-inline-start: calc(var(--refrain-rail-size, 0px) + var(--spacing-pane));
+  padding-block-end: var(--spacing-tight);
+  color: var(--file-quiet-ink, var(--color-text-quiet));
+  font-size: var(--text-note);
+  font-variant-numeric: tabular-nums;
+}
+
+.workspace-writing-bytes,
+.workspace-writing-digest {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-snug);
+  margin: 0;
+}
+
+.workspace-writing-digest {
+  position: relative;
+  inline-size: fit-content;
+}
+
+.workspace-writing-digest button {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-tight);
+  min-block-size: var(--spacing-control-sm);
+  border-radius: var(--radius-control);
+  color: inherit;
+}
+
+.workspace-writing-digest button svg {
+  opacity: 0;
+}
+
+.workspace-writing-digest
+  button:is(:focus-visible, :hover, [data-copy-receipt="copied"], [data-copy-receipt="refused"])
+  svg {
+  opacity: 1;
+}
+
+.workspace-writing-digest button[data-copy-receipt="refused"] {
+  color: var(--color-alert);
+}
+
+@media (pointer: coarse) {
+  .workspace-live-switch,
+  .workspace-writing-digest button {
+    min-block-size: max(44px, var(--spacing-control));
+  }
+
+  .workspace-writing-digest button svg {
+    opacity: 1;
+  }
+}
+
+@container shell (inline-size >= 86rem) {
+  .refrain-workspace:not([data-split]) .workspace-writing-readout {
+    position: absolute;
+    inset-block-end: var(--spacing-snug);
+    inset-inline-start: 0;
+  }
+}

@@ -39,6 +39,7 @@ import Mic from "@lucide/solid/icons/mic";
 import Pause from "@lucide/solid/icons/pause";
 import Pin from "@lucide/solid/icons/pin";
 import Plus from "@lucide/solid/icons/plus";
+import Puzzle from "@lucide/solid/icons/puzzle";
 import RefreshCw from "@lucide/solid/icons/refresh-cw";
 import Search from "@lucide/solid/icons/search";
 import Settings from "@lucide/solid/icons/settings";
@@ -65,6 +66,7 @@ const DRAWN = {
   add: Plus,
   hand: Hand,
   search: Search,
+  up: ArrowUp,
   chevron: ChevronRight,
   "go-back": ArrowLeft,
   reveal: FolderOutput,
@@ -85,6 +87,7 @@ const DRAWN = {
   sandbox: Box,
   terminal: SquareTerminal,
   propose: FilePenLine,
+  puzzle: Puzzle,
   pin: Pin,
   more: Ellipsis,
   branch: GitBranch,

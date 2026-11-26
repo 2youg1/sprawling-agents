@@ -26,6 +26,7 @@ export const SETUP_GROUPS = [
   "run",
   "rules",
   "automation",
+  "writing",
   "skills",
   "tools",
   "performance",

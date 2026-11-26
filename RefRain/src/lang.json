@@ -1379,6 +1379,142 @@
     "en": "No preview is available for this file format or encoding.",
     "zh": "此文件的格式或编码没有可用的预览。"
   },
+  "setup_group_writing": {
+    "en": "Writing",
+    "zh": "写作"
+  },
+  "writing_measure": {
+    "en": "Writing width",
+    "zh": "正文宽度"
+  },
+  "writing_gold": {
+    "en": "Golden",
+    "zh": "黄金比"
+  },
+  "writing_silver": {
+    "en": "Silver",
+    "zh": "白银比"
+  },
+  "writing_wide": {
+    "en": "Wide",
+    "zh": "宽幅"
+  },
+  "writing_indent": {
+    "en": "Two-character paragraph indent",
+    "zh": "两字符段首缩进"
+  },
+  "writing_indent_off": {
+    "en": "Off",
+    "zh": "关闭"
+  },
+  "writing_indent_display": {
+    "en": "Display only",
+    "zh": "仅显示"
+  },
+  "writing_indent_source": {
+    "en": "Insert in new paragraphs",
+    "zh": "新段落自动写入"
+  },
+  "writing_complete_indent": {
+    "en": "Complete paragraph indents",
+    "zh": "全文补齐段首缩进"
+  },
+  "writing_indent_count": {
+    "en": "Complete {count} paragraphs",
+    "zh": "补齐 {count} 个段落"
+  },
+  "writing_indent_empty": {
+    "en": "Paragraph indents are already complete.",
+    "zh": "段首缩进已补齐。"
+  },
+  "writing_indent_changed": {
+    "en": "The draft changed. Review the new preview.",
+    "zh": "草稿已变化，请核对新预览。"
+  },
+  "writing_global_bytes": {
+    "en": "Draft {size} B",
+    "zh": "全局 {size} B"
+  },
+  "writing_line_bytes": {
+    "en": "Line {size} B",
+    "zh": "当前行 {size} B"
+  },
+  "writing_copy_digest": {
+    "en": "Copy full BLAKE3 of the saved version",
+    "zh": "复制最近保存版本的完整 BLAKE3"
+  },
+  "writing_blake3": {
+    "en": "BLAKE3",
+    "zh": "BLAKE3"
+  },
+  "writing_copied_digest": {
+    "en": "Copied",
+    "zh": "已复制"
+  },
+  "writing_copy_failed": {
+    "en": "Copy failed",
+    "zh": "复制失败"
+  },
+  "writing_undo": {
+    "en": "Undo edits",
+    "zh": "撤回编辑"
+  },
+  "writing_undo_empty": {
+    "en": "No edits to undo.",
+    "zh": "当前没有可撤回的编辑。"
+  },
+  "writing_undo_pick": {
+    "en": "Select edits to preview their reversal.",
+    "zh": "勾选要撤回的编辑并查看预览。"
+  },
+  "writing_undo_apply": {
+    "en": "Apply reversal",
+    "zh": "应用撤回"
+  },
+  "writing_undo_conflict": {
+    "en": "Also select the later edit that changed this text: {edit}",
+    "zh": "请一并选择后来更改了这段文字的编辑：{edit}"
+  },
+  "writing_undo_stale": {
+    "en": "The draft changed. Review the new preview.",
+    "zh": "草稿已变化，请核对新预览。"
+  },
+  "writing_undo_change": {
+    "en": "Line {line} · {text}",
+    "zh": "第 {line} 行 · {text}"
+  },
+  "writing_undo_done": {
+    "en": "Reversed {count} edits.",
+    "zh": "已撤回 {count} 条编辑。"
+  },
+  "writing_search": {
+    "en": "Find and replace",
+    "zh": "查找与替换"
+  },
+  "writing_search_count": {
+    "en": "{current} / {total}",
+    "zh": "{current} / {total}"
+  },
+  "writing_search_empty": {
+    "en": "No matches",
+    "zh": "没有匹配"
+  },
+  "writing_search_total": {
+    "en": "{total} matches",
+    "zh": "{total} 处匹配"
+  },
+  "writing_preview_limit": {
+    "en": "Preview shows the first 32 of {count} changes.",
+    "zh": "共 {count} 处改动，预览显示前 32 处。"
+  },
+  "writing_indent_apply": {
+    "en": "Apply indents",
+    "zh": "应用缩进"
+  },
+  "writing_search_invalid": {
+    "en": "Invalid pattern",
+    "zh": "表达式无效"
+  },
   "refrain_source": {
     "en": "source",
     "zh": "源码"
@@ -12766,5 +12902,9 @@
   "appearance_feature_slashed_zero": {
     "en": "slashed zero",
     "zh": "斜线零"
+  },
+  "refrain_quote": {
+    "en": "Quote",
+    "zh": "引用"
   }
 }

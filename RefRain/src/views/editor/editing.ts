@@ -3,7 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import { defaultKeymap, history, historyKeymap, isolateHistory } from "@codemirror/commands";
 import { diff, unifiedMergeView } from "@codemirror/merge";
 import { search, searchKeymap } from "@codemirror/search";
 import {
@@ -21,6 +21,7 @@ import {
   drawSelection,
   dropCursor,
   highlightActiveLine,
+  highlightActiveLineGutter,
   highlightSpecialChars,
   keymap,
   lineNumbers,
@@ -28,8 +29,12 @@ import {
 } from "@codemirror/view";
 
 import type { EditorChange } from "../../core/document_pos";
+import type { WritingIndentation } from "../../core/writing";
 import { formatMarkdown, markdownEditing, markdownMode } from "./markdown_editing";
 import type { MarkdownFormat, MarkdownMode, MarkdownOptions } from "./markdown_editing";
+import { undoPoolExtension } from "./undo_pool";
+import { finishParagraph, freshParagraph, paragraphInput, typedIndent } from "./writing_indent";
+import { followWriting } from "./writing_scroll";
 
 export interface TextRange {
   readonly from: number;
@@ -37,7 +42,7 @@ export interface TextRange {
 }
 
 export interface ContextSelection {
-  readonly range: TextRange;
+  readonly range: TextRange | null;
   readonly x: number;
   readonly y: number;
   readonly event: MouseEvent | KeyboardEvent;
@@ -53,6 +58,7 @@ export interface EditorSetup {
 
   readonly phrases: Readonly<Record<string, string>>;
   readonly onEdit: () => void;
+  readonly onDocument?: (lines: number) => void;
   readonly onLine?: (line: string) => void;
   readonly onCompositionEnd?: () => void;
   readonly onSave: () => void;
@@ -60,9 +66,11 @@ export interface EditorSetup {
   readonly onMarkdownMode?: (mode: MarkdownMode) => void;
   readonly onSelection?: (range: TextRange | null) => void;
   readonly onContextSelection?: (selection: ContextSelection) => void;
+  readonly onFind?: (anchor: { readonly x: number; readonly y: number }) => boolean;
 }
 
 export interface Editing {
+  readonly view: EditorView;
   readonly changes: () => EditorChange[];
   readonly hasChanges: () => boolean;
 
@@ -84,6 +92,7 @@ export interface Editing {
   readonly diffing: (on: boolean) => void;
   readonly setMarkdown: (mode: MarkdownMode) => void;
   readonly typewriter: (on: boolean) => void;
+  readonly indent: (mode: WritingIndentation) => void;
   readonly readOnly: (on: boolean) => void;
   readonly composing: () => boolean;
 
@@ -157,6 +166,8 @@ export function openEditor(setup: EditorSetup): Editing {
   let composing = false;
   let awaiting: MarkdownMode | null = null;
   let typewriter = false;
+  let indentation: WritingIndentation = "off";
+  let composingParagraph: number | null = null;
   let alive = true;
   const merge = new Compartment();
   const locked = new Compartment();
@@ -185,24 +196,14 @@ export function openEditor(setup: EditorSetup): Editing {
   function applyInput(update: ViewUpdate, measured = false): void {
     const started = measured ? performance.now() : 0;
     const changed = update.docChanged;
+    if (changed) setup.onDocument?.(update.state.doc.lines);
     const selectedOrChanged = update.selectionSet || changed;
     if (selectedOrChanged && setup.onSelection !== undefined) {
       const range = selected(update.view);
       if (range !== null || selectionHeld) setup.onSelection(range);
       selectionHeld = range !== null;
     }
-    if (
-      typewriter &&
-      !composing &&
-      selectedOrChanged &&
-      update.transactions.some((tx) => tx.annotation(Transaction.userEvent) !== undefined)
-    ) {
-      queueMicrotask(() => {
-        if (!alive || view.compositionStarted) return;
-        const at = view.state.selection.main.head;
-        view.dispatch({ effects: EditorView.scrollIntoView(at, { y: "center" }) });
-      });
-    }
+    if (typewriter && !composing && selectedOrChanged) followWriting(update);
     const selectionReady = measured ? performance.now() : 0;
     const edited = changed && !update.transactions.some((each) => each.annotation(Moved) === true);
     if (edited) {
@@ -249,8 +250,27 @@ export function openEditor(setup: EditorSetup): Editing {
         dropCursor(),
         rectangularSelection(),
         highlightActiveLine(),
-        search({ top: true }),
+        ...(setup.onFind === undefined ? [] : [highlightActiveLineGutter(), undoPoolExtension]),
+        search(
+          setup.onFind === undefined
+            ? { top: true }
+            : {
+                createPanel: () => {
+                  const dom = setup.parent.ownerDocument.createElement("div");
+                  dom.hidden = true;
+                  dom.className = "workspace-search-anchor";
+                  return { dom };
+                },
+              },
+        ),
         keymap.of([
+          {
+            key: "Mod-f",
+            run: (editor) => {
+              const at = editor.coordsAtPos(editor.state.selection.main.head);
+              return setup.onFind?.({ x: at?.left ?? 0, y: at?.bottom ?? 0 }) ?? false;
+            },
+          },
           {
             key: "Mod-s",
             preventDefault: true,
@@ -265,16 +285,38 @@ export function openEditor(setup: EditorSetup): Editing {
         ]),
         merge.of([]),
         locked.of(EditorState.readOnly.of(false)),
-        setup.markdown === undefined ? [] : markdownEditing(setup.markdown),
+        setup.markdown === undefined
+          ? []
+          : [markdownEditing(setup.markdown), typedIndent(() => indentation === "source")],
         EditorView.domEventHandlers({
-          compositionstart() {
+          compositionstart(_event, editor) {
             composing = true;
+            if (indentation === "source" && editor.state.selection.main.empty)
+              composingParagraph = freshParagraph(
+                editor.state.doc,
+                editor.state.selection.main.head,
+              );
+            if (composingParagraph !== null)
+              editor.dispatch({ annotations: isolateHistory.of("before") });
             return false;
           },
           compositionend() {
             composing = false;
             requestAnimationFrame(() => {
               if (!alive) return;
+              const start = composingParagraph;
+              composingParagraph = null;
+              if (
+                indentation === "source" &&
+                start !== null &&
+                start <= view.state.doc.length &&
+                !view.state.readOnly &&
+                !view.compositionStarted
+              ) {
+                const insert = finishParagraph(view.state, start);
+                if (insert !== null)
+                  view.dispatch({ ...paragraphInput(insert), userEvent: "input.type.compose" });
+              }
               if (awaiting !== null) {
                 const mode = awaiting;
                 awaiting = null;
@@ -286,8 +328,8 @@ export function openEditor(setup: EditorSetup): Editing {
           },
           contextmenu(event, editor) {
             const range = selected(editor);
-            if (range === null || setup.onContextSelection === undefined) return false;
-            const at = editor.coordsAtPos(range.to);
+            if (setup.onContextSelection === undefined) return false;
+            const at = editor.coordsAtPos(editor.state.selection.main.head);
             const fromKeyboard = event.clientX === 0 && event.clientY === 0;
             setup.onContextSelection({
               range,
@@ -301,8 +343,8 @@ export function openEditor(setup: EditorSetup): Editing {
             if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10"))
               return false;
             const range = selected(editor);
-            if (range === null || setup.onContextSelection === undefined) return false;
-            const at = editor.coordsAtPos(range.to);
+            if (setup.onContextSelection === undefined) return false;
+            const at = editor.coordsAtPos(editor.state.selection.main.head);
             setup.onContextSelection({ range, event, x: at?.left ?? 0, y: at?.bottom ?? 0 });
             return true;
           },
@@ -334,6 +376,7 @@ export function openEditor(setup: EditorSetup): Editing {
   const clamp = (at: number): number => Math.min(Math.max(at, 0), view.state.doc.length);
 
   return {
+    view,
     changes: () => listed(composed),
     hasChanges: () => !composed.empty,
     editedSinceSent: () => (sinceSent === null ? null : !sinceSent.empty),
@@ -374,6 +417,9 @@ export function openEditor(setup: EditorSetup): Editing {
     setMarkdown,
     typewriter: (on) => {
       typewriter = on;
+    },
+    indent: (mode) => {
+      indentation = mode;
     },
     readOnly: (on) => {
       if (view.state.readOnly !== on)

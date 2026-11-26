@@ -267,6 +267,8 @@ Zen gives the conversation the centre columns without the Panorama information p
 
 On an ordinary launch the browser restores the last file or Session subject, conversation target, registered workspace, file identity and split geometry. A deep link takes precedence for its target. The view reuses the same mounted editor and composer during subject switches, so the editing history and in-flight draft stay with their owners. See `RefRain/Spec.lean` D17, D47 and D48.
 
+Markdown uses one file header and one writing surface. A named switch chooses live rendering. A hollow circle and a check distinguish a draft from an acknowledged save, and failures carry words. The lower-left readout draws draft and current-line bytes together and the saved BLAKE3 prefix below. Its copy control copies the whole digest. At narrow or split measures the readout follows the writing surface. Writing preferences occupy their own entry between Running and Extensions in the settings tree. Gold uses the narrower golden share, silver follows lines 4 and 10, and wide follows lines 3 and 11. Search and selective undo use the context tool surface, with a stable writing surface position. See `RefRain/Spec.lean` D114.
+
 The live workspace check uses a served city, a paired browser profile or a private launch redirect, and a folder containing a PDF. Run it from `RefRain/` with `bun scripts/workspace_revisit.ts REDIRECT_OR_URL WORKSPACE_ROOT PDF_NAME OUTPUT_DIRECTORY DEVTOOLS_PORT [FILE_LINK]`. A file deep link can open a previously registered file directly. The check uses native pointer and touch input, samples the page rectangle and scroll offset during the navigation transition, and writes wide and narrow screenshots plus frame data to the requested directory.
 
 
