@@ -74,6 +74,7 @@ async fn send(uri: &str, bytes: Vec<u8>) -> (u16, String) {
             Vec::new(),
             wire::DoorSenses {
                 clock: Arc::new(|| Ok(kernel::TimeMs::new(0))),
+                monotonic: Arc::new(|| tokio::time::Instant::now().into_std()),
                 entropy: Arc::new(|bytes: &mut [u8]| {
                     bytes.fill(7);
                     Ok(())

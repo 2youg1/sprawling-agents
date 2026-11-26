@@ -63,7 +63,7 @@ The cost page shows shares against the billed total rather than normalising its 
 
 ## When something breaks
 
-**The page asks for a pairing code.** This browser holds no device key for this city: it is a second browser, a private window, or one whose storage was cleared. Type the code the terminal shows; each code takes one try, right or wrong, and the terminal then shows a new one. Or type `/web` in the CLI, which pairs the browser it opens with no typing. A Safari profile that has not opened the page for seven days may have dropped the key, and pairs again the same way.
+**The page asks for a pairing code.** This browser holds no device key for this city: it is a second browser, a private window, or one whose storage was cleared. Press C in the quiet host, then copy and paste the code within two minutes. Each code enrolls one browser. Or type `/web` in the CLI, which pairs the browser it opens with no typing. A Safari profile that has not opened the page for seven days may have dropped the key, and pairs again the same way.
 
 **An ACP agent asks to sign in.** The agent answered that it needs a login, and the run was refused with `E_AUTH_REQUIRED`, naming the login methods the agent declares. The city does not start a login in this release: sign in with the agent's own program, outside the city, as its vendor documents, then send the task again. A login that keeps failing is a matter for the agent's vendor: the city never holds the agent's credentials.
 
@@ -120,7 +120,7 @@ sprawling dispatch watchtower 'open http://127.0.0.1:2501/, take a snapshot, pre
 
 A city with no model chosen for `main` answers that in one frame, `E_MODEL_UNCHOSEN`, so choose one on the second city's settings page first. Otherwise the second city's own page shows the browser's actions going out one at a time.
 
-The first city treats the watcher's browser as any other second browser: its page asks for a pairing code, because that browser holds no device key for the first city. Add the code the first city's terminal shows to the task, and the watchtower's browser pairs once; the code is spent by that one try, so the copy left in the watcher's Ledger opens nothing afterwards. Settings on the first city lists the watchtower's browser among the paired ones and forgets it when the watching is over. A building's browser is refused its own city's address, so a city cannot watch itself this way.
+The first city treats the watcher's browser as any other second browser: its page asks for a pairing code, because that browser holds no device key for the first city. Pair the watcher's browser on the first city's host before starting its task. Keep the live code in the pairing form and out of the task and Ledger. Settings on the first city lists the watchtower's browser among the paired ones and forgets it when the watching is over. A building's browser is refused its own city's address, so a city cannot watch itself this way.
 
 **What the resident is holding.** The browser starts on the first action and stops when the run ends. Firefox is preferred because it speaks WebDriver BiDi itself and needs no driver; Chromium works when `chromedriver` is on the search path, and `sprawling doctor` says which of the two this machine has. The profile is `~/cities/watcher/.sprawling/browser-profiles/watchtower`, so a login the watchtower performs belongs to the watchtower and to no other building, and it sits in the reserved subtree, which no write domain reaches, so a run cannot edit its own stored credentials.
 
@@ -162,35 +162,21 @@ Any program that runs as your user account can read that account's credential st
 
 `/remote open` makes the door reachable through the route that the `[remote]` table in the city's own `.sprawling/CONFIG.toml` names. It reads the table each time the door opens, so an edit takes effect at the next `/remote open` without a restart. Only the city's file may hold the table: a building or a room that writes `[remote]` is refused, because the door opens onto the whole city. With no table, `/remote open` refuses and names the keys each route needs.
 
-A Cloudflare named tunnel, made once with `cloudflared tunnel login`, `cloudflared tunnel create my-city` and `cloudflared tunnel route dns my-city city.example.org`:
+The public route runs Caddy on the same machine as the city. It publishes the city's built-in WebUI and remote sessions over HTTP/3 on UDP. The gateway target is a loopback port, and the public route has no TCP fallback.
 
 ```toml
 [remote]
-route = "cloudflare"
-tunnel = "my-city"
+route = "h3"
+command = "/absolute/path/to/caddy"
 url = "https://city.example.org"
-# command = "C:/tools/cloudflared.exe"   # when cloudflared is not on PATH
+listen = "0.0.0.0:443"
+certificate = "/absolute/path/to/fullchain.pem"
+private_key = "/absolute/path/to/privkey.pem"
 ```
 
-A command you write. The city starts it with the loopback address in `SPRAWLING_REMOTE_LOCAL`, and without the city's own `SPRAWLING_SECRET_*` variables and `SPRAWLING_PAIRING_TOKEN`, which no program the city starts inherits; once that address is reachable from outside, the command prints one line `{"url": "https://host"}` and keeps running until the door closes. `permanence` says whether the host name stays the same after the command restarts (`"fixed"`) or changes each time (`"per_start"`); a device keeps its key under the host name, so on a `per_start` route it pairs again after each restart.
+Use a browser-trusted certificate for this host. Keep its key under the city's operating account and renew the files before reopening the door. Point the DNS address record at this machine, allow incoming UDP 443, and publish an HTTPS record `1 . alpn="h3"` so browsers can discover HTTP/3 on their first visit. The network and browser resolver need to support that discovery. Use a service manager that stops the whole process group if the city is terminated on Unix. A network that blocks UDP cannot reach the remote door.
 
-```toml
-[remote]
-route = "command"
-command = "sh"
-args = ["/path/to/tailscale-route.sh"]
-permanence = "fixed"
-```
-
-For Tailscale, the script can wrap `tailscale serve`, so the devices on your tailnet reach the city at this machine's MagicDNS name:
-
-```sh
-host=$(tailscale status --json | jq -r '.Self.DNSName | rtrimstr(".")')
-echo "{\"url\": \"https://$host\"}"
-exec tailscale serve --https=443 "http://$SPRAWLING_REMOTE_LOCAL"
-```
-
-A route that does not start, a tunnel name or address that is not valid, and a command that prints no address within 30 seconds are refused at `/remote open`, before the door opens and before anything is written to the history.
+`/remote open` starts the gateway. `/remote pair <name>` prints an invitation you can copy and open in the remote browser. Once paired, the browser signs new sessions with the key stored for that origin. `/remote revoke <name>` removes the device's authority. `/remote close` ends the gateway and the open sessions. The Cloudflare setting is recognized for migration and refused when opening the door. The command route accepts a loopback URL for on-machine integrations.
 
 ## Moving a city
 
@@ -234,7 +220,7 @@ The names at the top of `MAYOR.md`, which the identity cards write, are not part
 
 ## What the terminal shows
 
-The console has two faces. The **CLI** shows the conversation of the room you speak to — what you wrote, what the resident answered, its tool lines and the questions waiting for you — because choosing to work in the terminal is choosing to see the work there. It never shows a credential. The **quiet host**, which `/web` switches to, shows two lines, the address and the pairing code, and at most one transient line: a remote-door confirmation code, or how far closing has got. It shows nothing the city records, so no word a model wrote reaches the terminal's scrollback, and it clears its screen before it hands the terminal back to the CLI. Every write the console makes goes through one bounded channel it owns, so a slow terminal never holds up a run. A few one-time notices from other parts of the city, such as a CPU placement that could not be applied, still go to standard error and can appear inside either face.
+The console has two faces. The **CLI** shows the conversation of the room you speak to — what you wrote, what the resident answered, its tool lines and the questions waiting for you — because choosing to work in the terminal is choosing to see the work there. It never shows a credential. The **quiet host**, which `/web` switches to, shows the address, a pairing code on request with C, and at most one transient line: a remote-door confirmation code, or how far closing has got. It shows nothing the city records, so no word a model wrote reaches the terminal's scrollback, and it clears its screen before it hands the terminal back to the CLI. Every write the console makes goes through one bounded channel it owns, so a slow terminal never holds up a run. A few one-time notices from other parts of the city, such as a CPU placement that could not be applied, still go to standard error and can appear inside either face.
 
 The console also tells the terminal what the city is doing, in the Program Status Protocol (OSC 7501), so a terminal or an agent dashboard that reads it can mark the city's tab as busy, waiting or finished without reading the screen. It is one record for the whole city: `blocked` while a request waits for an answer, `working` while a run is going, and otherwise how the last run ended, which is `done`, `error` for a run stopped at its limit, or `idle` for a run that was cancelled. The record carries counts, such as "2 runs are going", and never a word from the city's history, and the console clears it before it hands the terminal back. A terminal that does not know the sequence ignores it; for one that prints it instead, set `SPRAWLING_PROGRAM_STATUS=never`.
 
@@ -248,7 +234,7 @@ Ctrl+C does not close the city: the terminal keeps it for copying, and the CLI o
 
 ## Which browser the page opens in
 
-`/web` hands the page to whatever your operating system opens links with — the browser you already use, with its profile and its logins. What it opens is a small file in your per-user runtime directory, readable only by your account, that sends the browser on to the address with a one-time open code; the page redeems the code, takes it out of the address bar, and the city deletes the file. The terminal never prints that code, so the address it shows carries no secret and can be copied or opened any number of times. `sprawling serve` opens nothing unless given `--open`. `--no-open`, or `SPRAWLING_OPEN=never` in the environment, keeps the screen alone; a refusal beats a request. When nothing can be opened, or a `file:` page cannot reach the address, as under WSL, the quiet host already shows the address and the pairing code, and the pairing code pairs that browser instead.
+`/web` hands the page to whatever your operating system opens links with — the browser you already use, with its profile and its logins. What it opens is a small file in your per-user runtime directory, readable only by your account, that sends the browser on to the address with a one-time open code; the page redeems the code, takes it out of the address bar, and the city deletes the file. The plain address can be copied or opened any number of times. `sprawling serve` opens nothing unless given `--open`. `--no-open`, or `SPRAWLING_OPEN=never` in the environment, keeps the screen alone; a refusal beats a request. When nothing can be opened, or a `file:` page cannot reach the address, as under WSL, open the plain address, then press C in the quiet host and paste the code into that browser.
 
 ## Pairing a browser, and forgetting one
 

@@ -23,8 +23,6 @@ export type Knock<T> =
   | { readonly kind: "absent" }
   | Unreachable;
 
-export type PairProof = { readonly open: string } | { readonly code: string };
-
 const LABEL_CHARS = 64;
 const DOOR_TIMEOUT_MS = 8_000;
 
@@ -37,11 +35,11 @@ const ABSENT: readonly number[] = [404, 405, 501];
 
 export async function pair(
   origin: string,
-  proof: PairProof,
+  open: string,
   publicKey: string,
   label: string,
 ): Promise<Knock<string>> {
-  const body = { ...proof, public_key: publicKey, label: label.slice(0, LABEL_CHARS) };
+  const body = { open, public_key: publicKey, label: label.slice(0, LABEL_CHARS) };
   const paired = await knock(origin, "pair", body);
   if (paired.kind !== "answered") return paired;
   return read(

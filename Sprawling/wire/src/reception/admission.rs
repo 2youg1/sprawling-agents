@@ -47,7 +47,7 @@ pub fn decide_standing(pairing: Pairing) -> Standing {
                 "this browser was forgotten, or its session token has ended",
             )
             .with_recovery(
-                "pair this browser again with the pairing code the terminal shows; a browser \
+                "pair this browser again with a fresh pairing code from the city terminal; a browser \
                  the city still knows reconnects by itself",
             ),
         )),

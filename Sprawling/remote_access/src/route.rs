@@ -4,10 +4,11 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 use std::net::SocketAddr;
-use std::process::{Child, ChildStdout, Command, ExitStatus};
+use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, ExitStatus};
 
 use kernel::{AxCode, AxError};
 
+pub mod caddy;
 pub mod cloudflare;
 pub mod command;
 pub mod scripted;
@@ -107,6 +108,14 @@ impl Running {
 
     pub(crate) fn program(&self) -> &str {
         &self.program
+    }
+
+    pub(crate) fn stdin(&mut self) -> Option<ChildStdin> {
+        self.child.as_mut().and_then(|child| child.stdin.take())
+    }
+
+    pub(crate) fn stderr(&mut self) -> Option<ChildStderr> {
+        self.child.as_mut().and_then(|child| child.stderr.take())
     }
 
     pub(crate) fn stdout(&mut self) -> Option<ChildStdout> {

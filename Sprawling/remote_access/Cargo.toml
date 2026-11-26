@@ -16,7 +16,11 @@ aws-lc-rs = { workspace = true }
 # A route's child process starts from `child::command` (`Sprawling/remote_access/Spec.lean` D24).
 child = { workspace = true }
 kernel = { workspace = true }
+serde_json = { workspace = true }
 zeroize = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+win32job = { workspace = true }
 
 [lints]
 workspace = true

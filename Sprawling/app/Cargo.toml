@@ -33,7 +33,7 @@ browser = { workspace = true }
 agent_protocols = { workspace = true }
 # The remote listener answers its two WebSocket paths and the page on one
 # port (Sprawling/remote_access/Spec.lean §8-10).
-axum = { workspace = true, features = ["ws"] }
+axum = { workspace = true }
 cap-fs-ext = { workspace = true }
 cap-std = { workspace = true }
 notify = "=8.2.0"

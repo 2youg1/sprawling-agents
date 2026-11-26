@@ -165,15 +165,20 @@ async function serve(
   started.push(() => {
     served.kill();
   });
+  let asked = false;
   for (let tries = 0; tries < 150; tries += 1) {
-    const code = /pairing code[ \t]+([a-z0-9]{4}-[a-z0-9]{4})\b/i.exec(
-      said.replace(STYLING, ""),
-    )?.[1];
+    const screen = said.replace(STYLING, "");
+    if (!asked && screen.includes("C: show a pairing code")) {
+      const terminal = served.terminal ?? fail("the city has no terminal");
+      terminal.write("c");
+      asked = true;
+    }
+    const code = /pairing code[ \t]+([a-f0-9]{32})\b/i.exec(screen)?.[1];
     if (code !== undefined) return { code, process: served };
     await Bun.sleep(200);
   }
   served.kill();
-  return fail(`the city printed no pairing code:\n${said.slice(-2000)}`);
+  return fail("the city terminal did not issue a pairing code");
 }
 
 function call(

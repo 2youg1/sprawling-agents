@@ -94,7 +94,7 @@ pub(crate) fn open_paired(url: &str, door: &wire::LocalDoor) -> Result<(), kerne
             "open the WebUI in a browser",
             source.to_string(),
         )
-        .with_recovery("open the address the city printed, and type the pairing code it shows")
+        .with_recovery("open the address in a local browser, press C in the quiet host, then copy and paste the code")
     };
     if std::env::var_os("WSL_DISTRO_NAME").is_some() {
         return open_in_browser(url, unhandled);

@@ -232,9 +232,10 @@ const Ui = struct {
     }
 
     fn onPairing(self: *Ui, payload: []const u8) void {
+        if (self.shown != .quiet_host) return;
         self.gpa.free(self.pairing);
         self.pairing = self.gpa.dupe(u8, payload) catch "";
-        if (self.shown == .quiet_host) self.quiet();
+        self.quiet();
     }
 
     fn onEntries(self: *Ui, payload: []const u8) void {
@@ -287,6 +288,8 @@ const Ui = struct {
                 self.quiet();
             },
             .cli => {
+                self.gpa.free(self.pairing);
+                self.pairing = "";
                 if (self.transient) |t| {
                     self.gpa.free(t);
                     self.transient = null;
@@ -354,6 +357,8 @@ const Ui = struct {
                 } else if (k.code == .enter) {
                     const url = host_mod.urlOf(self.config);
                     _ = self.host.open_paired(self.host.ctx, url.ptr, url.len);
+                } else if (k.code == .char and (k.code.char == 'c' or k.code.char == 'C')) {
+                    self.host.tell(self.host.ctx, @backingInt(host_mod.LifecycleEvent.pair_code), 0);
                 }
             },
             .stopping => |s| {

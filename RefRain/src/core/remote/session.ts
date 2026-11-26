@@ -29,7 +29,7 @@ export function dialFor(
     void kept().then(async (device) => {
       if (gone()) return;
       if (device === null) {
-        line = plain(hearing);
+        hearing.closed();
         return;
       }
       const opened = await sessionOver(url, device);

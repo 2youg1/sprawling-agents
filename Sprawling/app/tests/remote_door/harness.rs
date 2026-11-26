@@ -23,6 +23,8 @@ use remote_access::door::DeviceId;
 use remote_access::handshake::{self, Invitation, PairReply, Reply, Session};
 use remote_access::keys::{SigningKey, VerifyingKey};
 use remote_access::seal::Payload;
+use reqwest::StatusCode;
+use reqwest::blocking::{Client, Response};
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, connect_async};
@@ -132,10 +134,18 @@ pub(crate) struct Visit {
     pub(crate) local_only_refused: Option<AxCode>,
 }
 
-pub(crate) async fn visit(at: &str, invitation: &Invitation) -> Visit {
+pub(crate) fn visit(at: &str, invitation: &Invitation) -> Visit {
     let key = SigningKey::from_seed(&[9; 32]).unwrap();
-    let (id, city) = pair(at, invitation, &key).await;
-    let (mut socket, mut session) = admitted(at, id, &city, &key).await;
+    let (id, city) = pair(at, invitation, &key);
+    let (mut socket, mut session) = admitted(at, id, &city, &key);
+    assert_eq!(
+        socket.frame(None, &socket.origin, vec![0]),
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        socket.frame(Some(&socket.bearer), "https://another.example", vec![0]),
+        StatusCode::FORBIDDEN
+    );
     let greeting = wire::ClientFrame::Hello(wire::Hello {
         wire_v: wire::WIRE_V,
         schema: wire::schema_hash(),
@@ -155,20 +165,19 @@ pub(crate) async fn visit(at: &str, invitation: &Invitation) -> Visit {
     }));
     let welcomed = exchange(&mut socket, &mut session, &greeting, |frame| {
         matches!(frame, wire::ServerFrame::Welcome(_))
-    })
-    .await;
+    });
     let read_answered = exchange(&mut socket, &mut session, &asking, |frame| {
         matches!(frame, wire::ServerFrame::Answered(_))
-    })
-    .await;
-    let act_carried_out = exchange(&mut socket, &mut session, &halting, |frame| {
-        matches!(frame, wire::ServerFrame::Event(record) if record.kind() == EventKind::CityHalted)
-    })
-    .await;
+    });
+    let act_carried_out = exchange(
+        &mut socket,
+        &mut session,
+        &halting,
+        |frame| matches!(frame, wire::ServerFrame::Event(record) if record.kind() == EventKind::CityHalted),
+    );
     let local_only_refused = exchange(&mut socket, &mut session, &revealing, |frame| {
         matches!(frame, wire::ServerFrame::Refusal(_))
-    })
-    .await;
+    });
     Visit {
         welcomed: welcomed.is_some(),
         read_answered: read_answered.is_some(),
@@ -180,8 +189,8 @@ pub(crate) async fn visit(at: &str, invitation: &Invitation) -> Visit {
     }
 }
 
-pub(crate) async fn exchange(
-    socket: &mut Socket,
+fn exchange(
+    socket: &mut Pipe,
     session: &mut Session,
     frame: &wire::ClientFrame,
     wanted: fn(&wire::ServerFrame) -> bool,
@@ -192,15 +201,9 @@ pub(crate) async fn exchange(
         .seal(&Payload::Frame(text).to_bytes())
         .unwrap();
 
-    socket.send(Message::Binary(sealed.into())).await.ok()?;
-    let deadline = tokio::time::Instant::now().checked_add(PATIENCE)?;
+    socket.send(sealed);
     loop {
-        let message = tokio::time::timeout_at(deadline, socket.next())
-            .await
-            .ok()??;
-        let Ok(Message::Binary(sealed)) = message else {
-            continue;
-        };
+        let sealed = socket.receive();
         let opened = session.opener.open(&sealed).ok()?;
         let Payload::Frame(text) = Payload::from_bytes(&opened).ok()? else {
             continue;
@@ -212,37 +215,32 @@ pub(crate) async fn exchange(
     }
 }
 
-pub(crate) async fn pair(
-    at: &str,
-    invitation: &Invitation,
-    key: &SigningKey,
-) -> (DeviceId, VerifyingKey) {
-    let mut socket = connect(at, "/remote/pair").await;
+fn pair(at: &str, invitation: &Invitation, key: &SigningKey) -> (DeviceId, VerifyingKey) {
     let pairing = handshake::device_pair_hello([1; 32]).unwrap();
-    send(&mut socket, pairing.hello().as_bytes().to_vec()).await;
-    let reply = PairReply::from_bytes(&receive(&mut socket).await).unwrap();
+    let mut socket = Pipe::open(at, "/remote/pair", pairing.hello().as_bytes().to_vec());
+    let reply = PairReply::from_bytes(&socket.receive()).unwrap();
     let claimed = pairing.claim(&reply, invitation, key).unwrap();
-    send(&mut socket, claimed.sealed.clone()).await;
+    socket.send(claimed.sealed);
     let mut session = claimed.session;
-    let id = session.opener.open(&receive(&mut socket).await).unwrap();
+    let id = session.opener.open(&socket.receive()).unwrap();
+    assert_eq!(socket.packet(), (1, Vec::new()));
+    assert_eq!(socket.response.read(&mut [0_u8; 1]).unwrap(), 0);
+    assert_eq!(
+        socket.frame(Some(&socket.bearer), &socket.origin, vec![0]),
+        StatusCode::FORBIDDEN
+    );
     (
         DeviceId::from_entropy(<[u8; 16]>::try_from(id).unwrap()),
         claimed.city,
     )
 }
 
-pub(crate) async fn admitted(
-    at: &str,
-    id: DeviceId,
-    city: &VerifyingKey,
-    key: &SigningKey,
-) -> (Socket, Session) {
-    let mut socket = connect(at, "/remote/session").await;
+fn admitted(at: &str, id: DeviceId, city: &VerifyingKey, key: &SigningKey) -> (Pipe, Session) {
     let waiting = handshake::device_hello(id, [7; 32]).unwrap();
-    send(&mut socket, waiting.hello().as_bytes().to_vec()).await;
-    let reply = Reply::from_bytes(&receive(&mut socket).await).unwrap();
+    let mut socket = Pipe::open(at, "/remote/session", waiting.hello().as_bytes().to_vec());
+    let reply = Reply::from_bytes(&socket.receive()).unwrap();
     let (finish, session) = waiting.finish(&reply, city, key).unwrap();
-    send(&mut socket, finish.as_bytes().to_vec()).await;
+    socket.send(finish.as_bytes().to_vec());
     (socket, session)
 }
 
@@ -250,17 +248,81 @@ pub(crate) async fn connect(at: &str, path: &str) -> Socket {
     connect_async(format!("ws://{at}{path}")).await.unwrap().0
 }
 
-pub(crate) async fn send(socket: &mut Socket, bytes: Vec<u8>) {
-    socket.send(Message::Binary(bytes.into())).await.unwrap();
+struct Pipe {
+    client: Client,
+    response: Response,
+    origin: String,
+    frames: String,
+    bearer: String,
 }
 
-pub(crate) async fn receive(socket: &mut Socket) -> Vec<u8> {
-    loop {
-        match tokio::time::timeout(PATIENCE, socket.next()).await {
-            Ok(Some(Ok(Message::Binary(bytes)))) => return bytes.to_vec(),
-            Ok(Some(Ok(Message::Ping(_) | Message::Pong(_)))) => {}
-            other => panic!("the remote listener sent no sealed bytes: {other:?}"),
+impl Pipe {
+    fn open(at: &str, path: &str, first: Vec<u8>) -> Self {
+        let origin = format!("https://{at}");
+        let url = format!("http://{at}{path}");
+        let client = gateway::client_for(kernel::Proxying::ExceptLocal, &url)
+            .timeout(PATIENCE)
+            .build()
+            .unwrap();
+        let frames = format!("http://{at}/remote/frame");
+        let response = client
+            .post(url)
+            .header("origin", &origin)
+            .header("sec-fetch-site", "same-origin")
+            .body(first)
+            .send()
+            .unwrap()
+            .error_for_status()
+            .unwrap();
+        let bearer = response.headers()["x-sprawling-pipe"]
+            .to_str()
+            .unwrap()
+            .to_owned();
+        assert_eq!(bearer.len(), 64);
+        assert_eq!(response.headers()["cache-control"], "no-store");
+        Self {
+            client,
+            response,
+            origin,
+            frames,
+            bearer,
         }
+    }
+
+    fn send(&self, bytes: Vec<u8>) {
+        assert_eq!(
+            self.frame(Some(&self.bearer), &self.origin, bytes),
+            StatusCode::NO_CONTENT
+        );
+    }
+
+    fn frame(&self, token: Option<&str>, origin: &str, body: Vec<u8>) -> StatusCode {
+        let request = self
+            .client
+            .post(&self.frames)
+            .header("origin", origin)
+            .body(body);
+        let request = match token {
+            Some(token) => request.bearer_auth(token),
+            None => request,
+        };
+        request.send().unwrap().status()
+    }
+
+    fn receive(&mut self) -> Vec<u8> {
+        let (kind, body) = self.packet();
+        assert_eq!(kind, 0, "the city stopped before sending the next frame");
+        body
+    }
+
+    fn packet(&mut self) -> (u8, Vec<u8>) {
+        let mut header = [0_u8; 5];
+        self.response.read_exact(&mut header).unwrap();
+        let kind = header[0];
+        let length = u32::from_be_bytes(header[1..].try_into().unwrap());
+        let mut body = vec![0_u8; length.try_into().unwrap()];
+        self.response.read_exact(&mut body).unwrap();
+        (kind, body)
     }
 }
 

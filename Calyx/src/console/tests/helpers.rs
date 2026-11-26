@@ -28,8 +28,6 @@ pub(super) fn room() -> Address {
     Address::parse("lab/room1").unwrap()
 }
 
-/// A terminal whose facts are synthetic on purpose: nothing here may
-/// name a real machine's directories, which `xtask release` refuses.
 pub(super) fn terminal(bind: &str, token: Option<&str>) -> Terminal {
     Terminal {
         url: "http://127.0.0.1:2501".to_owned(),
@@ -52,7 +50,6 @@ pub(super) fn vitals() -> wire::MetricsAnswer {
     }
 }
 
-/// The one function the socket calls, standing in for the views.
 pub(super) fn answering() -> Answering {
     Arc::new(|query: wire::Query| {
         let answer = match query {
@@ -68,13 +65,10 @@ pub(super) fn answering() -> Answering {
     })
 }
 
-/// Runs the console loop over a scripted script and returns what a
-/// person would have seen.
 pub(super) fn typed(script: &str, terminal: &Terminal) -> String {
     driven(script, terminal, &inside())
 }
 
-/// The line console over a script, with what it said collected in order.
 pub(super) fn driven(script: &str, terminal: &Terminal, inside: &Inside) -> String {
     let said = Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
     let into = Arc::clone(&said);
@@ -90,7 +84,6 @@ pub(super) fn driven(script: &str, terminal: &Terminal, inside: &Inside) -> Stri
     said.lock().unwrap().join("\n")
 }
 
-/// The console's reach into a city with no remote door.
 pub(super) fn inside() -> Inside {
     Inside {
         lifecycle: tokio::sync::mpsc::channel(8).0,
@@ -105,6 +98,7 @@ pub(super) fn inside() -> Inside {
             Vec::new(),
             wire::DoorSenses {
                 clock: Arc::new(|| Ok(kernel::TimeMs::new(0))),
+                monotonic: Arc::new(|| tokio::time::Instant::now().into_std()),
                 entropy: Arc::new(|bytes: &mut [u8]| {
                     bytes.fill(7);
                     Ok(())

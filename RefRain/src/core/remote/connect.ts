@@ -6,6 +6,7 @@
 import { claim, finish, pairHello, sessionHello, type Refused, type Session } from "./handshake";
 import type { Invitation } from "./invitation";
 import type { DeviceKey } from "./keys";
+import { reach } from "./pipe";
 import { payloadBytes } from "./seal";
 
 export type Path = "/remote/pair" | "/remote/session";
@@ -46,7 +47,7 @@ export function remoteUrl(
   location: Pick<Location, "protocol" | "host">,
   path: Path,
 ): string | null {
-  return location.protocol === "https:" ? `wss://${location.host}${path}` : null;
+  return location.protocol === "https:" ? `https://${location.host}${path}` : null;
 }
 
 export async function pairOver(
@@ -56,9 +57,8 @@ export async function pairOver(
 ): Promise<Paired | Refusal> {
   const pairing = await pairHello(fresh());
   if (pairing === null) return { kind: "refused", why: "agreement" };
-  const door = await reach(url);
+  const door = await reach(url, pairing.hello);
   if (door === null) return { kind: "unreachable" };
-  door.send(pairing.hello);
   const reply = await door.next();
   if (reply === null) return door.ended();
   const claimed = await claim(pairing, reply, invitation, key);
@@ -76,9 +76,8 @@ export async function pairOver(
 export async function sessionOver(url: string, device: Pinned): Promise<Opened | Refusal> {
   const waiting = await sessionHello(device.id, fresh());
   if (waiting === null) return { kind: "refused", why: "agreement" };
-  const door = await reach(url);
+  const door = await reach(url, waiting.hello);
   if (door === null) return { kind: "unreachable" };
-  door.send(waiting.hello);
   const reply = await door.next();
   if (reply === null) return door.ended();
   const finished = await finish(waiting, reply, device.city, device.key);
@@ -111,64 +110,4 @@ export interface Door {
   readonly ended: () => Promise<Refusal>;
   readonly refuse: (why: Refused) => Refusal;
   readonly close: () => void;
-}
-
-function reach(url: string): Promise<Door | null> {
-  const socket = new WebSocket(url);
-  socket.binaryType = "arraybuffer";
-  const arrived: Uint8Array<ArrayBuffer>[] = [];
-  const waiting: ((bytes: Uint8Array<ArrayBuffer> | null) => void)[] = [];
-  let shut = false;
-  const closed = new Promise<string | null>((settle) => {
-    socket.addEventListener("close", (event) => {
-      shut = true;
-      for (const wake of waiting.splice(0)) wake(null);
-      settle(event.reason === "" ? null : event.reason);
-    });
-  });
-  socket.addEventListener("message", (event: MessageEvent<unknown>) => {
-    if (!(event.data instanceof ArrayBuffer)) return;
-    const bytes = new Uint8Array(event.data);
-    const wake = waiting.shift();
-    if (wake === undefined) arrived.push(bytes);
-    else wake(bytes);
-  });
-  const door: Door = {
-    send: (bytes) => {
-      socket.send(bytes);
-    },
-    next: () => {
-      const ready = arrived.shift();
-      if (ready !== undefined) return Promise.resolve(ready);
-      if (shut) return Promise.resolve(null);
-      return new Promise((wake) => {
-        waiting.push(wake);
-      });
-    },
-    closed,
-    ended: async () => ({ kind: "closed", code: await closed }),
-    refuse: (why) => {
-      socket.close();
-      return { kind: "refused", why };
-    },
-    close: () => {
-      socket.close();
-    },
-  };
-  return new Promise((settle) => {
-    socket.addEventListener(
-      "open",
-      () => {
-        settle(door);
-      },
-      { once: true },
-    );
-    socket.addEventListener(
-      "error",
-      () => {
-        settle(null);
-      },
-      { once: true },
-    );
-  });
 }

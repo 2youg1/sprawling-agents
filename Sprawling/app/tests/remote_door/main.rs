@@ -81,8 +81,7 @@ fn a_device_reaches_the_city_through_the_door_over_real_sockets() {
         code: between(&invited, "#pair=", |each| each == '&'),
     };
 
-    let runtime = tokio::runtime::Runtime::new().unwrap();
-    let answered = runtime.block_on(visit(&at, &invitation));
+    let answered = visit(&at, &invitation);
     let closed = city.type_line("/remote close", "the remote door is closed");
     drop(city);
 
