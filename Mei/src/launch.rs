@@ -9,7 +9,6 @@ use crate::agent;
 use crate::doctor;
 use crate::error::{Code, Diagnostic, Error, Result};
 use crate::python;
-use crate::workspace;
 
 pub const MAX_TOKENS: u64 = 256_000;
 pub const DEFAULT_EFFORT: &str = "high";
@@ -111,64 +110,44 @@ pub fn python_tool(environment: &doctor::Environment) -> Value {
     })
 }
 
+pub fn request_settings(
+    model: &str,
+    extra: Option<serde_json::Map<String, Value>>,
+    environment: &doctor::Environment,
+) -> serde_json::Map<String, Value> {
+    let mut fields = serde_json::Map::from_iter([
+        ("model".to_owned(), Value::from(model)),
+        ("max_tokens".to_owned(), Value::from(MAX_TOKENS)),
+        ("thinking".to_owned(), json!({"type": "adaptive"})),
+        (
+            "output_config".to_owned(),
+            json!({"effort": DEFAULT_EFFORT}),
+        ),
+        ("system".to_owned(), Value::from(SYSTEM)),
+        (
+            "tools".to_owned(),
+            Value::Array(vec![python_tool(environment)]),
+        ),
+    ]);
+    fields.extend(extra.into_iter().flatten());
+    fields.remove("messages");
+    fields
+}
+
 pub fn initial_request(
-    task: Task,
+    task: Task<'_>,
     extra: Option<serde_json::Map<String, Value>>,
     environment: &doctor::Environment,
 ) -> Result<Value> {
-    let Task {
-        model,
-        prompt,
-        history,
-        guide,
-    } = task;
-    let opening = match history {
-        Some(_) => Value::String(prompt.to_owned()),
-        None => workspace::opening_content(guide, prompt),
+    let mut fields = request_settings(task.model, extra, environment);
+    let opening = match &task.history {
+        Some(_) => Value::from(task.prompt),
+        None => crate::workspace::opening_content(task.guide, task.prompt),
     };
-    let mut request = json!({
-        "model": model,
-        "max_tokens": MAX_TOKENS,
-        "thinking": {"type": "adaptive"},
-        "output_config": {"effort": DEFAULT_EFFORT},
-        "system": SYSTEM,
-        "tools": [python_tool(environment)],
-        "messages": [{"role": "user", "content": prompt}],
-    });
-    if let Some(fields) = extra {
-        let target = request.as_object_mut().ok_or_else(|| {
-            Error::Diagnostic(Diagnostic::new(
-                Code::Config,
-                "construct the Messages request",
-                "the base request is not an object",
-                "keep the base request as a JSON object",
-            ))
-        })?;
-        for (key, value) in fields {
-            target.insert(key, value);
-        }
-    }
-    request
-        .as_object_mut()
-        .ok_or_else(|| {
-            Error::Diagnostic(Diagnostic::new(
-                Code::Config,
-                "construct the Messages request",
-                "the base request is not an object",
-                "keep the base request as a JSON object",
-            ))
-        })?
-        .insert(
-            "messages".to_owned(),
-            Value::Array(
-                history
-                    .unwrap_or_default()
-                    .into_iter()
-                    .chain([json!({"role": "user", "content": opening})])
-                    .collect(),
-            ),
-        );
-    Ok(request)
+    let mut messages = task.history.unwrap_or_default();
+    messages.push(json!({"role": "user", "content": opening}));
+    fields.insert("messages".to_owned(), Value::Array(messages));
+    Ok(Value::Object(fields))
 }
 
 pub fn resolve_model(
@@ -208,7 +187,7 @@ pub fn bind_python_to_cwd(
         *bound = Some(cwd.to_path_buf());
     }
     if python.is_none() {
-        *python = Some(crate::python::Py::spawn_in(environment)?);
+        *python = Some(crate::python::Py::prepare_in(environment)?);
     }
     Ok(())
 }

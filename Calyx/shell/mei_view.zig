@@ -91,9 +91,34 @@ fn matches(spelling: []const u8, typed: []const u8) bool {
 
 const shown_body = 12_000;
 
+pub const LogEntry = struct {
+    item: write.Entry,
+    card: ?usize = null,
+};
+
+const Window = struct {
+    start: usize,
+    end: usize,
+
+    fn around(view: *const View, count: usize, rows: u16) Window {
+        const anchor = if (view.anchor) |a| @min(a.origin.entry, count) else count;
+        const margin = @as(usize, rows) + 2;
+        var window = Window{
+            .start = anchor -| margin -| (if (view.movement < 0) @as(usize, @abs(view.movement)) else 0),
+            .end = @min(count, anchor +| margin +| (if (view.movement > 0) @as(usize, @intCast(view.movement)) else 0)),
+        };
+        if (view.selection) |range| {
+            const ordered = range.ordered();
+            window.start = @min(window.start, ordered.start.origin.entry -| 1);
+            window.end = @max(window.end, @min(count, ordered.finish.origin.entry +| 2));
+        }
+        return window;
+    }
+};
+
 pub fn render(
     gpa: std.mem.Allocator,
-    log: []const write.Entry,
+    log: []const LogEntry,
     cards: []const Card,
     focus: usize,
     draft: []const u8,
@@ -108,10 +133,21 @@ pub fn render(
     const arena = arena_state.allocator();
     var entries: std.ArrayList(write.Entry) = .empty;
     var items: std.ArrayList(viewport.Item) = .empty;
-    var card_i: usize = 0;
-    for (log, 0..) |entry, index| {
+    view.trackDraft(if (draft.len != 0) log.len else null);
+    const window = Window.around(view, log.len, rows);
+    if (window.start > 0 and log[0].item == .banner) {
+        try entries.append(arena, log[0].item);
+        try items.append(arena, .{ .origin = .{ .entry = 0 } });
+    }
+    for (log[window.start..window.end], window.start..) |record, index| {
+        const entry = record.item;
+        const card_i = record.card orelse {
+            try entries.append(arena, entry);
+            try items.append(arena, .{ .origin = .{ .entry = index } });
+            continue;
+        };
         const card_id = std.math.cast(u16, card_i) orelse viewport.no_card;
-        if (entry == .tool and std.mem.eql(u8, entry.tool.name, "python") and card_i < cards.len and cards[card_i] == .python) {
+        if (cards[card_i] == .python) {
             const card = &cards[card_i].python;
             var tool = entry.tool;
             tool.subject = foldWord(card.fold, card_i == focus);
@@ -125,8 +161,7 @@ pub fn render(
                 try entries.append(arena, .{ .note = try tail(arena, card.output) });
                 try items.append(arena, .{ .origin = .{ .entry = index, .fragment = .output } });
             }
-            card_i += 1;
-        } else if (entry == .reasoning and entry.reasoning.body.len != 0 and card_i < cards.len and cards[card_i] == .reasoning) {
+        } else {
             const open = cards[card_i].reasoning;
             try entries.append(arena, if (open) .{ .note = "▾ reasoning" } else entry);
             try items.append(arena, .{ .origin = .{ .entry = index }, .card = card_id });
@@ -134,14 +169,9 @@ pub fn render(
                 try entries.append(arena, .{ .note = entry.reasoning.body });
                 try items.append(arena, .{ .origin = .{ .entry = index, .fragment = .thought } });
             }
-            card_i += 1;
-        } else {
-            try entries.append(arena, entry);
-            try items.append(arena, .{ .origin = .{ .entry = index } });
         }
     }
-    view.trackDraft(if (draft.len != 0) log.len else null);
-    if (draft.len > 0) {
+    if (draft.len > 0 and window.end == log.len) {
         try entries.append(arena, .{ .reply = draft });
         try items.append(arena, .{ .origin = .{ .entry = log.len } });
     }
@@ -193,14 +223,14 @@ test "a python card defaults to elapsed time and cycles four ways" {
     const output_text = try gpa.dupe(u8, "RESULT");
     defer gpa.free(output_text);
     var card = Card{ .python = .{ .code = code, .output = output_text } };
-    const log = [_]write.Entry{
-        .{ .tool = .{
+    const log = [_]LogEntry{
+        .{ .item = .{ .tool = .{
             .at = null,
             .name = "python",
             .subject = "",
             .took_us = 1_500_000,
             .outcome = .Answered,
-        } },
+        } }, .card = 0 },
     };
     var hits: std.ArrayList(Hit) = .empty;
     defer hits.deinit(gpa);
@@ -241,9 +271,9 @@ test "a python card defaults to elapsed time and cycles four ways" {
 
 test "the user line stays in the frame above a long reply" {
     const gpa = std.testing.allocator;
-    const log = [_]write.Entry{
-        .{ .you = .{ .at = null, .said = "用户的问题" } },
-        .{ .reply = "第一段答复，写得很长也很完整，窗口里仍然能看见上面的提问。" },
+    const log = [_]LogEntry{
+        .{ .item = .{ .you = .{ .at = null, .said = "用户的问题" } } },
+        .{ .item = .{ .reply = "第一段答复，写得很长也很完整，窗口里仍然能看见上面的提问。" } },
     };
     var hits: std.ArrayList(Hit) = .empty;
     defer hits.deinit(gpa);
@@ -267,7 +297,7 @@ test "the user line stays in the frame above a long reply" {
 
 test "the visible reasoning card has a click target and discloses its original text" {
     const gpa = std.testing.allocator;
-    const log = [_]write.Entry{.{ .reasoning = .{ .characters = 6, .body = "原样思考文本" } }};
+    const log = [_]LogEntry{.{ .item = .{ .reasoning = .{ .characters = 6, .body = "原样思考文本" } }, .card = 0 }};
     var card: Card = .{ .reasoning = false };
     var hits: std.ArrayList(Hit) = .empty;
     defer hits.deinit(gpa);
@@ -286,9 +316,9 @@ test "the visible reasoning card has a click target and discloses its original t
 
 test "widening and opening cards above the viewport preserve its reading place" {
     const gpa = std.testing.allocator;
-    const log = [_]write.Entry{
-        .{ .tool = .{ .at = null, .name = "python", .subject = "", .took_us = null, .outcome = .Answered } },
-        .{ .reply = "segment-00 segment-01 segment-02 segment-03 segment-04 segment-05 segment-06 segment-07 segment-08 segment-09 segment-10 segment-11 segment-12 segment-13 segment-14 segment-15" },
+    const log = [_]LogEntry{
+        .{ .item = .{ .tool = .{ .at = null, .name = "python", .subject = "", .took_us = null, .outcome = .Answered } }, .card = 0 },
+        .{ .item = .{ .reply = "segment-00 segment-01 segment-02 segment-03 segment-04 segment-05 segment-06 segment-07 segment-08 segment-09 segment-10 segment-11 segment-12 segment-13 segment-14 segment-15" } },
     };
     var code = "visible on open".*;
     var cards = [_]Card{.{ .python = .{ .code = &code, .output = &.{} } }};
@@ -316,9 +346,9 @@ test "widening and opening cards above the viewport preserve its reading place" 
 
 test "a result wave animates both failure and success without moving their names" {
     const gpa = std.testing.allocator;
-    const log = [_]write.Entry{
-        .{ .tool = .{ .at = null, .name = "python", .subject = "", .took_us = null, .outcome = .Failed } },
-        .{ .tool = .{ .at = null, .name = "python", .subject = "", .took_us = null, .outcome = .Answered } },
+    const log = [_]LogEntry{
+        .{ .item = .{ .tool = .{ .at = null, .name = "python", .subject = "", .took_us = null, .outcome = .Failed } }, .card = 0 },
+        .{ .item = .{ .tool = .{ .at = null, .name = "python", .subject = "", .took_us = null, .outcome = .Answered } }, .card = 1 },
     };
     const card: Card = .{ .python = .{ .code = &.{}, .output = &.{} } };
     const cards = [_]Card{ card, card };
@@ -336,4 +366,52 @@ test "a result wave animates both failure and success without moving their names
     defer gpa.free(settled);
     try std.testing.expect(std.mem.indexOf(u8, settled, "\x1b[38;2;172;172;172m×\x1b[39m python") != null);
     try std.testing.expect(std.mem.indexOf(u8, settled, "\x1b[38;2;172;172;172m✓\x1b[39m python") != null);
+}
+
+test "a windowed transcript agrees with full layout across scroll, resize and selection" {
+    const gpa = std.testing.allocator;
+    const region: write.Live = .{ .composer = .{ .typed = "", .cursor = 0, .placeholder = "Mei", .room = "Mei", .offer = "" } };
+    var log: [128]LogEntry = undefined;
+    var full: [log.len]write.Entry = undefined;
+    var items: [log.len]viewport.Item = undefined;
+    var labels: [log.len][48]u8 = undefined;
+    for (&log, &full, &items, 0..) |*record, *entry, *item, i| {
+        entry.* = if (i == 0) .{ .banner = .{ .city = "test", .address = "", .url = "" } } else .{ .reply = try std.fmt.bufPrint(&labels[i], "line {d} · 会话正文 text wraps", .{i}) };
+        record.* = .{ .item = entry.* };
+        item.* = .{ .origin = .{ .entry = i } };
+    }
+    const cards = [_]Card{.{ .python = .{ .code = &.{}, .output = &.{} } }};
+    log[120] = .{ .item = .{ .tool = .{ .at = null, .name = "python", .subject = "", .took_us = null, .outcome = .Answered } }, .card = 0 };
+    full[120] = log[120].item;
+    full[120].tool.subject = foldWord(.time, true);
+    items[120].card = 0;
+    var view: View = .{};
+    defer view.deinit(gpa);
+    var reference: View = .{};
+    defer reference.deinit(gpa);
+    var hits: std.ArrayList(Hit) = .empty;
+    defer hits.deinit(gpa);
+    var all_hits: std.ArrayList(Hit) = .empty;
+    defer all_hits.deinit(gpa);
+    for ([_]usize{ 64, 128 }) |count| {
+        const window = Window.around(&view, count, 24);
+        try std.testing.expectEqual(@as(usize, 26), window.end - window.start);
+    }
+    for ([_]i32{ 0, -13, -42, 2, 60, -3 }, 0..) |movement, i| {
+        view.scroll(movement);
+        reference.scroll(movement);
+        if (i == 3) {
+            view.selection = .{ .start = .{ .origin = .{ .entry = 35 } }, .finish = .{ .origin = .{ .entry = 109 }, .offset = 8 } };
+            reference.selection = view.selection;
+        }
+        const width: u16 = if (i % 2 == 0) 30 else 48;
+        const expected = try viewport.draw(gpa, &full, &items, region, width, 24, false, &reference, &all_hits);
+        defer gpa.free(expected);
+        const actual = try render(gpa, &log, &cards, 0, "", region, width, 24, &view, &hits);
+        defer gpa.free(actual);
+        try std.testing.expectEqualSlices(u8, expected, actual);
+        try std.testing.expectEqualSlices(Hit, all_hits.items, hits.items);
+        try std.testing.expectEqualDeep(reference.anchor, view.anchor);
+        try std.testing.expectEqualDeep(reference.visible.items, view.visible.items);
+    }
 }

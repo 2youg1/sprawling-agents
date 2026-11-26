@@ -3,7 +3,8 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use std::collections::BTreeSet;
+use std::borrow::Cow;
+use std::collections::HashSet;
 use std::io::{BufWriter, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -12,13 +13,14 @@ use serde_json::{Map, Value, json};
 use crate::error::{Result, protocol};
 use crate::observation;
 use crate::python::{Execution, Py};
+use crate::request::{Request, Transcript};
 use crate::steer::{self, Intake};
 use crate::transport::Client;
 
 pub const TOOL_NAME: &str = "python";
 
 pub(crate) trait Ports {
-    fn post(&mut self, request: &Value, pulse: &mut dyn Write) -> Result<Value>;
+    fn post(&mut self, request: &dyn Transcript, pulse: &mut dyn Write) -> Result<Value>;
     fn exec(&mut self, code: &str) -> Result<Execution>;
     fn steer(&mut self) -> Result<Vec<String>>;
 }
@@ -31,9 +33,9 @@ pub struct Live<'a> {
 }
 
 impl Ports for Live<'_> {
-    fn post(&mut self, request: &Value, pulse: &mut dyn Write) -> Result<Value> {
+    fn post(&mut self, request: &dyn Transcript, pulse: &mut dyn Write) -> Result<Value> {
         refuse_if_cancelled(self.cancelled)?;
-        self.client.post(request, pulse)
+        request.post(self.client, pulse)
     }
 
     fn exec(&mut self, code: &str) -> Result<Execution> {
@@ -62,6 +64,27 @@ fn refuse_if_cancelled(cancelled: Option<&AtomicBool>) -> Result<()> {
 }
 
 pub fn drive(request: &mut Value, live: &mut Live<'_>, trace: &mut dyn Write) -> Result<String> {
+    buffered_run(request, live, trace)
+}
+
+pub fn turn(
+    request: &mut Request,
+    prompt: Value,
+    live: &mut Live<'_>,
+    trace: &mut dyn Write,
+) -> Result<String> {
+    request.history.push(&Value::Object(Map::from_iter([
+        ("role".to_owned(), Value::from("user")),
+        ("content".to_owned(), prompt),
+    ])))?;
+    buffered_run(request, live, trace)
+}
+
+fn buffered_run(
+    request: &mut dyn Transcript,
+    live: &mut Live<'_>,
+    trace: &mut dyn Write,
+) -> Result<String> {
     let mut buffered = BufWriter::new(trace);
     let result = run(request, live, &mut buffered);
     drop(buffered.into_parts());
@@ -79,7 +102,7 @@ struct Call<'a> {
 }
 
 pub(crate) fn run(
-    request: &mut Value,
+    request: &mut dyn Transcript,
     ports: &mut dyn Ports,
     trace: &mut dyn Write,
 ) -> Result<String> {
@@ -129,10 +152,11 @@ pub(crate) fn run(
             .into());
         }
         if first_response {
-            trace_prompt(request, trace)?;
+            request.trace_prompt(trace)?;
             first_response = false;
         }
-        let (index, content) = append(request, content, Some(&stop), trace)?;
+        let (index, assistant) = append(request, content, Some(&stop), trace)?;
+        let content = &assistant.as_ref()["content"];
         let base = format!("messages[{index}]");
         match stop.as_str() {
             "pause_turn" => continue,
@@ -205,55 +229,17 @@ pub(crate) fn run(
 }
 
 fn append<'a>(
-    request: &'a mut Value,
+    request: &'a mut dyn Transcript,
     content: Value,
     stop: Option<&str>,
     trace: &mut dyn Write,
-) -> Result<(usize, &'a Value)> {
-    let messages = match request.get_mut("messages") {
-        Some(Value::Array(messages)) => messages,
-        value => {
-            return Err(protocol(
-                "append a message",
-                "request.messages is missing or is not an array",
-                "construct one Messages request with messages as an array before calling agent::run",
-            )
-            .with_path("request.messages")
-            .with_value(found(value.as_deref()))
-            .into());
-        }
-    };
+) -> Result<(usize, Cow<'a, Value>)> {
     let role = stop.map_or("user", |_| "assistant");
-    let mut fields = Map::from_iter([
+    let fields = Map::from_iter([
         ("role".to_owned(), Value::from(role)),
         ("content".to_owned(), content),
     ]);
-    if let Some(stop) = stop {
-        fields.insert("stop_reason".to_owned(), Value::from(stop));
-    }
-    let mut message = Value::Object(fields);
-    let logged = observation::write(trace, &message, "trace an appended message");
-    if stop.is_some()
-        && let Some(fields) = message.as_object_mut()
-    {
-        fields.remove("stop_reason");
-    }
-    let index = messages.len();
-    let stored = messages.push_mut(message);
-    logged?;
-    Ok((index, &stored["content"]))
-}
-
-fn trace_prompt(request: &Value, trace: &mut dyn Write) -> Result<()> {
-    let Some(prompt) = request
-        .get("messages")
-        .and_then(Value::as_array)
-        .and_then(|messages| messages.last())
-        .filter(|message| message["role"] == "user")
-    else {
-        return Ok(());
-    };
-    observation::write(trace, prompt, "trace the initial user prompt")
+    request.store(fields, stop, trace)
 }
 
 fn text(content: &Value, base: &str) -> Result<String> {
@@ -293,7 +279,7 @@ fn text(content: &Value, base: &str) -> Result<String> {
 
 fn calls<'a>(content: &'a Value, base: &str) -> Result<Vec<Call<'a>>> {
     let mut calls = Vec::new();
-    let mut ids = BTreeSet::new();
+    let mut ids = HashSet::new();
     for (index, block) in content.as_array().into_iter().flatten().enumerate() {
         let kind = block.get("type").and_then(Value::as_str).ok_or_else(|| {
             protocol(

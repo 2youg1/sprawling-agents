@@ -3,9 +3,13 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use std::io::{ErrorKind, Read, Write};
+use std::io::{ErrorKind, IoSlice, Read, Write};
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
+
+mod response;
+use response::Response;
 
 use serde_json::{Value, json};
 
@@ -41,6 +45,7 @@ pub struct Client {
     session: Option<String>,
     timeouts: Timeouts,
     probe: Timeouts,
+    idle: Mutex<Option<TcpStream>>,
 }
 
 impl Client {
@@ -96,6 +101,7 @@ impl Client {
             addresses,
             key,
             session: None,
+            idle: Mutex::new(None),
             probe: Timeouts {
                 connect: timeouts.connect.min(PROBE_TIMEOUT),
                 io: timeouts.io.min(PROBE_TIMEOUT),
@@ -124,44 +130,35 @@ impl Client {
                 "use JSON-compatible values in the request",
             )
         })?;
+        self.post_parts([&body, &[]], pulse)
+    }
+
+    pub(crate) fn post_parts(&self, parts: [&[u8]; 2], pulse: &mut dyn Write) -> Result<Value> {
         let path = format!("http://{}/v1/messages", self.authority);
         let session = match &self.session {
             Some(session) => format!("X-Magpie-Session: {session}\r\n"),
             None => String::new(),
         };
-        let mut stream = self.connect(&self.timeouts)?;
-        stream
-            .set_write_timeout(Some(self.timeouts.io))
-            .map_err(|err| {
-                Error::Diagnostic(
-                    Diagnostic::new(
-                        Code::Transport,
-                        "arm the Messages socket timeouts",
-                        err.to_string(),
-                        "retry the request against the same gateway; no retry was attempted",
-                    )
-                    .with_path(path.clone()),
-                )
-            })?;
-        write!(
-            stream,
-            "POST /v1/messages HTTP/1.0\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\nx-api-key: {}\r\nanthropic-version: 2023-06-01\r\n{}\r\n",
-            body.len(),
+        let mut stream = self.open(&self.timeouts, &path)?;
+        let head = format!(
+            "POST /v1/messages HTTP/1.0\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: keep-alive\r\nx-api-key: {}\r\nanthropic-version: 2023-06-01\r\n{}\r\n",
+            parts.iter().map(|part| part.len()).sum::<usize>(),
             self.key,
             session,
-        ).and_then(|()| stream.write_all(&body)).and_then(|()| stream.flush()).map_err(|err| {
+        );
+        let [messages, settings] = parts;
+        write_request(&mut stream, [head.as_bytes(), messages, settings]).map_err(|err| {
             Error::Diagnostic(
-                Diagnostic::new(Code::Transport, "write the Messages request", err.to_string(), "check the gateway connection; no retry was attempted")
-                    .with_path(path.clone()),
+                Diagnostic::new(
+                    Code::Transport,
+                    "write the Messages request",
+                    err.to_string(),
+                    "check the gateway connection; no retry was attempted",
+                )
+                .with_path(path.clone()),
             )
         })?;
-        let response = read_to_eof(
-            &mut stream,
-            &self.timeouts,
-            ResponseTrace { pulse, path: &path },
-            Read::read,
-        )?;
-        let answer = parse(&response)?;
+        let answer = self.receive(stream, &self.timeouts, ResponseTrace { pulse, path: &path })?;
         if self.session.is_some() {
             let route = match self.route_observation() {
                 Ok(route) => route,
@@ -206,25 +203,12 @@ impl Client {
 
     fn get(&self, target: &str, budget: &Timeouts) -> Result<Value> {
         let path = format!("http://{}{}", self.authority, target);
-        let mut stream = self.connect(budget)?;
-        stream.set_write_timeout(Some(budget.io)).map_err(|err| {
-            Error::Diagnostic(
-                Diagnostic::new(
-                    Code::Transport,
-                    "arm the Magpie socket timeouts",
-                    err.to_string(),
-                    "retry against the same gateway; no retry was attempted",
-                )
-                .with_path(path.clone()),
-            )
-        })?;
-        write!(
-            stream,
-            "GET {target} HTTP/1.0\r\nConnection: close\r\nx-api-key: {}\r\n\r\n",
+        let mut stream = self.open(budget, &path)?;
+        let head = format!(
+            "GET {target} HTTP/1.0\r\nConnection: keep-alive\r\nx-api-key: {}\r\n\r\n",
             self.key,
-        )
-        .and_then(|()| stream.flush())
-        .map_err(|err| {
+        );
+        stream.write_all(head.as_bytes()).map_err(|err| {
             Error::Diagnostic(
                 Diagnostic::new(
                     Code::Transport,
@@ -235,16 +219,54 @@ impl Client {
                 .with_path(path.clone()),
             )
         })?;
-        let response = read_to_eof(
-            &mut stream,
+        self.receive(
+            stream,
             budget,
             ResponseTrace {
                 pulse: &mut std::io::sink(),
                 path: &path,
             },
-            Read::read,
-        )?;
-        parse(&response)
+        )
+    }
+
+    fn receive(
+        &self,
+        mut stream: TcpStream,
+        budget: &Timeouts,
+        trace: ResponseTrace<'_>,
+    ) -> Result<Value> {
+        let (value, reusable) = read_response(&mut stream, budget, trace, Read::read)?;
+        if reusable {
+            *self
+                .idle
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(stream);
+        }
+        Ok(value)
+    }
+
+    fn open(&self, budget: &Timeouts, path: &str) -> Result<TcpStream> {
+        let idle = self
+            .idle
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .take();
+        let stream = match idle.filter(idle_is_open) {
+            Some(stream) => stream,
+            None => self.connect(budget)?,
+        };
+        stream.set_write_timeout(Some(budget.io)).map_err(|err| {
+            Error::Diagnostic(
+                Diagnostic::new(
+                    Code::Transport,
+                    "arm the Magpie socket timeouts",
+                    err.to_string(),
+                    "retry against the same gateway; no retry was attempted",
+                )
+                .with_path(path),
+            )
+        })?;
+        Ok(stream)
     }
 
     fn connect(&self, budget: &Timeouts) -> Result<TcpStream> {
@@ -272,15 +294,15 @@ impl Client {
     clippy::arithmetic_side_effects,
     reason = "the IO budget is measured from the transport's own monotonic clock, and a Duration added to an Instant cannot wrap inside any configured budget"
 )]
-fn read_to_eof(
+fn read_response(
     stream: &mut TcpStream,
     timeouts: &Timeouts,
     ResponseTrace { pulse, path }: ResponseTrace<'_>,
     mut read: impl FnMut(&mut TcpStream, &mut [u8]) -> std::io::Result<usize>,
-) -> Result<Vec<u8>> {
+) -> Result<(Value, bool)> {
     let mut last_pulse = Instant::now();
     let deadline = last_pulse + timeouts.io;
-    let mut response = Vec::new();
+    let mut response = Response::default();
     let mut chunk = [0_u8; 8192];
     loop {
         let remaining = deadline.saturating_duration_since(Instant::now());
@@ -288,9 +310,9 @@ fn read_to_eof(
             return Err(Error::Diagnostic(
                 Diagnostic::new(
                     Code::Transport,
-                    "read the Messages response to EOF",
-                    "the IO budget elapsed before EOF",
-                    "check that the gateway closes non-streaming responses without chunking; no retry was attempted",
+                    "read the Messages response",
+                    "the IO budget elapsed before the response was complete",
+                    "return the complete non-chunked response within the IO budget, with a length for keep-alive or EOF when closing; no retry was attempted",
                 )
                 .with_path(path),
             ));
@@ -308,18 +330,19 @@ fn read_to_eof(
             )
         })?;
         match read(stream, &mut chunk) {
-            Ok(0) => return Ok(response),
-            Ok(count) => response.extend_from_slice(chunk.get(..count).ok_or_else(|| {
-                Error::Diagnostic(
-                    Diagnostic::new(
-                        Code::Transport,
-                        "read the Messages response to EOF",
+            Ok(0) => return response.finish(),
+            Ok(count) => {
+                let bytes = chunk.get(..count).ok_or_else(|| {
+                    protocol(
+                        "read the Messages response",
                         "read returned a length past the buffer",
-                        "retry the request against the same gateway; no retry was attempted",
+                        "return a complete HTTP response",
                     )
-                    .with_path(path),
-                )
-            })?),
+                })?;
+                if response.extend(bytes)? {
+                    return response.finish();
+                }
+            }
             Err(err) if cfg!(windows) && err.raw_os_error() == Some(WSA_IO_PENDING) => {
                 if last_pulse.elapsed() >= timeouts.pulse {
                     write_pulse(pulse, path)?;
@@ -339,15 +362,48 @@ fn read_to_eof(
                 return Err(Error::Diagnostic(
                     Diagnostic::new(
                         Code::Transport,
-                        "read the Messages response to EOF",
+                        "read the Messages response",
                         err.to_string(),
-                        "check that the gateway closes non-streaming responses without chunking; no retry was attempted",
+                        "return the complete non-chunked response within the IO budget, with a length for keep-alive or EOF when closing; no retry was attempted",
                     )
                     .with_path(path),
                 ));
             }
         }
     }
+}
+
+fn idle_is_open(stream: &TcpStream) -> bool {
+    if stream.set_nonblocking(true).is_err() {
+        return false;
+    }
+    let idle = stream
+        .peek(&mut [0])
+        .is_err_and(|err| err.kind() == ErrorKind::WouldBlock);
+    stream.set_nonblocking(false).is_ok() && idle
+}
+
+fn write_request(stream: &mut impl Write, buffers: [&[u8]; 3]) -> std::io::Result<()> {
+    #[cfg(windows)]
+    if buffers
+        .iter()
+        .any(|buffer| u32::try_from(buffer.len()).is_err())
+    {
+        return buffers
+            .iter()
+            .try_for_each(|buffer| stream.write_all(buffer));
+    }
+    let mut slices = buffers.map(IoSlice::new);
+    let mut parts = slices.as_mut_slice();
+    while !parts.is_empty() {
+        match stream.write_vectored(parts) {
+            Ok(0) => return Err(ErrorKind::WriteZero.into()),
+            Ok(count) => IoSlice::advance_slices(&mut parts, count),
+            Err(err) if err.kind() == ErrorKind::Interrupted => continue,
+            Err(err) => return Err(err),
+        }
+    }
+    Ok(())
 }
 
 fn write_pulse(pulse: &mut dyn Write, path: &str) -> Result<()> {
@@ -405,70 +461,6 @@ fn authority(base: &str) -> Result<String> {
         ));
     }
     Ok(authority.to_owned())
-}
-
-fn invalid_status(status_line: &str) -> Error {
-    protocol(
-        "parse the HTTP status line",
-        format!("invalid status line: {status_line}"),
-        "return an HTTP status line with a three-digit status code",
-    )
-    .into()
-}
-
-fn parse(response: &[u8]) -> Result<Value> {
-    let Some(boundary) = response.windows(4).position(|window| window == b"\r\n\r\n") else {
-        return Err(protocol(
-            "parse the HTTP header/body boundary",
-            format!(
-                "response has no CRLF header/body boundary; first bytes: {}",
-                String::from_utf8_lossy(response.get(..200).unwrap_or(response))
-            ),
-            "return a complete HTTP response ending headers with CRLF CRLF",
-        )
-        .into());
-    };
-    let head = response.get(..boundary).unwrap_or_default();
-    let status = head
-        .windows(2)
-        .position(|window| window == b"\r\n")
-        .unwrap_or(head.len());
-    let status_line = String::from_utf8_lossy(head.get(..status).unwrap_or_default());
-    let code = status_line
-        .split_whitespace()
-        .nth(1)
-        .ok_or_else(|| invalid_status(&status_line))?;
-    let code = code
-        .parse::<u16>()
-        .map_err(|_| invalid_status(&status_line))?;
-    let headers = String::from_utf8_lossy(head.get(status.saturating_add(2)..).unwrap_or_default());
-    if headers
-        .lines()
-        .any(|line| line.to_ascii_lowercase().starts_with("transfer-encoding:"))
-    {
-        return Err(protocol(
-            "parse HTTP transfer headers",
-            "Transfer-Encoding is not supported",
-            "return a non-chunked JSON body with Connection: close",
-        )
-        .into());
-    }
-    let body = response
-        .get(boundary.saturating_add(4)..)
-        .unwrap_or_default();
-    if code != 200 {
-        return Err(Error::Body(String::from_utf8_lossy(body).into_owned()));
-    }
-    serde_json::from_slice(body).map_err(|err| {
-        Error::from(protocol(
-            "parse the Messages JSON body",
-            format!(
-                "{err}; first bytes: {}",
-                String::from_utf8_lossy(body.get(..200).unwrap_or(body))
-            ),
-            "return one complete JSON object as the HTTP body",
-        ))
-    })
 }
 
 #[cfg(test)]
