@@ -32,6 +32,7 @@ type Failure = Box<dyn Error + Send + Sync>;
 type Answer = h3::server::RequestStream<h3_quinn::BidiStream<Bytes>, Bytes>;
 
 const MAX_CONNECTIONS: usize = 64;
+const PAGE_CHUNK_BYTES: usize = 16 * 1024;
 const TICK: Duration = Duration::from_secs(1);
 
 #[derive(Clone)]
@@ -253,7 +254,7 @@ async fn answer(incoming: quinn::Incoming, serving: Serving) -> Result<(), Failu
                 .clone()
                 .oneshot(request.map(|()| Body::empty()))
                 .await?;
-            tokio::time::timeout(HANDSHAKE_PATIENCE, page(response, answer)).await??;
+            page(response, answer).await?;
             continue;
         } else {
             StatusCode::METHOD_NOT_ALLOWED
@@ -262,7 +263,7 @@ async fn answer(incoming: quinn::Incoming, serving: Serving) -> Result<(), Failu
             .status(status)
             .header(header::CACHE_CONTROL, "no-store")
             .body(Body::empty())?;
-        tokio::time::timeout(HANDSHAKE_PATIENCE, page(response, refused)).await??;
+        page(response, refused).await?;
     }
     Ok(())
 }
@@ -328,14 +329,20 @@ async fn carry(
 
 async fn page(mut response: Answer, answer: Response<Body>) -> Result<(), Failure> {
     let (head, body) = answer.into_parts();
-    response
-        .send_response(Response::from_parts(head, ()))
-        .await?;
+    tokio::time::timeout(
+        HANDSHAKE_PATIENCE,
+        response.send_response(Response::from_parts(head, ())),
+    )
+    .await??;
     let mut chunks = body.into_data_stream();
     while let Some(chunk) = chunks.next().await {
-        response.send_data(chunk?).await?;
+        let mut chunk = chunk?;
+        while !chunk.is_empty() {
+            let piece = chunk.split_to(chunk.len().min(PAGE_CHUNK_BYTES));
+            tokio::time::timeout(HANDSHAKE_PATIENCE, response.send_data(piece)).await??;
+        }
     }
-    response.finish().await?;
+    tokio::time::timeout(HANDSHAKE_PATIENCE, response.finish()).await??;
     Ok(())
 }
 

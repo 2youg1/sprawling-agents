@@ -48,5 +48,5 @@ pub(crate) struct Inside { pub(crate) desk: Arc<CommandDesk>, pub(crate) answeri
 
 `Doorway::open` 在同一把锁下检查门、准备入口、记录开门及持有监听任务。入口用同源 H3 页面与 WebTransport 上的应用消息实现 remote_access §8-10。监听期间将 UDP 实际地址及配置的公网 HTTPS 源登记为城的自有页面，由浏览器工具守卫。关门取走监听任务，QUIC 端点终止活动连接并撤销登记。入口不接受 TCP，城内转发使用城自己的 WebSocket。
 
-每条会话接纳一条浏览器发起的双向流。读帧进度跨异步取消保留，因此城事件与浏览器的部分帧可交错到达。QUIC 由 Quinn 接入，H3 与 WebTransport 分别由 h3 和 h3-webtransport 解析，TLS 使用工作区的 rustls。协议互通由实际浏览器检查。
+每条会话接纳一条浏览器发起的双向流。读帧进度跨异步取消保留，因此城事件与浏览器的部分帧可交错到达。QUIC 由 Quinn 接入，H3 与 WebTransport 分别由 h3 和 h3-webtransport 解析，TLS 使用工作区的 rustls。页面响应按最多 16 KiB 分块写入，每次写入限 10 秒。持续推进的慢速下载可以跨越这个期限。协议互通由实际浏览器检查。
 -/

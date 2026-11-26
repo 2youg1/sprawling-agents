@@ -242,8 +242,17 @@ impl PublicDoor {
                 .await
                 .unwrap();
         });
-        let socket = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
-        let address = socket.local_addr().unwrap();
+        let (udp, tcp) = (0..8)
+            .find_map(|_| {
+                let udp = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+                match std::net::TcpListener::bind(udp.local_addr().unwrap()) {
+                    Ok(tcp) => Some((udp, tcp)),
+                    Err(source) if source.kind() == std::io::ErrorKind::AddrInUse => None,
+                    Err(source) => panic!("reserve the test port for TCP: {source}"),
+                }
+            })
+            .expect("reserve one unused port for both TCP and UDP");
+        let address = udp.local_addr().unwrap();
         let origin = format!("https://{address}");
         let table = format!(
             "
@@ -258,6 +267,7 @@ private_key = '{}'
             key.display()
         );
         std::fs::write(&file, before + &table).unwrap();
+        drop((udp, tcp));
         Self {
             address,
             origin,

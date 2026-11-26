@@ -143,7 +143,7 @@ The remote door lets a phone or a second computer reach a city that runs on this
 
 Nothing that widens access, reaches a credential, or changes the machine or the city's rules can be done from a device, whatever it was paired as: attaching an endpoint, choosing a model, writing rules or configuration, installing a tool, raising or removing a building. Those stay at the machine the city runs on. The full list is the `class` column of `Sprawling/wire/Spec.lean` §19-2.
 
-The door admits a request only when its `Host` is one of the three loopback names or the route's public name, whether the route passes the browser's `Host` on or rewrites it to the loopback address. A page loaded from the route sends that public name's `https://` address as its `Origin`; any other `Origin` is refused with 403 before the connection opens. A route that serves the page under a second public name is therefore refused until it uses the name the door printed.
+Use the HTTPS address printed by the city. HTTP/3 requests must carry the configured authority. An authority mismatch returns 421. A WebTransport connection must also carry that same HTTPS origin, and an origin mismatch returns 403.
 
 The history records `remote_opened`, `device_paired`, `remote_session_started`, `device_revoked` and `remote_closed`, without keys, pairing codes or session ids.
 
