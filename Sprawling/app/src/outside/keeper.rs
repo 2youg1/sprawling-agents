@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -13,7 +12,7 @@ use kernel::{AxCode, AxError, EventDraft, EventKind, Ledger, Payload, RunId, Tim
 use remote_access::door::{Device, DeviceName, Door, Epoch};
 use remote_access::handshake::NONCE_BYTES;
 use remote_access::keys::SigningKey;
-use remote_access::route::{Opened, Route};
+use reqwest::Url;
 
 use super::console::Lasting;
 
@@ -28,8 +27,6 @@ pub(crate) type Clock = Arc<dyn Fn() -> Result<TimeMs, AxError> + Send + Sync>;
 
 pub(crate) type Entropy = Arc<dyn Fn(&mut [u8]) -> Result<(), AxError> + Send + Sync>;
 
-pub(crate) type Choosing = Box<dyn FnMut() -> Result<Box<dyn Route + Send>, AxError> + Send>;
-
 #[derive(Clone)]
 pub(crate) struct Senses {
     pub(crate) clock: Clock,
@@ -41,7 +38,6 @@ pub(crate) struct Keeping {
 
     pub(crate) ledger: Box<dyn Ledger + Send>,
 
-    pub(crate) choose: Choosing,
     pub(crate) senses: Senses,
 
     pub(crate) key: CityKey,
@@ -72,14 +68,12 @@ struct Kept {
     key: CityKey,
     devices: PathBuf,
     ledger: Box<dyn Ledger + Send>,
-    choose: Choosing,
     standing: Option<Standing>,
 }
 
 struct Standing {
-    route: Box<dyn Route + Send>,
-    opened: Opened,
-    listening: Option<Box<dyn Send>>,
+    origin: Url,
+    listening: Box<dyn Send>,
 }
 
 impl Doorway {
@@ -87,7 +81,6 @@ impl Doorway {
         let Keeping {
             devices,
             ledger,
-            choose,
             senses,
             key,
         } = keeping;
@@ -101,14 +94,18 @@ impl Doorway {
                 key,
                 devices,
                 ledger,
-                choose,
                 standing: None,
             })),
             senses,
         })
     }
 
-    pub(crate) fn open(&self, local: SocketAddr, lasting: Lasting) -> Result<Opened, AxError> {
+    pub(crate) fn open<T>(
+        &self,
+        lasting: Lasting,
+        prepare: impl FnOnce() -> Result<(Url, T), AxError>,
+        start: impl FnOnce(T) -> Box<dyn Send>,
+    ) -> Result<Url, AxError> {
         let now = (self.senses.clock)()?;
         let epoch = Epoch::from_entropy(drawn(&self.senses)?);
         let mut kept = self.kept()?;
@@ -116,40 +113,27 @@ impl Doorway {
             return Err(AxError::failure(
                 AxCode::Busy,
                 "open the remote door",
-                format!("it is open at {}", standing.opened.url.as_str()),
+                format!("it is open at {}", standing.origin.as_str()),
             )
             .with_recovery("close it first with `/remote close`, or leave it open"));
         }
-        let mut route = (kept.choose)()?;
-        let opened = route.open(local)?;
+        let (origin, prepared) = prepare()?;
         let closes_at = TimeMs::new(now.value().saturating_add(lasting.ms()));
         let line = RemoteOpened {
             closes_at,
-            url: opened.url.as_str().to_owned(),
+            url: origin.as_str().to_owned(),
         };
-        if let Err(refused) = kept.record(now, Who::Person, EventKind::RemoteOpened, &line) {
-            route.close()?;
-            return Err(refused);
-        }
+        kept.record(now, Who::Person, EventKind::RemoteOpened, &line)?;
         kept.door.open(epoch, closes_at)?;
         kept.standing = Some(Standing {
-            route,
-            opened: opened.clone(),
-            listening: None,
+            origin: origin.clone(),
+            listening: start(prepared),
         });
-        Ok(opened)
+        Ok(origin)
     }
 
     pub(crate) fn senses(&self) -> &Senses {
         &self.senses
-    }
-
-    pub(crate) fn attend(&self, listening: Box<dyn Send>) -> Result<(), AxError> {
-        let mut kept = self.kept()?;
-        if let Some(standing) = kept.standing.as_mut() {
-            standing.listening = Some(listening);
-        }
-        Ok(())
     }
 
     pub(crate) fn close(&self, why: RemoteClosing) -> Result<Phase, AxError> {
@@ -241,24 +225,16 @@ impl Kept {
     }
 
     fn close(&mut self, now: TimeMs, why: RemoteClosing) -> Result<(), AxError> {
-        let Some(Standing {
-            mut route,
-            listening,
-            ..
-        }) = self.standing.take()
-        else {
+        let Some(standing) = self.standing.take() else {
             return Ok(());
         };
         self.door.close();
-
-        drop(listening);
-        let closed_route = route.close();
+        drop(standing.listening);
         let who = match why {
             RemoteClosing::Expired => Who::City,
             RemoteClosing::Console | RemoteClosing::Locked => Who::Person,
         };
-        self.record(now, who, EventKind::RemoteClosed, &RemoteClosed { why })?;
-        closed_route
+        self.record(now, who, EventKind::RemoteClosed, &RemoteClosed { why })
     }
 
     fn require_open(&self, action: &str) -> Result<TimeMs, AxError> {

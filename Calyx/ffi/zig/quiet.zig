@@ -21,7 +21,8 @@ pub fn quiet(out: *std.Io.Writer, r: *scene.Reader) Error!void {
     const label_room = label.len + 3;
     const code_room = text.width(code);
     const key_label = "   key  ";
-    const hint = "C: show a pairing code";
+    const instructions = "Enter: open WebUI  C: show pairing code";
+    const hint = if (columns >= instructions.len) instructions else "Enter: open  C: show code";
     const second = (if (code.len == 0) hint.len else label_room + code_room) + if (key.len > 0) key_label.len + text.width(key) else 0;
     const block = @max(@max(text.width(url), second), text.width(transient));
     const left = (@as(usize, columns) -| block) / 2;
@@ -73,10 +74,24 @@ fn place(out: *std.Io.Writer, row: usize, column: usize) paint.Error!void {
     try out.print("\x1b[{d};{d}H", .{ row + 1, column + 1 });
 }
 
-test "a forty-column quiet host shows the whole pairing code" {
+test "a forty-column quiet host explains opening and renders a code only when requested" {
     const write = @import("write.zig");
     const gpa = std.testing.allocator;
     const code = "0123456789abcdef0123456789abcdef";
+    var hidden = try write.Scene.quietFrame(gpa, .{
+        .columns = 40,
+        .rows = 12,
+        .url = "http://127.0.0.1:3425/",
+        .code = "",
+    });
+    defer hidden.deinit(gpa);
+    var idle: scene.Reader = .{ .bytes = hidden.bytes.items };
+    _ = try idle.tag();
+    var hidden_bytes: [1024]u8 = undefined;
+    var hidden_output: std.Io.Writer = .fixed(&hidden_bytes);
+    try quiet(&hidden_output, &idle);
+    try std.testing.expect(std.mem.indexOf(u8, hidden_output.buffered(), "Enter: open WebUI  C: show pairing code") != null);
+    try std.testing.expect(std.mem.indexOf(u8, hidden_output.buffered(), code) == null);
     var frame = try write.Scene.quietFrame(gpa, .{
         .columns = 40,
         .rows = 12,

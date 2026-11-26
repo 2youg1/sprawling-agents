@@ -14,6 +14,7 @@ Calling a face this city did not invent requires knowing the shape of the reques
 
 | Project | Licence | What is followed | Where to look | Tracked to |
 |---|---|---|---|---|
+| [hyperium/h3](https://github.com/hyperium/h3) | MIT | WebTransport acceptance and the lifetime of the underlying HTTP/3 connection | `h3-webtransport/src/` | `efdc2d8bfda0` |
 | [imputnet/helium-windows](https://github.com/imputnet/helium-windows) | GPL-3.0 | The current-user and system installation paths for Helium's `chrome.exe` | `installer/helium.nsi` | `292ebd0ea2f2` |
 | [imputnet/helium-macos](https://github.com/imputnet/helium-macos) | GPL-3.0 | The `Helium.app` bundle name used in macOS packaging | `sign_and_package_app.sh` | `3f6d296353b1` |
 | [imputnet/helium-linux](https://github.com/imputnet/helium-linux) | GPL-3.0 | The Linux executable name `helium` | `patches/helium/linux/rename-chrome-binary.patch` | `a25707d6a236` |
@@ -157,6 +158,9 @@ Two lists exist and they answer different questions, so both are kept and neithe
 | [rustfft](https://crates.io/crates/rustfft) | MIT OR Apache-2.0 |
 | [rustix](https://crates.io/crates/rustix) | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT |
 | [rustls](https://crates.io/crates/rustls) | Apache-2.0 OR ISC OR MIT |
+| [quinn](https://crates.io/crates/quinn) | MIT OR Apache-2.0 |
+| [h3](https://crates.io/crates/h3), [h3-quinn](https://crates.io/crates/h3-quinn), [h3-webtransport](https://crates.io/crates/h3-webtransport) | MIT |
+| [wtransport](https://crates.io/crates/wtransport) (integration tests) | MIT OR Apache-2.0 |
 | [same-file](https://crates.io/crates/same-file) | Unlicense OR MIT |
 | [schemars](https://crates.io/crates/schemars) | MIT |
 | [secrecy](https://crates.io/crates/secrecy) | Apache-2.0 OR MIT |

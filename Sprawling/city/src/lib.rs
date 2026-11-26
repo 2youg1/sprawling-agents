@@ -59,7 +59,7 @@ pub use config_layers::write_second_threshold;
 pub use config_layers::{AgentRow, AgentRowSource, agent_rows, seat_agent, write_agent};
 pub use config_layers::{CitySetting, check_catalog, write_catalog, write_city_setting};
 pub use config_layers::{ConfigLayer, Layer, load as load_config};
-pub use config_layers::{HostPermanence, RemoteRoute, remote_route};
+pub use config_layers::{RemoteRoute, remote_route};
 pub use config_layers::{SessionCatalog, catalog_for_session, previous_sessions};
 pub use config_layers::{check_skill_shelves, stated_skill_shelves};
 pub use config_layers::{city_search, default_search_supplier};

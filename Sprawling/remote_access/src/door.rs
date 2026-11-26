@@ -288,6 +288,10 @@ impl Door {
         Ok(())
     }
 
+    pub fn end_session(&mut self, session: SessionId) {
+        self.sessions.retain(|held| held.id != session);
+    }
+
     #[must_use]
     pub fn authority(&self, session: SessionId, now: TimeMs) -> Option<Authority> {
         if matches!(self.phase, Phase::Closed) {

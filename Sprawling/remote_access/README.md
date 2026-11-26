@@ -2,7 +2,7 @@
 
 The remote door, and the routes that carry its bytes and decide nothing. A person who leaves the computer their city runs on still reaches that city from a tablet or a phone: sees it, answers what it asks, stops it. While the door is shut a city answers on loopback, or on the local network with a pairing token, and nowhere else. Rust code names the crate `remote_access`; `cargo -p` takes `sprawling-remote-access`.
 
-The crate is two layers, and only the second one can be replaced. The security core decides who gets in: `door` holds whether the door is open and in which epoch, the pairings still waiting, the paired devices and the sessions they hold; `pairing` mints the one-time pairing code; `keys` holds hybrid signing keys, ML-DSA-44 with Ed25519, derived from one 32-byte seed; `handshake` runs the key exchange of every connection, X25519 with ML-KEM-768, and its `pairing` half runs a device's first one; `seal` wraps every frame of a session in AES-256-GCM with a counter against replay; `confirm` holds the one request that waits for the code the city prints on its console. The second layer is `route`, which makes the remote listener on loopback reachable from outside and does nothing else: a same-host Caddy HTTP/3 listener for public access, a loopback command integration, and a scripted route for tests.
+The security core decides who gets in. `door` holds whether the door is open and in which epoch, the pairings still waiting, the paired devices and the sessions they hold; `pairing` mints the one-time pairing code; `keys` holds hybrid signing keys, ML-DSA-44 with Ed25519, derived from one 32-byte seed; `handshake` runs the key exchange of every connection, X25519 with ML-KEM-768, and its `pairing` half runs a device's first one; `seal` wraps every frame of a session in AES-256-GCM with a counter against replay; `confirm` holds the one request that waits for the code the city prints on its console.
 
 The door's decisions never name a route, and a route sees handshake messages and ciphertext only. The handshake authenticates the keys pinned at pairing rather than an address, and every frame is sealed end to end, so a route cannot pose as either side. What a route still delivers is the page itself, and a route that rewrote the page would read what the page reads: the person who chooses the route carries that trust, and cryptography cannot take it from them (`Sprawling/remote_access/Spec.lean` D10).
 
@@ -21,7 +21,7 @@ Each module holds one decision:
 - `confirm` — a state machine with a guard. One request waits at a time; every answer the guard reads ends it, so one request gives one guess. The guard refuses an answer that comes sooner than a second after the previous one, and locks after ten misses until the city restarts.
 - `route` — the seam, with three implementations. `open` returns only once the address is reachable from outside, and answers the `https` address and whether its host name survives a restart; `close` may be called twice and answers success on a route that was never open.
 
-`route` is the port of the seven shapes in [`ARCHITECTURE.md`](../../docs/ARCHITECTURE.md) section 9, and its implementations are adapters. The city selects `caddy::Caddy` for public access. It recognizes the Cloudflare configuration for migration and accepts a command route whose reported URL is loopback.
+The city process serves its embedded WebUI and the remote door over HTTP/3 and WebTransport. It rereads the city configuration on each opening.
 
 ## When a call fails
 
@@ -46,7 +46,7 @@ Three refusals happen before anything is attempted. `PublicUrl::parse` refuses a
 - The security core does no I/O, and time and entropy arrive as parameters, so every decision replays. The one exception is the ephemeral keys of both handshakes: the cryptography library draws them, because ML-KEM encapsulation takes no external entropy.
 - `Route`'s two methods are synchronous and block until the route is ready or the patience runs out (`Sprawling/remote_access/Spec.lean` D15). A caller runs them on a thread of its own; this crate depends on no executor.
 - The two production routes start a child process through `child::command`, so a route never inherits the city's console or its secrets (D24).
-- This crate reads no configuration. The caller parses the `[remote]` table and constructs `Tunnel`, `RouteCommand` and `Permanence` (D22).
+- The assembly layer owns the city configuration and public listener.
 - Opening the door, replacing the city key and confirming a request wait for the code the console prints; closing the door and locking it from a device do not (D4, D5). The code never enters a frame or a page.
 - The city key's seed lives in the city's vault, not in the city directory, and `keys::from_sealed` is this crate's only exposure of a seed (D23).
 - There is no `unsafe` in this crate. The vectors under `Tools/fixtures/remote-handshake` are written by its tests: run the tests whose names contain `vector` or `fixture` with `GOLDEN_WRITE=1` to write them again rather than editing the files, since the deterministic files are rewritten byte for byte and the two carrying randomness only when the committed copy no longer verifies.
@@ -72,4 +72,4 @@ cargo nextest run -p sprawling -E 'binary(remote_door)'          # the remote do
 cargo xtask gates spec depmap                                   # its specification and its dependency edges
 ```
 
-The door, the pairing code, the keys, both handshakes and the seal give the same bytes on Windows, macOS and Linux. The `cloudflare` route is not in the automatic tests: it needs an account, a domain and a connection to the edge, and section 8-8 of the SPEC holds the check an operator runs once by hand. `just models` builds every crate's specification, and `just test` runs the tests the whole workspace shares.
+The door, the pairing code, the keys, both handshakes and the seal give the same bytes on Windows, macOS and Linux. The app integration tests open the public listener and pair over a real WebTransport stream. `just models` builds every crate's specification, and `just test` runs the tests the whole workspace shares.

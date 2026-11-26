@@ -3,12 +3,11 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-use std::net::{SocketAddr, TcpStream};
+use std::net::UdpSocket;
 use std::time::Duration;
 
 use kernel::event::record::{RemoteClosed, RemoteClosing};
 use kernel::{EventRecord, Ledger};
-use remote_access::route::Route;
 
 use super::super::listener::{Reaching, open};
 use super::*;
@@ -22,23 +21,6 @@ impl Ledger for Records {
         let at = record.to_ref();
         self.0.lock().unwrap().push(record);
         Ok(at)
-    }
-}
-
-#[derive(Clone, Default)]
-struct Seen(Arc<Mutex<(Option<SocketAddr>, u32)>>);
-
-struct StandIn(Seen);
-
-impl Route for StandIn {
-    fn open(&mut self, local: SocketAddr) -> Result<Opened, AxError> {
-        self.0.0.lock().unwrap().0 = Some(local);
-        Ok(opened())
-    }
-
-    fn close(&mut self) -> Result<(), AxError> {
-        self.0.0.lock().unwrap().1 += 1;
-        Ok(())
     }
 }
 
@@ -58,14 +40,11 @@ fn within(done: impl Fn() -> bool) -> bool {
 fn an_open_door_closes_itself_as_expired_when_the_clock_passes_its_time() {
     let dir = tempfile::tempdir().unwrap();
     let records = Records::default();
-    let seen = Seen::default();
     let now = Arc::new(AtomicU64::new(1_000));
     let turned = Arc::clone(&now);
-    let chosen = seen.clone();
     let doorway = Doorway::keep(Keeping {
         devices: dir.path().join("remote").join("devices.toml"),
         ledger: Box::new(records.clone()),
-        choose: Box::new(move || Ok(Box::new(StandIn(chosen.clone())))),
         senses: Senses {
             clock: Arc::new(move || Ok(TimeMs::new(turned.load(Ordering::SeqCst)))),
             ..senses(1)
@@ -74,20 +53,44 @@ fn an_open_door_closes_itself_as_expired_when_the_clock_passes_its_time() {
     })
     .unwrap();
     let runtime = tokio::runtime::Runtime::new().unwrap();
+    let socket = UdpSocket::bind("127.0.0.1:0").unwrap();
+    let port = socket.local_addr().unwrap();
+    drop(socket);
+    let file = kernel::layout::CityLayout::new(dir.path()).city_config();
+    std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+    let identity = wtransport::Identity::self_signed(["127.0.0.1"]).unwrap();
+    let cert = dir.path().join("certificate.pem");
+    let key = dir.path().join("private.pem");
+    runtime.block_on(async {
+        identity
+            .certificate_chain()
+            .store_pemfile(&cert)
+            .await
+            .unwrap();
+        identity
+            .private_key()
+            .store_secret_pemfile(&key)
+            .await
+            .unwrap();
+    });
+    std::fs::write(file, format!(
+        "[remote]\nroute = 'h3'\nurl = 'https://{port}'\nlisten = '{port}'\ncertificate = '{}'\nprivate_key = '{}'\n",
+        cert.display(), key.display()
+    )).unwrap();
     let reaching = Reaching {
         runtime: runtime.handle().clone(),
-        city: local(),
+        city_root: dir.path().to_path_buf(),
+        city: port,
         token: "city-key".to_owned(),
         page: Arc::new(wire::ClientAssets::Embedded(&[])),
     };
     let lasting = Lasting::of_ms(60_000).unwrap();
     open(&doorway, &reaching, lasting).unwrap();
-    let port = seen.0.lock().unwrap().0.unwrap();
-    let answered_while_open = TcpStream::connect(port).is_ok();
+    let bound_while_open = UdpSocket::bind(port).is_err();
 
     now.store(1_000 + 60_000, Ordering::SeqCst);
     let closed = within(|| records.0.lock().unwrap().len() >= 2);
-    let refused_after = within(|| TcpStream::connect(port).is_err());
+    let refused_after = within(|| UdpSocket::bind(port).is_ok());
 
     let written: Vec<(EventKind, Option<RemoteClosing>)> = records
         .0
@@ -105,10 +108,9 @@ fn an_open_door_closes_itself_as_expired_when_the_clock_passes_its_time() {
         .map(|refused| *refused.code());
     assert_eq!(
         (
-            answered_while_open,
+            bound_while_open,
             closed,
             written,
-            seen.0.lock().unwrap().1,
             refused_after,
             invited.is_some(),
         ),
@@ -119,7 +121,6 @@ fn an_open_door_closes_itself_as_expired_when_the_clock_passes_its_time() {
                 (EventKind::RemoteOpened, None),
                 (EventKind::RemoteClosed, Some(RemoteClosing::Expired)),
             ],
-            1,
             true,
             true,
         )

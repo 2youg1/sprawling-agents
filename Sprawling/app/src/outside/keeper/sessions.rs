@@ -44,8 +44,17 @@ impl Doorway {
             device: device.text(),
             expires,
         };
-        kept.record(now, Who::Person, EventKind::RemoteSessionStarted, &line)?;
+        if let Err(refused) = kept.record(now, Who::Person, EventKind::RemoteSessionStarted, &line)
+        {
+            kept.door.end_session(id);
+            return Err(refused);
+        }
         Ok((id, session))
+    }
+
+    pub(in crate::outside) fn end_session(&self, session: SessionId) -> Result<(), AxError> {
+        self.kept()?.door.end_session(session);
+        Ok(())
     }
 
     pub(crate) fn authority(&self, session: SessionId) -> Result<Option<Authority>, AxError> {
