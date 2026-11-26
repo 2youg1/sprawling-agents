@@ -200,19 +200,30 @@ Resume preserves legacy tool names and string/array content, including image blo
 
 Calyx reports Program Status Protocol (OSC 7501) states: `working`, `done`, `error`, or `idle` after cancellation. Unsupported terminals ignore it. Headless `-p` and piped runs do not emit OSC 7501.
 
-## Memory
+<a name="memory"></a>
 
-One reading on Windows 11 x86-64 (16 cores), release binaries from this tree, using the Windows working set of each process. The session holds 6.8 MiB of message text: Mei stores a 6.8 MiB JSONL and Pi 1.5.2 loads the same text from a 7.1 MiB session. Pi ran with `--offline` and its default context files, skills and extensions. No model provider was contacted; Mei's one request went to a local stand-in. Calyx was read 30 seconds after `/resume`; Mei's peak was taken while one request carried the history.
+## Performance
 
-| Process | Empty session | 6.8 MiB session |
-|---|---:|---:|
-| Calyx (idle) | 8.3 MiB | 33.8 MiB |
-| Mei core (peak) | 5.8 MiB | 22.1 MiB |
-| python guest (peak) | 13.5 MiB | 13.5 MiB |
-| **Mei + Calyx + python** | **27.6 MiB** | **69.4 MiB** |
-| Pi TUI (idle) | 120.8 MiB | 144.1 MiB |
+Mei 0.18.3 and Pi 1.6.1 ran on the same Linux x86-64 host with a 4-vCPU quota and a 16 GiB memory limit. Each task starts a fresh headless process against the same scripted local provider. Both sides run the same Python code for the file task, through Mei's persistent guest or Pi's Bash tool, and resume the same 1 MiB of history in the session workload.
 
-The core and its python guest exist only while a task runs; Calyx alone is the idle cost. The large session adds about 26 MiB to Calyx and 16 MiB to the core. These are working-set readings on one machine, not a cross-platform benchmark; a different counter, session or platform gives different numbers.
+The table shows selected workloads where Mei's P50 and P95 were both favorable. Read each cell as **P50 / P95 / CV**. CV is the sample standard deviation divided by the mean. Throughput is measured per batch, and active memory is total process-tree PSS at the final request.
+
+<!-- mei-pi:begin -->
+| Metric | Workload | Parallel | Samples Mei / Pi | Mei | Pi |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Launch to first request (ms) | Short answer | 1 | 40 / 40 | 1.66 / 2.18 / 17.1% | 277.23 / 366.19 / 14.5% |
+| Task wall time (ms) | Short answer | 8 | 320 / 320 | 5.86 / 9.15 / 57.9% | 847.97 / 1,031.37 / 17.8% |
+| Task wall time (ms) | 64 KiB input | 8 | 320 / 320 | 8.71 / 11.64 / 23.9% | 836.53 / 1,030.74 / 18.6% |
+| Task wall time (ms) | 1 MiB history resume | 8 | 320 / 320 | 30.54 / 43.20 / 80.7% | 852.85 / 1,055.11 / 17.0% |
+| Task wall time (ms) | Three tool calls | 1 | 40 / 40 | 28.37 / 34.19 / 70.3% | 384.34 / 536.38 / 14.9% |
+| Task wall time (ms) | Three tool calls | 8 | 320 / 320 | 58.08 / 75.65 / 31.4% | 1,174.17 / 1,403.07 / 14.3% |
+| Later tool round trips (ms) | Three tool calls | 8 | 640 / 640 | 1.78 / 7.27 / 102.0% | 69.80 / 138.30 / 44.3% |
+| Batch throughput (tasks/s) | Three tool calls | 8 | 40 / 40 | 117.55 / 136.58 / 15.0% | 6.33 / 6.93 / 7.5% |
+| Active tree PSS (MiB) | Three tool calls | 1 | 40 / 40 | 8.78 / 8.81 / 0.5% | 100.75 / 102.98 / 1.1% |
+| Active tree PSS (MiB) | Three tool calls | 8 | 40 / 40 | 51.70 / 51.71 / 0.04% | 610.96 / 620.41 / 1.3% |
+<!-- mei-pi:end -->
+
+The report covers all tested settings, including 1, 4 and 8 parallel tasks, distribution charts, intervals, outcomes and measurement details. The fixture measures local harness behavior with scripted responses. To view the charts, select “Download raw file” on the report page and open the saved HTML file in a browser. [HTML report](https://github.com/2youg1/sprawling-agents/blob/main/docs/benchmarks/mei-pi/report.html) · [CSV results](https://github.com/2youg1/sprawling-agents/blob/main/docs/benchmarks/mei-pi/results.csv)
 
 ## Prompt and tool contract
 
