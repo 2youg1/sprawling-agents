@@ -61,7 +61,8 @@ The undo pool lists up to 64 recent actions in the open editor, bounded by
 not edit. Applying multiple actions is one CodeMirror transaction and one
 ordinary undo step. Each inverse rebases through later retained changes in
 reverse order. Overlap requires selecting the later dependency or preserving the
-original document. A document change between preview and application requires
+original document. A reversed dependency that has restored the exact bytes
+allows an earlier edit to be selected separately. A document change between preview and application requires
 the plan to be taken again from the current editor state. A received change
 without a local edit history starts a new pool; an acknowledged save with the
 same editor text does not.

@@ -4,7 +4,7 @@
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
 import { invertedEffects, isolateHistory } from "@codemirror/commands";
-import { ChangeSet, StateEffect, StateField, Transaction, type EditorState, type Text } from "@codemirror/state";
+import { ChangeSet, StateEffect, StateField, Transaction, type ChangeSpec, type EditorState, type Text } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 
 const POOL_ACTIONS = 64;
@@ -161,26 +161,42 @@ export type UndoPoolPlan =
       readonly journal: Journal;
     };
 
+function changedText(changes: ChangeSet, original: Text): ChangeSet {
+  const kept: ChangeSpec[] = [];
+  let identical = false;
+  changes.iterChanges((from, to, _start, _end, insert) => {
+    if (to - from === insert.length && original.slice(from, to).eq(insert)) identical = true;
+    else kept.push({ from, to, insert });
+  });
+  return identical ? ChangeSet.of(kept, original.length) : changes;
+}
+
 export function planUndo(state: EditorState, picked: ReadonlySet<number>): UndoPoolPlan {
   const journal = state.field(undoJournal);
   let remaining = picked.size;
   let carried = ChangeSet.empty(state.doc.length);
   let planned = carried;
+  let observed = state.doc;
   let later: Entry | undefined;
   for (const entry of [...journal.entries].reverse()) {
     if (remaining === 0) break;
     if (!picked.has(entry.id) || entry.reversed) {
       carried = entry.forward.compose(carried);
       later ??= entry;
+      observed = entry.inverse.apply(observed);
       continue;
     }
     if (later !== undefined && changesContact(entry.inverse, carried)) {
-      const dependency = dependencyFor(journal.entries, entry, picked) ?? later;
-      return { kind: "conflict", later: dependency };
+      carried = changedText(carried, observed);
+      if (changesContact(entry.inverse, carried)) {
+        const dependency = dependencyFor(journal.entries, entry, picked) ?? later;
+        return { kind: "conflict", later: dependency };
+      }
     }
     const mapped = entry.inverse.map(carried);
     carried = carried.map(entry.inverse, true);
     planned = planned.compose(mapped);
+    observed = entry.inverse.apply(observed);
     remaining -= 1;
   }
   if (remaining !== 0 || planned.empty || planned.apply(state.doc).eq(state.doc))
