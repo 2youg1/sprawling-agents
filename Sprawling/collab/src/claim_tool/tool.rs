@@ -3,9 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-//! The tool itself: the seven actions, and the arguments they are
-//! spelled with.
-
+use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
 
 use super::{ClaimDesk, Pinner};
@@ -17,34 +15,29 @@ use kernel::{
 };
 use serde_json::{Map, Value};
 
-/// The tool itself: a thin router onto the desk.
 pub struct ClaimTool {
     meta: ToolMeta,
     desk: Arc<Mutex<ClaimDesk>>,
-    /// Where a path given as `evidence` is pinned; without one, `finish`
-    /// takes a Locator only.
     pinner: Option<Pinner>,
 }
 
 impl ClaimTool {
-    /// The name, disclosure and schema `new` registers. The catalog page
-    /// reads the same value before a run has frozen a table.
-    ///
-    /// # Errors
-    /// A schema that does not build, which these literals cannot produce.
     pub fn definition() -> Result<ToolDef, AxError> {
         let mut properties = Map::new();
         for (field, kind, description) in [
             (
                 "action",
                 "string",
-                "`list` | `claim` | `finish` (evidence) | `block` (reason) | `release` (reason) \
-                 | `split` (parts) | `add` (parts; Mayor, empty plan)",
+                "`list` | `claim` | `finish` | `block` | `release` | `split` | `add` (Mayor)",
             ),
             ("node", "string", "dotted index, such as `2.3`"),
             ("evidence", "string", "a path or locator"),
             ("reason", "string", "one line: why"),
-            ("parts", "array", "the children, each `{item, weight}`"),
+            (
+                "parts",
+                "array",
+                "text, or `{item, weight, needs}`; needs: existing row IDs",
+            ),
         ] {
             let mut spec = Map::new();
             spec.insert("type".to_owned(), Value::String(kind.to_owned()));
@@ -63,8 +56,6 @@ impl ClaimTool {
         );
         Ok(ToolDef {
             name: ToolName::parse("plan")?,
-            // The question sits in the cached prefix, so it costs no
-            // latency and no spend; the method stays the model's.
             description: "Take a node of this building's plan before unassigned work. \
                           Must this be expanded?"
                 .to_owned(),
@@ -72,9 +63,6 @@ impl ClaimTool {
         })
     }
 
-    /// # Errors
-    /// Propagates a malformed tool name or parameter schema, neither of
-    /// which can happen with the literals below, and a desk left locked.
     pub fn new(desk: Arc<Mutex<ClaimDesk>>) -> Result<ClaimTool, AxError> {
         let defined = Self::definition()?;
         let room = desk
@@ -105,7 +93,6 @@ impl ClaimTool {
         })
     }
 
-    /// This tool, pinning a path given as `evidence` through `pinner`.
     #[must_use]
     pub fn pinning(self, pinner: Pinner) -> ClaimTool {
         ClaimTool {
@@ -197,14 +184,6 @@ impl Tool for ClaimTool {
 }
 
 impl ClaimDesk {
-    /// Writes a top-level row under the plan's root, the one door into
-    /// an empty plan.
-    ///
-    /// The root's share is held by the building's Mayor (kernel
-    /// `Share.lean` D25), so only `hall/mayor` adds here; a run elsewhere
-    /// adds under the branch it holds, which is `split`. The new index
-    /// follows the last top-level row, and the grown table is rebuilt
-    /// before anything is written, as a split's is.
     fn add(&mut self, rows: &[NewChild]) -> Result<Payload, AxError> {
         let refuse = |subject: String, recovery: String| {
             AxError::failure(AxCode::InvalidArgs, "add a plan row", subject).with_recovery(recovery)
@@ -229,8 +208,18 @@ impl ClaimDesk {
                     .to_owned(),
             ));
         }
-        let last = self
-            .tree()?
+        let tree = self.tree()?;
+        if let Some(missing) = rows
+            .iter()
+            .flat_map(|row| &row.needs)
+            .find(|need| tree.get(need).is_none())
+        {
+            return Err(refuse(
+                format!("no existing row numbered {missing}"),
+                "name an existing prerequisite; add it before adding work that needs it".to_owned(),
+            ));
+        }
+        let last = tree
             .nodes()
             .filter(|node| node.row.id.parent().is_none())
             .map(|node| node.row.id.ordinal())
@@ -252,14 +241,13 @@ impl ClaimDesk {
                 child: NewChild {
                     item: row.item.trim().to_owned(),
                     weight: row.weight,
+                    needs: row.needs.clone(),
                 },
             };
             grown = effect.apply(&grown)?;
             added.push(Value::String(id.to_string()));
             effects.push(effect);
         }
-        // Built before it is written, as a split's table is: rows that
-        // would not parse or build are refused with the file untouched.
         let RoadmapShape::WellFormed { rows: parsed } = check_roadmap_shape(&grown) else {
             return Err(refuse(
                 "the rows would leave a table that does not parse".to_owned(),
@@ -276,8 +264,6 @@ impl ClaimDesk {
     }
 }
 
-/// The one place the seven actions are spelled for a caller that got it
-/// wrong. A second list would drift from the schema above.
 pub(super) const ACTIONS: &str =
     "use `list`, `claim`, `finish`, `block`, `release`, `split` or `add`";
 
@@ -312,19 +298,14 @@ fn reason_of(args: &Map<String, Value>, action: &str) -> Result<String, AxError>
     Ok(raw.to_owned())
 }
 
-/// The children of a split, as the model wrote them.
-///
-/// A bare string is accepted as well as an object: a weight nobody
-/// stated is 1, and refusing the shorter form would make the common case
-/// — divide this evenly — the one that needs the most typing.
 fn parts_of(args: &Map<String, Value>) -> Result<Vec<NewChild>, AxError> {
     let refuse = |why: &str| {
         AxError::failure(
             AxCode::InvalidArgs,
-            "read the parts of a split",
+            "read the parts of a plan change",
             why.to_owned(),
         )
-        .with_recovery("pass `parts` as a list of `{item, weight}`, or of plain strings")
+        .with_recovery("pass text or `{item, weight, needs}` in `parts`; use an array of existing row IDs for `needs`")
     };
     let listed = args
         .get("parts")
@@ -336,6 +317,7 @@ fn parts_of(args: &Map<String, Value>) -> Result<Vec<NewChild>, AxError> {
             Value::String(item) => NewChild {
                 item: item.clone(),
                 weight: 1,
+                needs: Vec::new(),
             },
             Value::Object(map) => {
                 let item = map
@@ -343,9 +325,27 @@ fn parts_of(args: &Map<String, Value>) -> Result<Vec<NewChild>, AxError> {
                     .and_then(Value::as_str)
                     .ok_or_else(|| refuse("a part with no `item`"))?;
                 let weight = map.get("weight").and_then(Value::as_u64).unwrap_or(1);
+                let mut needs = Vec::new();
+                if let Some(value) = map.get("needs") {
+                    let listed = value
+                        .as_array()
+                        .ok_or_else(|| refuse("`needs` is not an array"))?;
+                    let mut seen = BTreeSet::new();
+                    for value in listed {
+                        let raw = value
+                            .as_str()
+                            .ok_or_else(|| refuse("a `needs` entry is not a row ID string"))?;
+                        let node = NodeId::parse(raw)?;
+                        if !seen.insert(node.clone()) {
+                            return Err(refuse("a row ID appears twice in `needs`"));
+                        }
+                        needs.push(node);
+                    }
+                }
                 NewChild {
                     item: item.to_owned(),
                     weight: u32::try_from(weight).unwrap_or(u32::MAX),
+                    needs,
                 }
             }
             Value::Null | Value::Bool(_) | Value::Number(_) | Value::Array(_) => {

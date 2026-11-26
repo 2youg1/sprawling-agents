@@ -9,14 +9,10 @@ use kernel::{Tool, ToolCall, ToolName};
 
 use super::tool::ACTIONS;
 use super::*;
-// The desk produces the effects; whether one still holds is
-// `claim_effect`'s question, asked here against a real desk run.
 use crate::claim_effect::still_true;
 use kernel::spine::{check_roadmap_shape, set_roadmap_status};
 use kernel::{EvidenceCell, Locator, RoadmapShape};
 
-/// The plan's evidence column for one node, read back the way a person
-/// reading the file would: the reader half of what `finish` writes.
 fn evidence_of(text: &str, id: &NodeId) -> Option<Locator> {
     let RoadmapShape::WellFormed { rows } = check_roadmap_shape(text) else {
         return None;
@@ -108,8 +104,6 @@ fn a_node_somebody_else_is_working_on_is_refused_with_a_ready_one() {
     );
 }
 
-/// The ready set is what `list` offers: a node whose dependency is
-/// not done is not work anybody can take.
 #[test]
 fn listing_offers_what_is_ready_rather_than_what_is_merely_unclaimed() {
     let shared = desk();
@@ -148,9 +142,6 @@ fn a_run_holds_one_node_at_a_time() {
     assert!(refusal.recovery().contains("one node"));
 }
 
-/// A path given as evidence is pinned through the tool's `Pinner`, and a
-/// string spelled as a Locator is judged as one even when a `Pinner`
-/// stands by (`Sprawling/collab/Spec.lean` D20).
 #[test]
 fn a_path_given_as_evidence_is_pinned_and_a_broken_locator_is_not() {
     let shared = desk();
@@ -225,8 +216,6 @@ fn finishing_requires_evidence_that_parses() {
     );
 }
 
-/// The plan gate, from the tool's side: a run may only put down the
-/// node it took, and it may not close one it never claimed.
 #[test]
 fn a_run_can_only_put_down_what_it_took() {
     let shared = desk();
@@ -315,8 +304,6 @@ fn putting_a_node_down_without_a_reason_is_refused() {
     assert!(refusal.recovery().contains("one line"));
 }
 
-/// A run that ends holding a node leaves red behind, and the reason
-/// says what happened rather than inventing one.
 #[test]
 fn a_run_that_freezes_still_holding_a_node_leaves_it_red() {
     let shared = desk();
@@ -392,4 +379,38 @@ fn the_tool_refuses_a_call_bearing_another_tools_name() {
         "plan",
         "a refusal must not poison the tool"
     );
+}
+
+#[test]
+fn list_reports_done_evidence_separately_from_unwritten_rows() {
+    let shared = desk();
+    let tool = ClaimTool::new(Arc::clone(&shared)).unwrap();
+    tool.invoke(&call(serde_json::json!({"action":"claim", "node":"1"})))
+        .unwrap();
+    let evidence = locator();
+    tool.invoke(&call(serde_json::json!({
+        "action":"finish", "node":"1", "evidence":evidence
+    })))
+    .unwrap();
+    let staged = tool
+        .invoke(&call(serde_json::json!({"action":"list"})))
+        .unwrap();
+    assert_eq!(
+        staged.result.as_map()["done"],
+        serde_json::json!([{"node":"1","item":"wire the kiln","evidence":evidence}])
+    );
+    assert_eq!(staged.result.as_map()["pending"], serde_json::json!(["1"]));
+    let saved = shared.lock().unwrap().roadmap().unwrap().to_owned();
+    let later = Arc::new(Mutex::new(ClaimDesk::new(
+        "potter@lab.2".to_owned(),
+        Address::parse("lab/room1").unwrap(),
+        saved,
+        Booking::new(|_| Ok(())),
+    )));
+    let list = ClaimTool::new(later)
+        .unwrap()
+        .invoke(&call(serde_json::json!({"action":"list"})))
+        .unwrap();
+    assert_eq!(list.result.as_map()["done"], staged.result.as_map()["done"]);
+    assert_eq!(list.result.as_map()["pending"], serde_json::json!([]));
 }

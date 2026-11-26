@@ -159,7 +159,7 @@ What each of these tools may do is decided in its own desk; `Sprawling/collab/Sp
 
 **Take a node of this building's plan before unassigned work.**
 
-[`Sprawling/collab/src/claim_tool/tool.rs`](../../Sprawling/collab/src/claim_tool/tool.rs). `Roadmap.md` is the plan, and this tool is its one editing entrance: `claim` takes a ready node, and `finish` (with evidence), `block`, `release` and `split` act only on the node this run holds. `add` puts top-level parts into an empty plan and is the Mayor's alone. Dormant, every building.
+[`Sprawling/collab/src/claim_tool/tool.rs`](../../Sprawling/collab/src/claim_tool/tool.rs). `Roadmap.md` is the plan, and this tool is its one editing entrance: `claim` takes a ready node, and `finish` (with evidence), `block`, `release` and `split` act only on the node this run holds. `add` appends top-level parts and is the Mayor's alone. For `split` or `add`, a part can be plain text or an object with `item`, optional `weight` and optional `needs` (an array of existing row IDs). `list` includes `done` with evidence when available and `pending` with row IDs changed or added in this run but not yet written to the roadmap. Dormant, every building.
 
 ### `goal`
 

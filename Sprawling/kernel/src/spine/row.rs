@@ -68,4 +68,5 @@ pub enum RoadmapShape {
 pub struct NewChild {
     pub item: String,
     pub weight: u32,
+    pub needs: Vec<NodeId>,
 }
