@@ -79,8 +79,10 @@ fn built(here: &Path, out: &Path, zig_target: &str, leaf: &str) -> Result<(), St
             "-Doptimize=safe",
             &format!("-Dtarget={zig_target}"),
             &format!("-Dconsole-leaf={leaf}"),
-            "--prefix",
+            "--cache-dir",
         ])
+        .arg(out.join("zig-cache"))
+        .arg("--prefix")
         .arg(out)
         .status()
         .map_err(|err| format!("zig did not start: {err}"))?;

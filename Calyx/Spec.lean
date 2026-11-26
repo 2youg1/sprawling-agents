@@ -106,7 +106,8 @@ stdin）。理由：一次完成要求无参 TTY 与显式 `calyx` 均可进交�
 
 /-! D22 Cargo 构建 Calyx 时，渲染叶包通过 `cargo::metadata=zig_source` 交出其 Zig 源目录，
 壳的构建脚本从 `DEP_SPRAWLING_CONSOLE_LEAF_ZIG_SOURCE` 取得目录并传给 Zig 的
-`-Dconsole-leaf`。直接在仓库的 Calyx 目录运行 `zig build` 时使用 `ffi/zig`。
+`-Dconsole-leaf`。Zig 的本地缓存放在 Cargo 的 `OUT_DIR`，归档内的源码目录保持只读。
+直接在仓库的 Calyx 目录运行 `zig build` 时使用 `ffi/zig`。
 理由：Cargo 将壳和渲染叶归档为独立的包，渲染叶是其 Zig 源的唯一拥有者。被否：从壳查找
 嵌套的 Cargo 包，发布归档没有该目录；在壳的包里再携带一份渲染叶，两个拷贝会漂移。
 验收：分别解开 `cargo package` 生成的壳和渲染叶归档后，通过原构建脚本构建壳与可执行文件。 -/
