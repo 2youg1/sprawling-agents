@@ -15,8 +15,9 @@ import type { Editing } from "../editor/editing";
 import { phrasesIn } from "../editor/reading";
 import Button from "../parts/button.solid";
 import Glyph from "../parts/glyph.solid";
-import type { CellLook, Choice } from "../parts/segmented";
+import type { Choice } from "../parts/segmented";
 import { useSegmented } from "../parts/segmented.solid";
+import ThemePreview from "../parts/theme_preview.look.solid";
 import Card from "./card_view";
 import { colourTokens, declaredNames, drawnColours, readLegibility, textClaims } from "./colours";
 import type { DrawnColour, Reading } from "./colours";
@@ -75,30 +76,6 @@ function presetChoices(word: (key: Key) => string): readonly Choice<Preset>[] {
   }));
 }
 
-function ThemePreview(props: { readonly cell: CellLook }) {
-  const sample = () => PRESETS.find((preset) => preset.value === props.cell.key)?.appearance;
-  return (
-    <button
-      {...props.cell.wire}
-      data-control=""
-      data-theme-preview={props.cell.state === "held" ? undefined : sample()?.lighting}
-      data-palette={sample()?.neutralPalette ? "graphite" : "blue"}
-      type="button"
-      class="theme-preview relative flex min-h-touch min-w-0 items-center justify-between gap-snug rounded-control border border-edge-input bg-page px-base py-tight text-label text-text"
-    >
-      <span class="min-w-0 text-balance">{props.cell.label}</span>
-      <span aria-hidden="true" class="flex size-glyph-sm shrink-0 items-center justify-center">
-        <Show
-          when={props.cell.state === "held"}
-          fallback={<span class="size-dot rounded-pill bg-accent" />}
-        >
-          <Glyph name="check" size="sm" class="text-accent" />
-        </Show>
-      </span>
-    </button>
-  );
-}
-
 function ThemePreviews(props: {
   readonly word: (key: Key) => string;
   readonly held: Preset | null;
@@ -123,7 +100,17 @@ function ThemePreviews(props: {
           <div role="group" aria-label={band().heading} class="theme-preview-row">
             <Glyph name={index() === 0 ? "sun" : "moon"} class="text-text-quiet" />
             <For each={band().cells} keyed={(cell) => cell.key}>
-              {(cell) => <ThemePreview cell={cell()} />}
+              {(cell) => {
+                const sample = () =>
+                  PRESETS.find((preset) => preset.value === cell().key)?.appearance;
+                return (
+                  <ThemePreview
+                    cell={cell()}
+                    lighting={sample()?.lighting}
+                    palette={sample()?.neutralPalette ? "graphite" : "blue"}
+                  />
+                );
+              }}
             </For>
           </div>
         )}
