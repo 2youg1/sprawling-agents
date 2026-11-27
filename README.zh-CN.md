@@ -16,6 +16,8 @@
 
 <a name="核心特色与设计亮点"></a>
 
+## 能用它做什么
+
 给一群 Agent 一个能长期工作的地方。工作区是一座城市，项目各有自己的楼，Agent 在房间里分工，交接写进你能随时打开的文件。你不用守着聊天窗口，也能知道工作走到了哪儿。
 
 - **规则写在自己的文件里。** 提示词、写入范围和审查规则都能打开看；运行开始前，就能划定 Agent 在哪儿做事。
@@ -31,19 +33,21 @@
 
 ## 快速开始
 
-已有 Bun 时，从下面这两条命令开始。
+1. 用 Bun 安装 Sprawling。
 
-```sh
-bun install --global sprawling@latest
-```
+   ```sh
+   bun install --global sprawling@latest
+   ```
 
-安装后打开新终端。如果找不到 `sprawling`，运行 `bun pm bin --global`，并把返回的目录加入 `PATH`，再运行：
+2. 打开新终端，启动第一座城市。如果找不到 `sprawling`，运行 `bun pm bin --global`，并把返回的目录加入 `PATH`。
 
-```sh
-sprawling up ./cities/first
-```
+   ```sh
+   sprawling up ./cities/first
+   ```
 
-打开页面后，连接一个模型 provider，为 `main` 选择模型，再把第一项任务交给 Mayor。终端启动后显示安静宿主。先按 Esc 进入 CLI，再输入 `/web` 重新打开页面并返回安静宿主，或输入 `/quit` 停止城市。[安装指南](docs/start/getting-started.zh-CN.md#1-安装)列出独立安装脚本、预编译包和版本验证方式。
+3. 在浏览器里连接一个模型 provider，为 `main` 选择模型，再把第一项任务交给 Mayor。
+
+终端启动后显示安静宿主。先按 Esc 进入 CLI，再输入 `/web` 重新打开页面并返回安静宿主，或输入 `/quit` 停止城市。独立安装脚本、预编译包和版本验证方式见[安装指南](docs/start/getting-started.zh-CN.md#1-安装)。
 
 ## 项目地图
 
@@ -58,9 +62,23 @@ sprawling up ./cities/first
 
 ## 文档
 
-- [上手指南](docs/start/getting-started.zh-CN.md)与[文档索引](docs/README.md)。
-- [日常运行](docs/operate/operating.md)、[工具与 Agent 集成](docs/integrate/integrations.md)和[结构](docs/ARCHITECTURE.md)。
-- [贡献指南](docs/CONTRIBUTING.md)、[Agent 工作规范](AGENTS.md)与[模型阅读入口](LLM.md)。
-- <a name="来源与致谢"></a> [发布记录](docs/CHANGELOG.md)、[报告安全问题](docs/SECURITY.md)与[来源和许可](docs/third-party.md)。
-- <a name="为什么做它"></a> [项目缘起](Sprawling/background.zh-CN.md)
+[文档索引](docs/README.md) · [模型阅读入口](LLM.md)
+
+### 使用与扩展 Sprawling
+
+- [上手指南](docs/start/getting-started.zh-CN.md) · [English](docs/start/getting-started.md)
+- [日常运行](docs/operate/operating.md)
+- [工具与 Agent 集成](docs/integrate/integrations.md) · [CLI 与 Wire 参考](docs/wire.md)
+
+### 参与贡献
+
+- [架构](docs/ARCHITECTURE.md) · [贡献指南](docs/CONTRIBUTING.md) · [Agent 工作规范](AGENTS.md)
+
+<a name="来源与致谢"></a>
+
+## 发布与项目信息
+
+- [发布记录](docs/CHANGELOG.md)
 - <a name="代码签名政策"></a> [校验版本与代码签名](docs/start/getting-started.zh-CN.md#选一个版本核对来源)
+- [报告安全问题](docs/SECURITY.md) · [来源和许可](docs/third-party.md)
+- <a name="为什么做它"></a> [项目缘起](Sprawling/background.zh-CN.md)
