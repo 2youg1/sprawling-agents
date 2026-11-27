@@ -3,12 +3,10 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-import { OPS, RenderingCancelledException, TextLayer } from "pdfjs-dist";
-import { Result } from "effect";
+import { RenderingCancelledException, TextLayer } from "pdfjs-dist";
 import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
 import { cropPdf, type PdfRegion } from "./pdf_anchor";
 import type { PdfDetail } from "./pdf_document";
-import { neutralTones } from "./pdf_tones";
 
 export { gpuAvailability, openPdf, type Opened, type PdfDetail } from "./pdf_document";
 
@@ -25,11 +23,7 @@ export interface PagePaint {
   readonly detail?: PdfDetail;
   readonly number: number;
   readonly width: number;
-  readonly present: (
-    original: HTMLCanvasElement,
-    tones: HTMLCanvasElement | ImageBitmap | null,
-    full: boolean,
-  ) => void;
+  readonly present: (original: HTMLCanvasElement, full: boolean) => void;
   readonly measure: (size: Size) => void;
   readonly failure: (reason: unknown) => void;
   readonly textLayer?: HTMLDivElement;
@@ -105,39 +99,6 @@ export function drawPdf(options: PagePaint) {
   };
 }
 
-function scanned({
-  fnArray,
-  argsArray,
-}: Awaited<ReturnType<PDFPageProxy["getOperatorList"]>>): boolean {
-  let textMode = 0;
-  let image = false;
-  const modeStack: number[] = [];
-  for (const [index, instruction] of fnArray.entries()) {
-    if (instruction === OPS.save || instruction === OPS.paintFormXObjectBegin) {
-      modeStack.push(textMode);
-    } else if (instruction === OPS.restore || instruction === OPS.paintFormXObjectEnd) {
-      textMode = modeStack.pop() ?? 0;
-    } else if (instruction === OPS.setTextRenderingMode) {
-      const arguments_: unknown = argsArray[index];
-      if (Array.isArray(arguments_) && typeof arguments_[0] === "number") {
-        textMode = arguments_[0];
-      }
-    } else if (instruction === OPS.showText && (textMode & 3) !== 3) {
-      return false;
-    } else if (
-      instruction === OPS.paintImageXObject ||
-      instruction === OPS.paintImageMaskXObject ||
-      instruction === OPS.paintImageMaskXObjectGroup ||
-      instruction === OPS.paintImageXObjectRepeat ||
-      instruction === OPS.paintInlineImageXObject ||
-      instruction === OPS.paintInlineImageXObjectGroup
-    ) {
-      image = true;
-    }
-  }
-  return image;
-}
-
 function cancelled(signal: AbortSignal): boolean {
   return signal.aborted;
 }
@@ -156,15 +117,15 @@ async function paintPreview(options: PagePaint, signal: AbortSignal): Promise<PD
   options.measure({ width: natural.width, height: natural.height });
   if (options.cached === undefined) {
     const preview = raster(page, options.width, PREVIEW_DENSITY, PREVIEW_PIXELS);
-    const first = await renderRaster(page, preview, signal, true).catch(async (reason: unknown) => {
+    const first = await renderRaster(page, preview, signal).catch(async (reason: unknown) => {
       if (signal.aborted || options.detail === undefined) return Promise.reject(reason);
       const document = await options.detail();
       if (document === options.pdf) return Promise.reject(reason);
       const original = await document.getPage(options.number);
-      return renderRaster(original, preview, signal, true).finally(() => original.cleanup());
+      return renderRaster(original, preview, signal).finally(() => original.cleanup());
     });
     if (first === null) return null;
-    options.present(first, Result.getOrNull(Result.try(() => previewTones(first))), false);
+    options.present(first, false);
   }
   return cancelled(signal) ? null : page;
 }
@@ -192,21 +153,9 @@ async function paintSharp(
   options: PagePaint,
   signal: AbortSignal,
 ): Promise<void> {
-  const display = fullViewport(source, options.width);
+  const display = raster(source, options.width, window.devicePixelRatio);
   const original = await renderRaster(source, display, signal);
-  if (original === null) return;
-  const operators = await source.getOperatorList().catch(() => null);
-  await showTones(
-    original,
-    operators !== null && scanned(operators),
-    options.present,
-    true,
-    signal,
-  );
-}
-
-function fullViewport(page: PDFPageProxy, width: number) {
-  return raster(page, width, Math.max(1.35, window.devicePixelRatio));
+  if (original !== null) options.present(original, true);
 }
 
 export async function cropFullPage(
@@ -218,7 +167,7 @@ export async function cropFullPage(
   const pdf = await detail();
   if (signal.aborted) return null;
   const page = await pdf.getPage(picked.page);
-  return renderRaster(page, fullViewport(page, width), signal)
+  return renderRaster(page, raster(page, width, Math.max(1.35, window.devicePixelRatio)), signal)
     .then((canvas) => {
       if (canvas === null) return null;
       return cropPdf(canvas, picked.region).finally(() => {
@@ -273,18 +222,12 @@ async function renderRaster(
   page: PDFPageProxy,
   viewport: ReturnType<PDFPageProxy["getViewport"]>,
   signal: AbortSignal,
-  readback = false,
 ): Promise<HTMLCanvasElement | null> {
   if (signal.aborted) return null;
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.floor(viewport.width));
   canvas.height = Math.max(1, Math.floor(viewport.height));
-  const context = readback
-    ? canvas.getContext("2d", { alpha: false, willReadFrequently: true })
-    : null;
-  const task = page.render(
-    context === null ? { canvas, viewport } : { canvas, canvasContext: context, viewport },
-  );
+  const task = page.render({ canvas, viewport });
   const cancel = () => {
     task.cancel();
   };
@@ -299,79 +242,6 @@ async function renderRaster(
   });
   if (cancelled(signal)) return null;
   return canvas;
-}
-
-function previewTones(original: HTMLCanvasElement): HTMLCanvasElement | null {
-  const { width, height } = original;
-  const pixels = original.getContext("2d")?.getImageData(0, 0, width, height);
-  if (pixels === undefined) return null;
-  const tones = document.createElement("canvas");
-  tones.width = width;
-  tones.height = height;
-  const context = tones.getContext("2d");
-  if (context === null) return null;
-  neutralTones(pixels, false);
-  context.putImageData(pixels, 0, 0);
-  return tones;
-}
-
-async function showTones(
-  original: HTMLCanvasElement,
-  scan: boolean,
-  present: PagePaint["present"],
-  full: boolean,
-  signal: AbortSignal,
-): Promise<void> {
-  const tones = await mapTones(original, scan, signal).catch(() => null);
-  if (signal.aborted) {
-    tones?.close();
-    original.width = 0;
-    original.height = 0;
-  } else {
-    present(original, tones, full);
-  }
-}
-
-async function mapTones(
-  original: HTMLCanvasElement,
-  scan: boolean,
-  signal: AbortSignal,
-): Promise<ImageBitmap | null> {
-  if (
-    signal.aborted ||
-    typeof OffscreenCanvas === "undefined" ||
-    typeof createImageBitmap === "undefined"
-  )
-    return null;
-  const bitmap = await createImageBitmap(original);
-  if (signal.aborted) {
-    bitmap.close();
-    return null;
-  }
-  const started = Result.try(
-    () =>
-      new Worker(new URL("./pdf_clear.worker.ts", import.meta.url), {
-        type: "module",
-      }),
-  );
-  if (Result.isFailure(started)) {
-    bitmap.close();
-    return null;
-  }
-  const worker = started.success;
-  return new Promise<ImageBitmap | null>((resolve) => {
-    const finish = (image: ImageBitmap | null): void => {
-      worker.terminate();
-      signal.removeEventListener("abort", cancel);
-      resolve(image);
-    };
-    const cancel = (): void => finish(null);
-    signal.addEventListener("abort", cancel, { once: true });
-    worker.onmessage = (event: MessageEvent<ImageBitmap | null>) => finish(event.data);
-    worker.onerror = cancel;
-    const posted = Result.try(() => worker.postMessage({ bitmap, scan }, [bitmap]));
-    if (Result.isFailure(posted)) cancel();
-  }).finally(() => bitmap.close());
 }
 
 export function pagesText(pdf: PDFDocumentProxy): Promise<readonly string[]> {

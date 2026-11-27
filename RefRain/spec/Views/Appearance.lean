@@ -39,12 +39,12 @@ PDF pixels available on hold.
 
 Brightness is a bounded integer percentage, with 50 used for a new browser
 profile and saved values retained. The canvas offset adjusts OKLCH lightness.
-The PDF default is cool stone with light ink and dark paper. At 0, 50 and 100
-percent, paper lightness is 0.13, 0.17 and 0.23, and ink lightness is 0.8378,
-0.844 and 0.8484. Adjacent ranges interpolate in OKLCH with a fixed 247 degree
-hue and chroma of 0.023 for paper and 0.01656 for ink. The two endpoints of the
-pixel mapping measure approximately −75 Lc at each reference brightness.
-Forced colors retain system colors and suppress wallpaper. An opaque text
+PDF opens with its source colors. In night mode, the paper, ink and surround
+take their hue and chroma from the page theme, including the graphite preset
+and the chroma setting. Reading brightness varies night paper lightness
+from 0.13 through 0.17 to 0.23. The ink keeps a fixed lightness so that the
+control adjusts the dark surface directly. A fixed PDF hue would defeat
+theme changes. Forced colors use Canvas and CanvasText and suppress wallpaper. An opaque text
 backing separates Session content from arbitrary colors in a user image.
 The stored Blend opacity sets the temporary activity panel's background mix
 in OKLCH. The panel text keeps its semantic ink color.

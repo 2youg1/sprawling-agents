@@ -10,6 +10,7 @@ import { fill, say, type Key } from "../../../core/lang";
 import type { Lang } from "../../../core/lang";
 import { storeValue } from "../../../core/solid_store";
 import { BRIGHTNESS, wallpaperSettings } from "../../../core/wallpaper";
+import Button from "../../parts/button.solid";
 import type { ContextTool } from "../../parts/context_tools";
 import Glyph from "../../parts/glyph.solid";
 import { short } from "../reading";
@@ -298,6 +299,8 @@ export function PdfReaderControls(props: {
   readonly first: number;
   readonly last: number;
   readonly total: number;
+  readonly night: boolean;
+  readonly onNight: () => void;
   readonly onLayout: (layout: PdfLayout) => void;
   readonly onScale: (scale: number) => void;
   readonly onTurn: (direction: number) => void;
@@ -369,6 +372,14 @@ export function PdfReaderControls(props: {
           </button>
         </div>
       </Show>
+      <div class="pdf-reader-night">
+        <Button
+          label={say(props.lang, "pdf_night")}
+          glyph="moon"
+          pressed={props.night}
+          onPress={props.onNight}
+        />
+      </div>
     </div>
   );
 }

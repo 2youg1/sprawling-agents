@@ -3,13 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 // Copyright (c) 2026 2youg1 and the sprawling contributors
 
-// The button's wiring as RefRain/spec/Views/Parts.lean §7-2 states it:
-// `aria-disabled` while loading or refused, `aria-busy` only while
-// loading, `aria-describedby` pointing at the hint that carries the
-// reason, and one guard that keeps a press from landing unless the
-// control is idle. These hold for any look that spreads the bag, which
-// is why the test imports no look.
-
 import { describe, expect, test } from "bun:test";
 
 import { lookOf, type ButtonProps } from "./button";
@@ -46,10 +39,23 @@ describe("button wiring", () => {
       "aria-busy": false,
       "aria-describedby": undefined,
       "aria-label": undefined,
+      "aria-pressed": undefined,
       onclick: undefined,
     });
     wire.onclick();
     expect(hand.presses()).toBe(1);
+  });
+
+  test("a toggle publishes both pressed states and uses the same activation", () => {
+    const hand = counted({ label: "Night mode" });
+    const off = lookOf({ ...hand.props, pressed: false });
+    const on = lookOf({ ...hand.props, pressed: true });
+    expect(off.label).toBe(on.label);
+    expect(off.wire(undefined)["aria-pressed"]).toBe("false");
+    expect(on.wire(undefined)["aria-pressed"]).toBe("true");
+    off.wire(undefined).onclick();
+    on.wire(undefined).onclick();
+    expect(hand.presses()).toBe(2);
   });
 
   test("a given name is what the control is read by, while the face stays the label", () => {

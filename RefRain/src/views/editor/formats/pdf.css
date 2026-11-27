@@ -46,7 +46,7 @@
   color: var(--color-text);
 }
 
-.pdf-control:is(:hover, [aria-pressed="true"]) {
+.pdf-control:hover {
   border-color: var(--color-accent);
 }
 
@@ -75,6 +75,10 @@
   font-variant-numeric: tabular-nums;
 }
 
+.pdf-reader-night {
+  margin-inline-start: auto;
+}
+
 .pdf-next-page > svg {
   transform: scaleX(-1);
 }
@@ -88,7 +92,16 @@
   overflow-anchor: none;
   scrollbar-gutter: stable;
   padding: var(--spacing-pane);
-  background: var(--pdf-surround, var(--color-reading-canvas));
+  background: var(--color-reading-canvas);
+}
+
+.pdf-view[data-layout="spread"] .pdf-scroll {
+  scrollbar-gutter: auto;
+  padding: var(--spacing-tight);
+}
+
+.pdf-view[data-night="true"] :is(.pdf-scroll, .pdf-zoom-scroll) {
+  background: var(--pdf-surround);
 }
 
 .pdf-pages {
@@ -99,18 +112,21 @@
   gap: var(--spacing-pane);
 }
 
-.pdf-pages[data-layout="spread"] {
+.pdf-view[data-layout="spread"] .pdf-pages {
   flex-direction: row;
-  justify-content: center;
-  align-items: start;
-  min-inline-size: max(100%, calc(2 * var(--pdf-page-width) + var(--spacing-pane)));
+  justify-content: safe center;
+  align-items: safe center;
+  inline-size: max-content;
+  min-inline-size: 100%;
+  min-block-size: 100%;
+  gap: var(--spacing-tight);
 }
 
-.pdf-pages[data-layout="continuous"] {
+.pdf-view[data-layout="continuous"] .pdf-pages {
   position: relative;
 }
 
-.pdf-pages[data-layout="continuous"] > .pdf-sheet {
+.pdf-view[data-layout="continuous"] .pdf-pages > .pdf-sheet {
   position: absolute;
   inset-inline: 0;
   margin-inline: auto;
@@ -121,7 +137,11 @@
   flex: none;
   inline-size: var(--pdf-page-width, 100%);
   overflow: clip;
-  background: var(--pdf-paper, var(--color-page));
+  background: var(--color-page);
+}
+
+.pdf-view[data-night="true"] .pdf-sheet {
+  background: var(--pdf-paper);
 }
 
 .pdf-pixels,
@@ -145,12 +165,16 @@
   block-size: 100%;
 }
 
-.pdf-clear {
-  filter: var(--pdf-tone-filter, none);
+.pdf-tone-paper {
+  flood-color: var(--pdf-paper);
 }
 
-.pdf-view[data-original="true"] .pdf-clear {
-  visibility: hidden;
+.pdf-tone-ink {
+  flood-color: var(--pdf-ink);
+}
+
+.pdf-view[data-night="true"] .pdf-original {
+  filter: var(--pdf-tone-filter);
 }
 
 .pdf-text-layer {

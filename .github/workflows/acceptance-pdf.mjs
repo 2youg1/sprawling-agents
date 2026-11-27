@@ -227,6 +227,7 @@ const navigation = (page) => page.locator("#workspace-navigation-key");
 const subject = (page) => page.locator("#workspace-subject-key");
 const surface = (page) => page.locator(".pdf-scroll");
 const sheet = (page, number) => page.locator(`.pdf-sheet[data-page="${number}"]`);
+const nightMode = (page) => page.getByRole("button", { name: english("pdf_night"), exact: true });
 
 async function sampledPaper(page, capture) {
   const paper = await sheet(page, 1).boundingBox();
@@ -554,15 +555,12 @@ async function openDocument(page, name, root) {
     );
   });
   await entry.click();
-  await sheet(page, 1).locator(".pdf-clear").waitFor();
+  await sheet(page, 1).locator('[data-pdf-quality="full"]').waitFor();
 }
 
 async function crop(page) {
   const current = sheet(page, 1);
-  await page.waitForFunction(() => {
-    const sheet = document.querySelector('.pdf-sheet[data-page="1"]');
-    return sheet?.querySelector(".pdf-original")?.width > sheet?.clientWidth;
-  });
+  await current.locator('[data-pdf-quality="full"]').waitFor();
   await keyboardTools(page);
   await pdfTool(page, "pdf_select_region").click();
   const box = await current.boundingBox();
@@ -661,12 +659,22 @@ try {
   await showRail(page, subject(page));
   await subject(page).click();
   await openDocument(page, PAPER, root);
+  assert.equal(await nightMode(page).getAttribute("aria-pressed"), "false");
+  const original = await sampledPaper(page, await page.screenshot());
+  assert.ok(original.margin.every((channel) => channel >= 245));
+  assert.ok(original.blue[2] >= 247 && original.blue[0] <= 8);
+  assert.ok(original.red[0] >= 247 && original.red[2] <= 8);
+  const sourceCanvas = await sheet(page, 1).locator(".pdf-original").elementHandle();
+  await nightMode(page).press("Space");
+  assert.equal(await nightMode(page).getAttribute("aria-pressed"), "true");
+  assert.ok(await sourceCanvas.evaluate((canvas) => canvas.isConnected));
   const dark = await page.screenshot({ path: join(output, "paper-page-width.png") });
   evidence.paper = await sampledPaper(page, dark);
   const [r, g, b] = evidence.paper.margin;
-  assert.ok(r < g && g < b && b < 42, "the default paper is cool and dark");
-  assert.ok(evidence.paper.blue[2] >= 247 && evidence.paper.blue[0] <= 8);
-  assert.ok(evidence.paper.red[0] >= 247 && evidence.paper.red[2] <= 8);
+  assert.ok(Math.max(r, g, b) < 42, "night mode darkens the PDF paper");
+  for (const pixel of [evidence.paper.blue, evidence.paper.red]) {
+    assert.ok(Math.max(...pixel) - Math.min(...pixel) < 30, "night pixels share the theme tint");
+  }
   await keyboardTools(page);
   await toolRow(page, "original").focus();
   await page.keyboard.down("Space");
@@ -721,25 +729,18 @@ try {
   await brightness.waitFor();
   const raster = await sheet(page, 1).locator(".pdf-original").elementHandle();
   assert.ok(raster);
-  const mapped = await sheet(page, 1).locator(".pdf-clear").elementHandle();
-  assert.ok(mapped);
-  const oldFilter = await page.locator(".pdf-tone-map feFuncR").getAttribute("tableValues");
+  const paperTone = page.locator(".pdf-tone-paper");
+  const oldFilter = await paperTone.evaluate((node) => getComputedStyle(node).floodColor);
   const previousLight = await brightness.inputValue();
   await brightness.press("End");
   assert.notEqual(await brightness.inputValue(), previousLight);
   await page.waitForFunction(
-    (initial) =>
-      document.querySelector(".pdf-tone-map feFuncR")?.getAttribute("tableValues") !== initial,
+    (initial) => getComputedStyle(document.querySelector(".pdf-tone-paper")).floodColor !== initial,
     oldFilter,
   );
   assert.ok(
     await raster.evaluate(
       (canvas) => canvas === document.querySelector('.pdf-sheet[data-page="1"] .pdf-original'),
-    ),
-  );
-  assert.ok(
-    await mapped.evaluate(
-      (canvas) => canvas === document.querySelector('.pdf-sheet[data-page="1"] .pdf-clear'),
     ),
   );
   const apply = objectTools(page).getByRole("button", { name: english("wallpaper_apply") });
@@ -876,6 +877,20 @@ try {
       .evaluateAll((pages) => pages.map((page) => Number(page.dataset.page)));
   await layout.selectOption("spread");
   assert.deepEqual(await shownPages(), [3, 4]);
+  await surface(restored).evaluate((view) => {
+    const viewport = view.getBoundingClientRect();
+    for (const page of view.querySelectorAll(".pdf-sheet")) {
+      const { top, right, bottom, left } = page.getBoundingClientRect();
+      if (
+        top < viewport.top ||
+        right > viewport.right ||
+        bottom > viewport.bottom ||
+        left < viewport.left ||
+        view.scrollHeight > view.clientHeight
+      )
+        throw new Error("The fitted book spread must be fully visible without scrolling");
+    }
+  });
   const fitted = await sheet(restored, 3).boundingBox();
   assert.ok(fitted);
   const scale = restored.getByRole("slider", { name: english("pdf_reader_scale") });
@@ -961,6 +976,7 @@ try {
       scroller.scrollTop += row.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
     });
     await scanned.locator('.pdf-original[data-pdf-quality="full"]').waitFor();
+    await nightMode(restored).click();
     evidence.scan = {
       sha256: createHash("sha256").update(scan).digest("hex"),
       position: await position(restored),

@@ -25,6 +25,32 @@ export function numbered(pageList: HTMLElement, page: number): HTMLElement | nul
   return pageList.querySelector(`.pdf-sheet[data-page="${String(page)}"]`);
 }
 
+export function pdfViewport(view: HTMLElement, pages: HTMLElement, layout: PdfLayout) {
+  const style = getComputedStyle(view);
+  const pagesStyle = getComputedStyle(pages);
+  const paddingTop = Number.parseFloat(style.paddingTop);
+  const spread = layout === "spread";
+  return {
+    width:
+      (spread ? view.offsetWidth : view.clientWidth) -
+      Number.parseFloat(style.paddingLeft) -
+      Number.parseFloat(style.paddingRight),
+    height: spread
+      ? view.offsetHeight - paddingTop - Number.parseFloat(style.paddingBottom)
+      : view.clientHeight,
+    paddingTop,
+    gap: Number.parseFloat(spread ? pagesStyle.columnGap : pagesStyle.rowGap) || 0,
+  };
+}
+
+export function bookPageWidth(
+  { width, height, gap }: ReturnType<typeof pdfViewport>,
+  ratios: readonly number[],
+): number {
+  const horizontal = (width - (ratios.length - 1) * gap) / ratios.length;
+  return Math.min(horizontal, height / Math.max(...ratios));
+}
+
 const FALLBACK: Size = { width: 595, height: 842 };
 
 function lowBit(value: number): number {

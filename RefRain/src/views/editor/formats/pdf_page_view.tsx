@@ -27,17 +27,6 @@ interface PageProps {
   readonly cache?: PdfRasterCache;
 }
 
-function enhanced(bitmap: ImageBitmap): HTMLCanvasElement {
-  const canvas = document.createElement("canvas");
-  canvas.width = bitmap.width;
-  canvas.height = bitmap.height;
-  const context = canvas.getContext("bitmaprenderer");
-  if (context === null) canvas.getContext("2d")?.drawImage(bitmap, 0, 0);
-  else context.transferFromImageBitmap(bitmap);
-  bitmap.close();
-  return canvas;
-}
-
 export function PdfPage(props: PageProps) {
   let pixels: HTMLDivElement | undefined;
   let words: HTMLDivElement | undefined;
@@ -72,7 +61,6 @@ export function PdfPage(props: PageProps) {
         } else release();
         visible = { page: number, width, raster };
         surface.replaceChildren(raster.original);
-        if (raster.clear !== null) surface.append(raster.clear);
         props.onReady?.(width, raster.full ? "full" : "preview");
       };
       const cameBack = props.cache?.take(number, width);
@@ -84,13 +72,10 @@ export function PdfPage(props: PageProps) {
         detail: props.detailDocument,
         number,
         width,
-        present: (original, tones, full) => {
+        present: (original, full) => {
           original.className = "pdf-original";
           if (full) original.dataset.pdfQuality = "full";
-          const clear =
-            tones instanceof HTMLCanvasElement || tones === null ? tones : enhanced(tones);
-          if (clear !== null) clear.className = "pdf-clear";
-          display({ original, full, clear });
+          display({ original, full });
         },
         measure: (size) => {
           props.measured?.(size);
