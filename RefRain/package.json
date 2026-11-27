@@ -7,10 +7,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "typecheck": "bun check --no-script",
     "lint": "oxlint --type-aware --deny-warnings src swap scripts",
-    "test": "bun test --conditions=browser",
-    "fmt": "cd .. && bun fmt"
+    "test": "bun test --conditions=browser"
   },
   "dependencies": {
     "@codemirror/commands": "^6.11.1",

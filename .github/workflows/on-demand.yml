@@ -256,7 +256,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npx --yes @puppeteer/browsers install chrome-headless-shell@stable --path "$RUNNER_TEMP/engines"
+          bun x --bun @puppeteer/browsers install chrome-headless-shell@stable --path "$RUNNER_TEMP/engines"
           shell=$(find "$RUNNER_TEMP/engines" -type f -name 'chrome-headless-shell.exe' | head -n 1)
           test -n "$shell"
           echo "SPRAWLING_BROWSER=$shell" >> "$GITHUB_ENV"
@@ -622,7 +622,7 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/acceptance-browser"
           bun add --cwd "$RUNNER_TEMP/acceptance-browser" playwright@1.58.2
-          "$RUNNER_TEMP/acceptance-browser/node_modules/.bin/playwright" install chromium
+          bun "$RUNNER_TEMP/acceptance-browser/node_modules/playwright/cli.js" install chromium
           module="$RUNNER_TEMP/acceptance-browser/node_modules/playwright/index.mjs"
           ! command -v cygpath > /dev/null 2>&1 || module="$(cygpath -m "$module")"
           echo "PLAYWRIGHT_MODULE=$module" >> "$GITHUB_ENV"

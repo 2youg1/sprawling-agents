@@ -321,7 +321,7 @@ export function readRunId(raw: string): Option.Option<RunId>;  // 地址栏与�
 
 ### §4 设计
 
-- **4-1 Bun 检查 TypeScript 和 Solid JSX。** `bun run typecheck` 运行 `bun check --no-script`，按本工程的严格 tsconfig 检查领域模块、视图、替代外观及构建配置，类型错误阻止交付。
+- **4-1 Bun 检查 TypeScript 和 Solid JSX。** `bun check` 按本工程的严格 tsconfig 检查领域模块、视图、替代外观及构建配置，类型错误阻止交付。
 - **4-2 使用浏览器条件运行测试。** `bun run test` 传给 Bun `--conditions=browser`。测试读取 `@solidjs/web` 的 `isServer`，验证解析到浏览器运行时。
 - **4-3 hash 路由，不用 path 路由。** 片段不发给服务端，书签、后退、深链成立，且不动 `ClientAssets::lookup` 那道安全判定。
 - **4-4 身份值只由生成的 `Schema` 产出，`as` 全库禁用。** `Address` 与 `RunId` 是 `wire.ts` 里带 pattern 的 brand，判合法只有一条路：`Schema.decodeOption`，非法值答 `None`，与 Rust 的 `Result` 同形（`core/run_id.ts` 是 run id 那条判定的唯一家）。`as` 全库禁用（`as const` 除外），所以「新类型」只能由构造器产出；`make` 是 brand 的构造器，供本文已经写对的字面量用（`MAYOR` 与夹具），它不查 pattern。
@@ -1358,7 +1358,7 @@ end PdfReading
 | oxlint、oxlint-tsgolint、eslint-plugin-solid | 类型感知的 Oxlint 及官方 Solid 2 规则 |
 | @types/bun | `bun:test` 的类型，仅测试文件用 |
 
-脚本：`dev`、`build` 走 Vite（`base: ./`），`typecheck` 走 Bun，`lint` 走类型感知的 Oxlint，`test` 固定浏览器条件。`src/vite-env.d.ts` 提供构建环境与资源导入的类型。
+脚本：`dev`、`build` 由 Bun 运行 Vite（`base: ./`），`lint` 由 Bun 启动类型感知的 Oxlint，`test` 固定浏览器条件。类型检查直接运行 `bun check`，格式化从仓库根目录运行 `bun fmt`。`RefRain/bunfig.toml` 的 `run.bun` 让包的 Node shebang 也由 Bun 执行，使本地开发与构建使用同一个运行时。`src/vite-env.d.ts` 提供构建环境与资源导入的类型。
 
 ### §7-9 一个库进来要满足的条件
 
@@ -1389,7 +1389,7 @@ end PdfReading
 
 /-! ## 16 测试与约束
 
-模型由 `just models`（`lake build`，无 `sorry`、`admit` 或 `axiom`）证明。实现与模型的对应由客户端自己的测试判：`just check-client` 跑 `bun run lint`、`bun run typecheck` 与 `bun run test`。画出来的页面由 `cargo xtask render` 在真引擎里量 `#/gallery`（`Tools/xtask/Spec.lean` §8-13），颜色、字句、动效与体积各有自己的门（`xtask color`、`wording`、`motion`、`budget`）。键表今天没有一次按键进过真引擎（§7-10）：模型证明的是规格自洽，`bun test` 判的是实现里不碰 DOM 的那一半，其余由人按 `docs/frontend-method.md` 的走查判。
+模型由 `just models`（`lake build`，无 `sorry`、`admit` 或 `axiom`）证明。实现与模型的对应由客户端自己的测试判：`just check-client` 跑 `bun run lint`、`bun check` 与 `bun run test`。画出来的页面由 `cargo xtask render` 在真引擎里量 `#/gallery`（`Tools/xtask/Spec.lean` §8-13），颜色、字句、动效与体积各有自己的门（`xtask color`、`wording`、`motion`、`budget`）。键表今天没有一次按键进过真引擎（§7-10）：模型证明的是规格自洽，`bun test` 判的是实现里不碰 DOM 的那一半，其余由人按 `docs/frontend-method.md` 的走查判。
 -/
 
 /-! ## 17 文档关系

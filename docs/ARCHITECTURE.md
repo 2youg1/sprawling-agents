@@ -28,7 +28,7 @@ One process serves one page, and the page is inside the binary rather than
 beside it: `Sprawling/app/build.rs` compresses `Sprawling/app/web-dist` and emits
 an `include_bytes!` entry per file, so a server that started has no asset
 directory left to lose. The page is `RefRain/`: Solid 2 and Effect, bundled by
-Vite and driven by bun (§2).
+Vite running on Bun (§2).
 
 **The wire is the seam, not the language.** A second client written against
 `wire::frames` in any language is a supported thing to build; what the
@@ -95,7 +95,7 @@ every week.
 | Inbound WebSocket | `axum` with its `ws` feature (`Sprawling/wire/Cargo.toml`) | It carries the WebSocket implementation itself, so the served protocol has one version authority rather than two. |
 | Outbound WebSocket | `tokio-tungstenite`, no default features | A client rather than a server: it drives the browser over WebDriver BiDi and is what an integration test speaks the wire with. TLS termination is deliberately not here — a face reachable beyond this machine refuses to serve without a credential, so certificates stay the proxy's (`Sprawling/wire/Spec.lean` §8-41). |
 | HTTP client | `reqwest`, blocking, `rustls`, no default features | One client for the whole workspace: providers and HTTP-reached MCP servers. Two clients would mean two TLS stacks in one binary. The TLS backend is aws-lc-rs, installed once by `gateway::reach::tls`. |
-| Client | Solid 2 and Effect, bundled by Vite 8 and driven by Bun | Its runtime dependencies are exactly the list `RUNTIME` in `Tools/xtask/src/npm.rs`, each admitted under `RefRain/Spec.lean` §7-9, with Solid as the rendering runtime. Solid compiles the JSX views; Effect decodes the wire with `Schema` and carries the client's few effectful steps. Cost: a JavaScript toolchain has to be present to build the page the binary embeds. |
+| Client | Solid 2 and Effect, bundled by Vite 8 running on Bun | Its runtime dependencies are exactly the list `RUNTIME` in `Tools/xtask/src/npm.rs`, each admitted under `RefRain/Spec.lean` §7-9, with Solid as the rendering runtime. Solid compiles the JSX views. Effect decodes the wire with `Schema` and carries the client's few effectful steps. Building the page the binary embeds requires Bun. |
 | History | JSONL segments, appended, chain-verified | A history a person can read with `tail` and a machine can verify byte by byte. Cost: the Ledger's throughput is the city's throughput (§11). |
 | Content store | BLAKE3 | One hash for the whole library: content addressing and `IdemKey` derivation. Identical content is stored once. |
 | Restoration | `git2`, vendored libgit2 | Each project owns a private Git object database, and each run owns its working files, index and checkpoint references. A discarded file points at the private commit containing its bytes. Cost: a C library in the tree, vendored so there is no system dependency. |
