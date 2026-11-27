@@ -96,6 +96,7 @@ test {
     _ = menu;
     _ = @import("termio.zig");
     _ = @import("screen.zig");
+    _ = @import("city_ui.zig");
     _ = @import("mei_command.zig");
     _ = @import("mei_effort.zig");
     _ = @import("mei_observation.zig");

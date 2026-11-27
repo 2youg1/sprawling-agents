@@ -10,7 +10,7 @@ pub const scene = @import("scene.zig");
 pub const text = @import("text.zig");
 pub const viewport = @import("viewport.zig");
 const frame = @import("frame.zig");
-const quiet = @import("quiet.zig");
+pub const quiet = @import("quiet.zig");
 
 pub const Drawn = extern struct {
     written: usize,
@@ -44,6 +44,7 @@ fn draw(out: *std.Io.Writer, r: *scene.Reader) frame.Error!frame.Left {
 test {
     _ = @import("scene.zig");
     _ = write;
+    _ = quiet;
     _ = @import("text.zig");
     _ = @import("paint.zig");
     _ = @import("flow.zig");

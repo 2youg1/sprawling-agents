@@ -279,13 +279,14 @@ pub const Ui = struct {
 
     fn handleEvent(self: *Ui, event: termio.Event) ?u8 {
         switch (event) {
-            .key => |key| return self.onKey(key),
+            .key => |key| if (key.phase != .release) return self.onKey(key),
             .paste => |pasted| {
                 self.editor.paste(pasted) catch {};
                 self.refilter();
                 self.touch(true);
             },
             .resize => self.noteResize(),
+            .keyboard_flags, .focus_lost => {},
             .lost => {
                 self.lost = true;
                 runtime.stop(self);

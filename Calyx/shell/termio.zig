@@ -12,7 +12,8 @@ pub const Modifiers = packed struct(u8) {
     control: bool = false,
     alt: bool = false,
     shift: bool = false,
-    _pad: u5 = 0,
+    other: bool = false,
+    _pad: u4 = 0,
 };
 
 pub const Code = union(enum) {
@@ -23,6 +24,7 @@ pub const Code = union(enum) {
     delete,
     tab,
     back_tab,
+    control,
     left,
     right,
     up,
@@ -34,9 +36,14 @@ pub const Code = union(enum) {
     unknown,
 };
 
+pub const KeyPhase = enum { press, repeat, release };
+
 pub const Key = struct {
     code: Code,
     modifiers: Modifiers = .{},
+    phase: KeyPhase = .press,
+    tracks_hold: bool = false,
+    base_layout: ?u21 = null,
 };
 
 pub const Size = struct { columns: u16, rows: u16 };
@@ -45,6 +52,8 @@ pub const Event = union(enum) {
     key: Key,
     paste: []const u8,
     resize: Size,
+    keyboard_flags: u16,
+    focus_lost,
     lost,
 };
 
@@ -66,7 +75,8 @@ var alternate: bool = false;
 var resize_armed: bool = false;
 var pending_unit: u16 = 0;
 var mouse_held: bool = false;
-var sgr_drop_until: i64 = 0;
+var windows_g_held: bool = false;
+var sgr_drop_until: u64 = 0;
 var winch_read: if (is_windows) void else posix.fd_t = if (is_windows) {} else -1;
 var winch_write: if (is_windows) void else posix.fd_t = if (is_windows) {} else -1;
 
@@ -174,6 +184,30 @@ pub fn plainKeyboard() Error!void {
     if (protocols.bracketed_paste) try writeAll("\x1b[?2004l");
 }
 
+const quiet_release_flags = 11;
+const quiet_keyboard_flags = quiet_release_flags | 4;
+
+pub fn quietKeyReleases(flags: u16) bool {
+    return is_windows or flags & quiet_release_flags == quiet_release_flags;
+}
+
+pub fn enterQuietInput() Error!void {
+    windows_g_held = false;
+    if (inputProtocols(activeInputBackend()).kitty_keyboard) {
+        try writeAll(std.fmt.comptimePrint("\x1b[>{d}u\x1b[?u\x1b[?1004h", .{quiet_keyboard_flags}));
+    }
+    try trackPointer();
+}
+
+pub fn leaveQuietInput() Error!void {
+    const pointer_result = untrackPointer();
+    const keyboard_result = if (inputProtocols(activeInputBackend()).kitty_keyboard)
+        writeAll("\x1b[?1004l\x1b[<u")
+    else {};
+    try pointer_result;
+    return keyboard_result;
+}
+
 pub fn trackPointer() Error!void {
     mouse_held = false;
     if (inputProtocols(activeInputBackend()).sgr_mouse) try writeAll("\x1b[?1002h\x1b[?1006h");
@@ -200,13 +234,34 @@ pub fn copySelection(gpa: std.mem.Allocator, io: std.Io, environ: *const std.pro
         child.stdin = null;
         if (!(try child.wait(io)).success()) return error.ClipboardUnavailable;
     } else {
-        const encoder = std.base64.standard.Encoder;
-        const encoded = try gpa.alloc(u8, encoder.calcSize(selection.len));
-        defer gpa.free(encoded);
-        const sequence = try std.fmt.allocPrint(gpa, "\x1b]52;c;{s}\x1b\\", .{encoder.encode(encoded, selection)});
-        defer gpa.free(sequence);
-        try writeAll(sequence);
+        try copyOsc52(gpa, selection);
     }
+}
+
+pub fn copyPairingCode(code: *const [32]u8) !void {
+    if (is_windows) {
+        var utf16: [33]u16 = undefined;
+        for (code, utf16[0..32]) |byte, *unit| unit.* = byte;
+        utf16[32] = 0;
+        try WinApi.copyUnicode(&utf16);
+    } else {
+        var bytes: [64]u8 = undefined;
+        var scratch = std.heap.FixedBufferAllocator.init(&bytes);
+        try copyOsc52(scratch.allocator(), code);
+    }
+}
+
+fn copyOsc52(gpa: std.mem.Allocator, selection: []const u8) !void {
+    const prefix = "\x1b]52;c;";
+    const suffix = "\x1b\\";
+    const encoder = std.base64.standard.Encoder;
+    const payload_end = prefix.len + encoder.calcSize(selection.len);
+    const sequence = try gpa.alloc(u8, payload_end + suffix.len);
+    defer gpa.free(sequence);
+    @memcpy(sequence[0..prefix.len], prefix);
+    _ = encoder.encode(sequence[prefix.len..payload_end], selection);
+    @memcpy(sequence[payload_end..], suffix);
+    try writeAll(sequence);
 }
 
 pub fn setTitle(title: []const u8) Error!void {
@@ -264,7 +319,7 @@ fn finishParse(buf: []u8, filled: *usize) Error!?Event {
             }
             const lone = filled.* == 1 and buf[0] == 0x1b;
             if (!lone and std.mem.startsWith(u8, buf[0..filled.*], "\x1b[<")) {
-                sgr_drop_until = nowMs() + 50;
+                sgr_drop_until = monotonicMs() + 50;
             }
             filled.* = 0;
             if (lone) return .{ .key = .{ .code = .esc } };
@@ -312,7 +367,7 @@ fn takeParsed(buf: []u8, filled: *usize) ?Event {
 
 fn dropPendingSgr(buf: []u8, filled: *usize) void {
     if (sgr_drop_until == 0) return;
-    if (nowMs() > sgr_drop_until) {
+    if (monotonicMs() > sgr_drop_until) {
         sgr_drop_until = 0;
         return;
     }
@@ -394,6 +449,7 @@ fn readEventWindows() Error!?Event {
     const KEY_EVENT: u16 = 1;
     const MOUSE_EVENT: u16 = 2;
     const WINDOW_BUFFER_SIZE_EVENT: u16 = 4;
+    const FOCUS_EVENT: u16 = 16;
     const KeyRecord = extern struct {
         down: i32,
         repeat: u16,
@@ -416,6 +472,7 @@ fn readEventWindows() Error!?Event {
             key: KeyRecord,
             mouse: MouseRecord,
             size: extern struct { x: i16, y: i16 },
+            focused: i32,
         },
     };
     const ReadConsoleInputW = struct {
@@ -449,13 +506,10 @@ fn readEventWindows() Error!?Event {
             } } } };
         },
         KEY_EVENT => {
-            if (record.event.key.down == 0) return null;
-            return windowsKeyEvent(
-                record.event.key.virtual_key,
-                record.event.key.unicode,
-                record.event.key.control,
-            );
+            const key = record.event.key;
+            return windowsKeyRecord(key.virtual_key, key.unicode, key.control, key.down != 0, &windows_g_held);
         },
+        FOCUS_EVENT => return windowsFocusRecord(record.event.focused != 0, &windows_g_held),
         else => return null,
     }
 }
@@ -591,6 +645,37 @@ fn windowsKeyEvent(virtual_key: u16, unit: u16, control: u32) ?Event {
     return .{ .key = .{ .code = code, .modifiers = mods } };
 }
 
+fn windowsFocusRecord(focused: bool, g_held: *bool) ?Event {
+    g_held.* = false;
+    return if (focused) null else .focus_lost;
+}
+
+fn windowsKeyRecord(virtual_key: u16, unit: u16, control: u32, down: bool, g_held: *bool) ?Event {
+    const control_down = control & 0x000c != 0;
+    if (virtual_key == 'G') {
+        const was_held = g_held.*;
+        g_held.* = down;
+        if (!down) return .{ .key = .{ .code = .{ .char = 'g' }, .phase = .release } };
+        if (control_down) {
+            return .{ .key = .{
+                .code = .{ .char = 'g' },
+                .modifiers = .{ .control = true, .alt = control & 0x0003 != 0, .shift = control & 0x0010 != 0 },
+                .phase = if (was_held) .repeat else .press,
+                .tracks_hold = true,
+            } };
+        }
+    }
+    if (down) return windowsKeyEvent(virtual_key, unit, control);
+    return switch (virtual_key) {
+        0x11, 0xa2, 0xa3 => .{ .key = .{
+            .code = .control,
+            .modifiers = .{ .control = control_down },
+            .phase = .release,
+        } },
+        else => null,
+    };
+}
+
 fn utf16Unit(pending: *u16, unit: u16) ?u21 {
     if (unit >= 0xD800 and unit <= 0xDBFF) {
         pending.* = unit;
@@ -614,11 +699,11 @@ fn controlLetter(unit: u16) ?u21 {
     return @as(u21, unit) | 0x60;
 }
 
-fn nowMs() i64 {
-    if (is_windows) return 0;
+pub fn monotonicMs() u64 {
+    if (is_windows) return WinApi.GetTickCount64();
     var ts: posix.timespec = undefined;
-    if (posix.errno(posix.system.clock_gettime(posix.CLOCK.REALTIME, &ts)) != .SUCCESS) return 0;
-    return @as(i64, ts.sec) * 1000 + @divTrunc(@as(i64, ts.nsec), std.time.ns_per_ms);
+    if (posix.errno(posix.system.clock_gettime(posix.CLOCK.MONOTONIC, &ts)) != .SUCCESS) return 0;
+    return @as(u64, @intCast(ts.sec)) * 1000 + @as(u64, @intCast(@divTrunc(ts.nsec, std.time.ns_per_ms)));
 }
 
 pub fn parseOne(input: []const u8, used: *usize) ?Event {
@@ -705,6 +790,7 @@ fn parseCsi(input: []const u8, used: *usize) ?Event {
             current = current *% 10 +% (c - '0');
             continue;
         }
+        if (c == '?' and i == 2) continue;
         if (c == ';' or c == ':') {
             if (param_i < params.len) {
                 params[param_i] = current;
@@ -720,35 +806,75 @@ fn parseCsi(input: []const u8, used: *usize) ?Event {
         }
         used.* = i + 1;
         const mods = modifiersFromParam(if (param_i >= 2) params[1] else 0);
+        const phase = if (param_i >= 3 and std.mem.indexOfScalar(u8, input[2..i], ':') != null)
+            keyPhase(params[2]) orelse .press
+        else
+            .press;
         return switch (c) {
-            'A' => .{ .key = .{ .code = .up, .modifiers = mods } },
-            'B' => .{ .key = .{ .code = .down, .modifiers = mods } },
-            'C' => .{ .key = .{ .code = .right, .modifiers = mods } },
-            'D' => .{ .key = .{ .code = .left, .modifiers = mods } },
-            'H' => .{ .key = .{ .code = .home, .modifiers = mods } },
-            'F' => .{ .key = .{ .code = .end, .modifiers = mods } },
-            'Z' => .{ .key = .{ .code = .back_tab, .modifiers = .{ .shift = true } } },
-            '~' => .{ .key = .{ .code = codeFromTilde(params[0]), .modifiers = mods } },
+            'A' => .{ .key = .{ .code = .up, .modifiers = mods, .phase = phase } },
+            'B' => .{ .key = .{ .code = .down, .modifiers = mods, .phase = phase } },
+            'C' => .{ .key = .{ .code = .right, .modifiers = mods, .phase = phase } },
+            'D' => .{ .key = .{ .code = .left, .modifiers = mods, .phase = phase } },
+            'H' => .{ .key = .{ .code = .home, .modifiers = mods, .phase = phase } },
+            'F' => .{ .key = .{ .code = .end, .modifiers = mods, .phase = phase } },
+            'Z' => .{ .key = .{ .code = .back_tab, .modifiers = .{ .shift = true }, .phase = phase } },
+            '~' => .{ .key = .{ .code = codeFromTilde(params[0]), .modifiers = mods, .phase = phase } },
             't' => blk: {
                 if (params[0] == 8 and param_i >= 3) {
                     break :blk .{ .resize = .{ .rows = params[1], .columns = params[2] } };
                 }
                 break :blk .{ .key = .{ .code = .unknown } };
             },
-            'u' => blk: {
-                if (params[0] == 27) {
-                    break :blk .{ .key = .{ .code = .esc, .modifiers = mods } };
-                }
-                break :blk .{ .key = .{
-                    .code = .{ .char = params[0] },
-                    .modifiers = mods,
-                } };
-            },
+            'O' => if (i == 2) .focus_lost else .{ .key = .{ .code = .unknown } },
+            'u' => parseKitty(input[2..i]),
             else => .{ .key = .{ .code = .unknown } },
         };
     }
     used.* = 0;
     return null;
+}
+
+fn parseKitty(fields: []const u8) Event {
+    const unknown: Event = .{ .key = .{ .code = .unknown } };
+    if (fields.len == 0) return unknown;
+    if (fields[0] == '?') {
+        const flags = std.fmt.parseInt(u16, fields[1..], 10) catch return unknown;
+        return .{ .keyboard_flags = flags };
+    }
+
+    var groups = std.mem.splitScalar(u8, fields, ';');
+    var code_parts = std.mem.splitScalar(u8, groups.next().?, ':');
+    const cp = std.fmt.parseInt(u21, code_parts.first(), 10) catch return unknown;
+    _ = code_parts.next();
+    const base_layout = if (code_parts.next()) |base| std.fmt.parseInt(u21, base, 10) catch null else null;
+    var mod_parts = std.mem.splitScalar(u8, groups.next() orelse "1", ':');
+    const modifier_field = mod_parts.next().?;
+    const mods = if (modifier_field.len == 0) 1 else std.fmt.parseInt(u16, modifier_field, 10) catch return unknown;
+    const kind = std.fmt.parseInt(u8, mod_parts.next() orelse "1", 10) catch return unknown;
+    const code: Code = switch (cp) {
+        9 => .tab,
+        13 => .enter,
+        27 => .esc,
+        127 => .backspace,
+        57442, 57448 => .control,
+        else => if (cp >= 32 and cp <= 0x10ffff and (cp < 0xd800 or cp > 0xdfff)) .{ .char = cp } else .unknown,
+    };
+    return .{ .key = .{
+        .code = code,
+        .modifiers = modifiersFromParam(mods),
+        .phase = keyPhase(kind) orelse return unknown,
+        .tracks_hold = true,
+        .base_layout = base_layout,
+    } };
+}
+
+fn keyPhase(kind: u16) ?KeyPhase {
+    return switch (kind) {
+        1 => .press,
+        2 => .repeat,
+        3 => .release,
+        else => null,
+    };
 }
 
 fn parseSgr(input: []const u8, used: *usize) ?Event {
@@ -804,6 +930,7 @@ fn modifiersFromParam(value: u16) Modifiers {
         .shift = bits & 1 != 0,
         .alt = bits & 2 != 0,
         .control = bits & 4 != 0,
+        .other = bits & 0x38 != 0,
     };
 }
 
@@ -868,6 +995,34 @@ const WinApi = if (is_windows) struct {
         hConsoleOutput: HANDLE,
         lpConsoleScreenBufferInfo: *CONSOLE_SCREEN_BUFFER_INFO,
     ) callconv(.winapi) BOOL;
+
+    extern "kernel32" fn GetTickCount64() callconv(.winapi) u64;
+    extern "kernel32" fn GetConsoleWindow() callconv(.winapi) ?std.os.windows.HWND;
+    extern "kernel32" fn GlobalAlloc(flags: u32, size: usize) callconv(.winapi) ?HANDLE;
+    extern "kernel32" fn GlobalFree(memory: HANDLE) callconv(.winapi) ?HANDLE;
+    extern "kernel32" fn GlobalLock(memory: HANDLE) callconv(.winapi) ?*anyopaque;
+    extern "kernel32" fn GlobalUnlock(memory: HANDLE) callconv(.winapi) BOOL;
+    extern "user32" fn OpenClipboard(owner: std.os.windows.HWND) callconv(.winapi) BOOL;
+    extern "user32" fn CloseClipboard() callconv(.winapi) BOOL;
+    extern "user32" fn EmptyClipboard() callconv(.winapi) BOOL;
+    extern "user32" fn SetClipboardData(format: u32, memory: HANDLE) callconv(.winapi) ?HANDLE;
+
+    fn copyUnicode(units: []const u16) !void {
+        const moveable = 2;
+        const unicode_text = 13;
+        const memory = GlobalAlloc(moveable, units.len * @sizeOf(u16)) orelse return error.ClipboardUnavailable;
+        errdefer _ = GlobalFree(memory);
+        const locked = GlobalLock(memory) orelse return error.ClipboardUnavailable;
+        const text: [*]u16 = @ptrCast(@alignCast(locked));
+        @memcpy(text[0..units.len], units);
+        _ = GlobalUnlock(memory);
+
+        const owner = GetConsoleWindow() orelse return error.ClipboardUnavailable;
+        if (!OpenClipboard(owner).toBool()) return error.ClipboardUnavailable;
+        defer _ = CloseClipboard();
+        if (!EmptyClipboard().toBool()) return error.ClipboardUnavailable;
+        _ = SetClipboardData(unicode_text, memory) orelse return error.ClipboardUnavailable;
+    }
 
     fn stdHandle(kind: DWORD) Error!HANDLE {
         const h = GetStdHandle(kind);
@@ -1056,14 +1211,14 @@ test "Windows raw input mode reads native window and mouse records" {
 }
 
 test "a discarded sgr tail stops at its terminator" {
-    sgr_drop_until = nowMs() + 1000;
+    sgr_drop_until = monotonicMs() + 1000;
     defer sgr_drop_until = 0;
     var buf = [_]u8{ ';', '6', 'M', 'a' };
     var filled: usize = buf.len;
     dropPendingSgr(&buf, &filled);
     try std.testing.expectEqual(@as(usize, 1), filled);
     try std.testing.expectEqual(@as(u8, 'a'), buf[0]);
-    try std.testing.expectEqual(@as(i64, 0), sgr_drop_until);
+    try std.testing.expectEqual(@as(u64, 0), sgr_drop_until);
 }
 
 test "a partial escape becomes esc only when it is a lone escape" {
@@ -1134,14 +1289,53 @@ test "seeded termio fuzz never traps" {
         }
         var used: usize = 0;
         const event = parseOne(buf[0..n], &used);
-        if (event) |ev| {
+        if (event != null) {
             try std.testing.expect(used > 0);
             try std.testing.expect(used <= n);
-            switch (ev) {
-                .key, .paste, .resize, .lost => {},
-            }
         } else {
             try std.testing.expectEqual(@as(usize, 0), used);
         }
     }
+}
+
+test "Kitty reports the chord, native modifiers, focus loss, and modified clicks" {
+    var used: usize = 0;
+    try std.testing.expectEqual(@as(u16, 11), parseOne("\x1b[?11u", &used).?.keyboard_flags);
+    try std.testing.expectEqual(@as(usize, 6), used);
+    try std.testing.expect(parseOne("\x1b[O", &used).? == .focus_lost);
+
+    const down = parseOne("\x1b[103;5u", &used).?.key;
+    try std.testing.expectEqual(@as(u21, 'g'), down.code.char);
+    try std.testing.expect(down.modifiers.control and down.phase == .press);
+    try std.testing.expect(parseOne("\x1b[103;5:2u", &used).?.key.phase == .repeat);
+    try std.testing.expect(parseOne("\x1b[103:71;5:3u", &used).?.key.phase == .release);
+    const cyrillic = parseOne("\x1b[1087::103;5u", &used).?.key;
+    try std.testing.expectEqual(@as(u21, 1087), cyrillic.code.char);
+    try std.testing.expectEqual(@as(?u21, 'g'), cyrillic.base_layout);
+    const up = parseOne("\x1b[57442;1:3u", &used).?.key;
+    try std.testing.expect(up.code == .control and up.phase == .release and !up.modifiers.control);
+    try std.testing.expect(parseOne("\x1b[13;5u", &used).?.key.code == .enter);
+    try std.testing.expect(parseOne("\x1b[1;5:3A", &used).?.key.phase == .release);
+    const click = parseOne("\x1b[<16;6;7M", &used).?.key.code.click;
+    try std.testing.expect(click.button == 16 and click.column == 6 and click.row == 7 and !click.release);
+}
+
+test "Windows G repeats stay repeats when Control is released and pressed again" {
+    var held = false;
+    const down = windowsKeyRecord('G', 7, 8, true, &held).?.key;
+    try std.testing.expect(down.code.char == 'g' and down.phase == .press and down.modifiers.control);
+    try std.testing.expect(windowsKeyRecord('G', 7, 8, true, &held).?.key.phase == .repeat);
+    try std.testing.expect(windowsKeyRecord(0x11, 0, 0, false, &held).?.key.code == .control);
+    try std.testing.expect(windowsKeyRecord('G', 7, 8, true, &held).?.key.phase == .repeat);
+    try std.testing.expect(windowsKeyRecord('G', 0, 8, false, &held).?.key.phase == .release);
+    try std.testing.expect(windowsKeyRecord('G', 7, 8, true, &held).?.key.phase == .press);
+}
+
+test "Windows focus changes discard a G hold whose release was missed" {
+    var held = false;
+    try std.testing.expect(windowsKeyRecord('G', 7, 8, true, &held).?.key.phase == .press);
+    try std.testing.expect(windowsFocusRecord(false, &held).? == .focus_lost);
+    try std.testing.expect(!held);
+    try std.testing.expect(windowsFocusRecord(true, &held) == null);
+    try std.testing.expect(windowsKeyRecord('G', 7, 8, true, &held).?.key.phase == .press);
 }
