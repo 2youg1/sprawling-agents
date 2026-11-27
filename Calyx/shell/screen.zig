@@ -63,7 +63,7 @@ pub const Screen = struct {
         const erased = self.frameEntries(&.{}, null);
         termio.plainKeyboard() catch {};
         self.setStyle(.default) catch {};
-        _ = self.writeSlice("\x1b[?25h");
+        termio.writeAll("\x1b[?25h") catch {};
         termio.disableRaw() catch {};
         return worst(worst(left, erased), if (self.lost) .lost else .shown);
     }

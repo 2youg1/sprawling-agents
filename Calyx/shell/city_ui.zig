@@ -680,7 +680,7 @@ const Ui = struct {
     }
 
     fn giveBack(self: *Ui, code: i32) i32 {
-        if (!self.dry and !self.lost) _ = self.screen.giveBack();
+        if (!self.dry) _ = self.screen.giveBack();
         return code;
     }
 };
