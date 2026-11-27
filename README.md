@@ -16,7 +16,9 @@
 
 <a name="what-it-does"></a>
 
-Give a team a place to work. In Sprawling, a workspace is a city: projects live in buildings, agents work in rooms, and a handoff is a file you can open. Drop in to see what changed, rather than staying in the chat to keep work moving.
+## What you can do
+
+Give a team a place to work. In Sprawling, a workspace is a city where projects live in buildings, agents work in rooms, and handoffs stay in files you can open. Drop in to see what changed while you were away.
 
 - **Set the rules in your own files.** Own the prompts, write boundaries and review rules. Choose where an agent can work before the run starts.
 - **Follow the work all the way back.** Look from a Git commit to the run, its prompt, tool results and evidence. Verify and replay the Ledger offline without calling the model again.
@@ -31,19 +33,21 @@ This source tree is at <!-- xtask:begin workspace_version -->0.18.3<!-- xtask:en
 
 ## Quick start
 
-With Bun installed, run:
+1. Install Sprawling with Bun.
 
-```sh
-bun install --global sprawling@latest
-```
+   ```sh
+   bun install --global sprawling@latest
+   ```
 
-Open a new terminal. If `sprawling` is not found, run `bun pm bin --global` and add the reported directory to `PATH`. Then run:
+2. Open a new terminal and start your first city. If `sprawling` is not found, run `bun pm bin --global` and add the reported directory to `PATH`.
 
-```sh
-sprawling up ./cities/first
-```
+   ```sh
+   sprawling up ./cities/first
+   ```
 
-In the browser, connect a model provider, select a model for `main`, and give the Mayor a first task. The terminal starts as the quiet host. Press Esc to enter the CLI, then type `/web` to reopen the page and return to the quiet host, or `/quit` to stop the city. The [installation guide](docs/start/getting-started.md#1-install) also covers standalone installers, prebuilt archives and release verification.
+3. In the browser, connect a model provider, select a model for `main`, and give the Mayor a first task.
+
+The terminal starts as the quiet host. Press Esc to enter the CLI, then type `/web` to reopen the page and return to the quiet host, or `/quit` to stop the city. For standalone installers and prebuilt archives, see the [installation and release verification guide](docs/start/getting-started.md#1-install).
 
 <a name="projects"></a>
 
@@ -60,9 +64,23 @@ In the browser, connect a model provider, select a model for `main`, and give th
 
 ## Documentation
 
-- [Getting started](docs/start/getting-started.md) ([简体中文](docs/start/getting-started.zh-CN.md)) and the [documentation index](docs/README.md).
-- [Operating a city](docs/operate/operating.md), [integrating tools and agents](docs/integrate/integrations.md), and [architecture](docs/ARCHITECTURE.md).
-- [Contribution guide](docs/CONTRIBUTING.md), [agent instructions](AGENTS.md), and [reading guide for models](LLM.md).
-- <a name="sources-and-credits"></a> [Release history](docs/CHANGELOG.md), [security reporting](docs/SECURITY.md), and [credits and licences](docs/third-party.md).
-- <a name="why-i-built-this"></a> [Project background](Sprawling/background.md)
+[Documentation index](docs/README.md) · [Documentation for models](LLM.md)
+
+### Use and extend Sprawling
+
+- [Getting started](docs/start/getting-started.md) · [简体中文](docs/start/getting-started.zh-CN.md)
+- [Operating a city](docs/operate/operating.md)
+- [Integrating tools and agents](docs/integrate/integrations.md) · [CLI and wire reference](docs/wire.md)
+
+### Contribute
+
+- [Architecture](docs/ARCHITECTURE.md) · [Contribution guide](docs/CONTRIBUTING.md) · [Repository agent instructions](AGENTS.md)
+
+<a name="sources-and-credits"></a>
+
+## Releases and project information
+
+- [Release history](docs/CHANGELOG.md)
 - <a name="code-signing-policy"></a> [Release verification and code signing](docs/start/getting-started.md#select-and-verify-a-version)
+- [Security reporting](docs/SECURITY.md) · [Credits and licences](docs/third-party.md)
+- <a name="why-i-built-this"></a> [Project background](Sprawling/background.md)
