@@ -109,6 +109,7 @@ test "a forty-column quiet host explains opening and renders a code only when re
     var output: std.Io.Writer = .fixed(&bytes);
     try quiet(&output, &input);
     try std.testing.expect(std.mem.indexOf(u8, output.buffered(), code) != null);
+    try std.testing.expect(std.mem.indexOf(u8, output.buffered(), "Enter: open WebUI") != null);
 }
 
 test "narrow quiet host instructions leave room for the existing key" {

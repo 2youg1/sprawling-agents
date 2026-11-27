@@ -44,6 +44,7 @@ fn draw(out: *std.Io.Writer, r: *scene.Reader) frame.Error!frame.Left {
 test {
     _ = @import("scene.zig");
     _ = write;
+    _ = quiet;
     _ = @import("text.zig");
     _ = @import("paint.zig");
     _ = @import("flow.zig");
