@@ -399,7 +399,7 @@ D19（人的定规）：彩色令牌照旧只落在主轴与它的补色上，�
 
 **`--bundle <dir>` 量另一个目录里的客户端包**，`<dir>` 相对仓库根。只有替换测试用它；不带时读 `crate::bundle::dist(root)`，§8-18「门与二进制打开同一个目录」不变。
 
-**替换测试 `just swap`**：①`bun run typecheck`，`RefRain/swap/` 在 tsconfig 里，替代外观必须满足它所替换的外观的 props 类型；②`RefRain/swap/` 里每个替代外观对应的 `RefRain/src/<同路径>.test.ts` 接线测试原样通过，缺这个文件即红；③`bun run build --config vite.swap.config.ts`，构建在 Vite 的 `resolveId` 钩子里、按解析之后的绝对路径把 `RefRain/src/<路径>.look.solid.tsx` 换成 `RefRain/swap/<同路径>.look.solid.tsx`，产物写进仓库根的 `target/swap-web`；`RefRain/swap/` 里没有外观、或某个替代外观一次也没被换进去（没有对应的外观，或没有座位 import 它）时构建失败；④`cargo xtask render --bundle target/swap-web`，全部性质加部件花名册；⑤`color` 与 `motion` 本来就走 `RefRain/swap/`（§8-8、§8-51）。`ci.yml` 的 `gates` 作业在 `gates-artifacts` 之后跑它。替代外观不进出货的 bundle，`artifact` 与 `packaged` 不受影响。
+**替换测试 `just swap`**：①`bun check`，`RefRain/swap/` 在 tsconfig 里，替代外观必须满足它所替换的外观的 props 类型；②`RefRain/swap/` 里每个替代外观对应的 `RefRain/src/<同路径>.test.ts` 接线测试原样通过，缺这个文件即红；③`bun run build --config vite.swap.config.ts`，构建在 Vite 的 `resolveId` 钩子里、按解析之后的绝对路径把 `RefRain/src/<路径>.look.solid.tsx` 换成 `RefRain/swap/<同路径>.look.solid.tsx`，产物写进仓库根的 `target/swap-web`；`RefRain/swap/` 里没有外观、或某个替代外观一次也没被换进去（没有对应的外观，或没有座位 import 它）时构建失败；④`cargo xtask render --bundle target/swap-web`，全部性质加部件花名册；⑤`color` 与 `motion` 本来就走 `RefRain/swap/`（§8-8、§8-51）。`ci.yml` 的 `gates` 作业在 `gates-artifacts` 之后跑它。替代外观不进出货的 bundle，`artifact` 与 `packaged` 不受影响。
 
 D37 **替换测试使用解析后的绝对路径。** `vite.swap.config.ts` 把与 `RefRain/swap/` 同路径的 Solid 外观换入，启用的每一个替代外观须实际进入产物。`just swap` 检查 props、原接线测试和该构建的渲染。替代产物写入 `target/swap-web`，二进制嵌入目录专供生产构建。
 

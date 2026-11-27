@@ -652,7 +652,7 @@ check-client: build-web client-checks
 # Bun checks the installed Solid JSX types and TypeScript sources.
 client-checks:
     bun Sprawling/city/skills/playback/assemble.js --check
-    cd RefRain && bun run lint && bun run typecheck && bun run test
+    cd RefRain && bun run lint && bun check && bun run test
 
 # The gate that opens the gallery in a real engine, on its own: roles,
 # accessible names, landmarks, one left edge, nothing outside its box.
@@ -687,7 +687,7 @@ swap:
         exit 1
     fi
     cd RefRain
-    bun run typecheck
+    bun check
     bun run test "${tests[@]}"
     bun run build --config vite.swap.config.ts
     cd ..

@@ -30,15 +30,18 @@ cargo run --locked -p sprawling -- up ./cities/first
 
 ## 开发与检查
 
-在 `RefRain/` 下使用项目固定的 Bun 版本。
+在 `RefRain/` 下使用项目固定的 Bun 版本。Bun 运行 Vite 和类型感知的 Oxlint，并直接完成类型检查、格式化和测试。
 
 ```sh
 bun install --frozen-lockfile
+bun run dev
 bun run lint
-bun run typecheck
+bun check
 bun run test
 bun run build
 ```
+
+从仓库根目录运行 `bun fmt`，使用全仓库的格式化配置。
 
 ## 会话发送验收
 

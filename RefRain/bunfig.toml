@@ -8,3 +8,6 @@
 # install takes what `bun.lock` pins, whatever its age.
 [install]
 minimumReleaseAge = 259200
+
+[run]
+bun = true

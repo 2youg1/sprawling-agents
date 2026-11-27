@@ -38,7 +38,7 @@ The host owns dispatch, authentication and persistent city state. RefRain uses t
 
 | Tool | Role |
 |---|---|
-| Bun 1.4.5 | Installs the locked dependency tree, builds and checks TypeScript, and runs the browser-condition tests. |
+| Bun 1.4.5 | Installs the locked dependency tree, runs Vite and Oxlint, checks TypeScript, formats sources, and runs the browser-condition tests. |
 | Solid 2 | Renders the workspace, document editor, conversation, administration, and gallery. |
 | Vite 8 | The official Solid plugin compiles one embedded client. Format engines and their assets load from that same origin. |
 | Native CSS | The theme publishes semantic roles and stylesheets, an explicit cascade, a responsive workspace grid and utility selectors used by existing looks. |
@@ -49,11 +49,14 @@ The host owns dispatch, authentication and persistent city state. RefRain uses t
 
 ```bash
 bun install --frozen-lockfile
+bun run dev        # Vite development server with Solid refresh
 bun run lint       # type-aware Oxlint with zero warnings allowed
-bun run typecheck  # TypeScript and Solid JSX
+bun check          # TypeScript and Solid JSX
 bun run test [file...]          # the logic next to what it judges
 bun run build      # production client for Rust to embed
 ```
+
+Run `bun fmt` from the repository root to use the shared formatter configuration.
 
 `cargo xtask gates` runs the gates that judge this directory from
 outside: `npm` (lockfile and licences), `wording` (every word from

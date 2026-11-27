@@ -205,7 +205,7 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/acceptance-browser"
           bun add --cwd "$RUNNER_TEMP/acceptance-browser" playwright@1.58.2
-          "$RUNNER_TEMP/acceptance-browser/node_modules/.bin/playwright" install chromium
+          bun "$RUNNER_TEMP/acceptance-browser/node_modules/playwright/cli.js" install chromium
           echo "PLAYWRIGHT_MODULE=$(cygpath -m "$RUNNER_TEMP/acceptance-browser/node_modules/playwright/index.mjs")" >> "$GITHUB_ENV"
       - name: Apply and restore through the page, read back with reg.exe
         shell: bash
