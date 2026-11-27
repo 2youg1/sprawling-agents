@@ -30,7 +30,9 @@ cargo run --locked -p sprawling -- up ./cities/first
 
 ## 开发与检查
 
-在 `RefRain/` 下使用项目固定的 Bun 版本。Bun 运行 Vite 和类型感知的 Oxlint，并直接完成类型检查、格式化和测试。
+CI 和 Nix 从 [package.json](package.json) 的 `packageManager` 读取 Bun 版本。Dependabot 通过 PR 提议依赖和锁文件更新，构建按已提交的锁文件安装。
+
+在 `RefRain/` 下使用该版本的 Bun。Bun 运行 Vite 和类型感知的 Oxlint，并直接完成类型检查、格式化和测试。
 
 ```sh
 bun install --frozen-lockfile

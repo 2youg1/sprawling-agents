@@ -16,10 +16,9 @@
 # in a change of its own, by `cargo update`, where the whole lockfile diff
 # is read at once.
 #
-# A version update waits out the platform's three-day cooldown, left at
-# its default because being the first machine to compile a fresh release
-# buys one day of freshness and carries the whole risk of a compromised
-# one. Security updates are switched on in the repository settings rather
+# A version update waits three days to avoid resolving a fresh release
+# before a compromised publication can be withdrawn.
+# Security updates are switched on in the repository settings rather
 # than here, and they ignore the cooldown, so a vulnerability fix is never
 # delayed by it. Dependabot's finest interval is daily and there is no
 # event trigger; a webhook-fired updater would be a second mechanism with
@@ -34,15 +33,6 @@
 # Crates that must move together are one group, and each group is listed
 # before the catch-all `patch-and-minor`, because an update joins the
 # first group it matches.
-#
-# The JavaScript side of the tree is `RefRain/`, whose dependencies bun
-# resolves into `RefRain/bun.lock`. No entry covers it yet: Dependabot's bun
-# updater reads lockfile version 1, while bun writes version 2 from 1.4
-# onward, so an entry would fail on every run instead of opening pull
-# requests. It goes in once the updater reads version 2. Until then the
-# runtime dependencies `RUNTIME` in `Tools/xtask/src/npm.rs` lists are
-# held on caret ranges in `RefRain/package.json`, and the npm gate checks
-# that the lockfile agrees with them.
 version: 2
 
 updates:
@@ -58,6 +48,19 @@ updates:
     groups:
       actions:
         patterns: ["*"]
+
+  - package-ecosystem: bun
+    directory: /RefRain
+    schedule:
+      interval: daily
+    cooldown:
+      default-days: 3
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "CS0.DEPS"
+    groups:
+      patch-and-minor:
+        update-types: ["patch", "minor"]
 
   # The workspace. Patch and minor updates arrive in one grouped PR a day,
   # a major alone - a major is a decision, and a decision needs its own PR.

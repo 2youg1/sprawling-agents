@@ -38,7 +38,7 @@ The host owns dispatch, authentication and persistent city state. RefRain uses t
 
 | Tool | Role |
 |---|---|
-| Bun 1.4.5 | Installs the locked dependency tree, runs Vite and Oxlint, checks TypeScript, formats sources, and runs the browser-condition tests. |
+| Bun | Installs the locked dependency tree, runs Vite and Oxlint, checks TypeScript, formats sources, and runs the browser-condition tests. |
 | Solid 2 | Renders the workspace, document editor, conversation, administration, and gallery. |
 | Vite 8 | The official Solid plugin compiles one embedded client. Format engines and their assets load from that same origin. |
 | Native CSS | The theme publishes semantic roles and stylesheets, an explicit cascade, a responsive workspace grid and utility selectors used by existing looks. |
@@ -46,6 +46,10 @@ The host owns dispatch, authentication and persistent city state. RefRain uses t
 | Effect 4 | Schemas decode frames before their values reach a view. |
 
 ## Commands
+
+CI and Nix read the Bun version from `packageManager` in [package.json](package.json).
+Dependabot proposes dependency and lockfile updates through pull requests. Builds
+install from the committed lockfile.
 
 ```bash
 bun install --frozen-lockfile
