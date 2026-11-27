@@ -41,7 +41,7 @@ rustls = { workspace = true }
 tower = { workspace = true }
 cap-fs-ext = { workspace = true }
 cap-std = { workspace = true }
-notify = "=8.2.0"
+notify = "=9.0.0"
 crossterm = { workspace = true }
 # The terminal shell: frame leaf and City/Mei console backends (`Calyx/Spec.lean`).
 calyx = { workspace = true }
