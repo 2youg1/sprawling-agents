@@ -15,6 +15,8 @@ const lifecycle = @import("lifecycle.zig");
 
 const held_back_cap: usize = 512;
 const face_look_ms: i32 = 100;
+const pairing_feedback_ms = 4000;
+const Pairing = union(enum) { idle, pending: u32, visible: [32]u8, failed };
 
 pub const RunMode = enum { tty, dry };
 
@@ -59,7 +61,10 @@ const Ui = struct {
     shown: lifecycle.Face = .opening,
     menu: ?menu_mod.Menu = null,
     transient: ?[]u8 = null,
-    pairing: []u8 = "",
+    pairing: Pairing = .idle,
+    pairing_request: u32 = 0,
+    pairing_feedback: ?struct { text: []u8, expires: u64 } = null,
+    keyboard_flags: u16 = 0,
     live: LiveMeta = .{},
     held_back: std.ArrayList(write.Entry) = .empty,
     held_arena: std.heap.ArenaAllocator,
@@ -80,7 +85,10 @@ const Ui = struct {
         self.shown = .opening;
         self.menu = null;
         self.transient = null;
-        self.pairing = "";
+        self.pairing = .idle;
+        self.pairing_request = 0;
+        self.pairing_feedback = null;
+        self.keyboard_flags = 0;
         self.live = .{};
         self.held_back = .empty;
         self.held_arena = .init(gpa);
@@ -94,8 +102,6 @@ const Ui = struct {
             self.held_arena.deinit();
             self.frame_arena.deinit();
         }
-        self.pairing = try gpa.dupe(u8, "");
-        errdefer gpa.free(self.pairing);
         self.poll_buf = try gpa.alloc(u8, 64 * 1024);
     }
 
@@ -104,7 +110,7 @@ const Ui = struct {
         self.screen.deinit();
         self.clearMenu();
         if (self.transient) |t| self.gpa.free(t);
-        self.gpa.free(self.pairing);
+        self.clearPairingFeedback();
         self.freeLive();
         self.held_back.deinit(self.gpa);
         self.held_arena.deinit();
@@ -147,17 +153,21 @@ const Ui = struct {
         self.turnTo(surface);
 
         var stdin_filled: usize = 0;
+        var input_burst: usize = 0;
 
         while (true) {
             if (self.lost) return self.giveBack(1);
             if (self.shown == .gone) return self.giveBack(0);
 
-            self.drainHost();
-
+            if (self.dry or input_burst == 64 or (stdin_filled == 0 and !termio.waitReadable(0))) {
+                self.drainHost();
+                self.expirePairingFeedback();
+                input_burst = 0;
+            }
             if (self.dry) return self.giveBack(0);
-
-            const timeout: i32 = face_look_ms;
-            if (!pollStdin(timeout) and stdin_filled == 0) continue;
+            if (self.lost or self.shown == .gone) continue;
+            if (stdin_filled == 0 and !termio.waitReadable(face_look_ms)) continue;
+            input_burst += 1;
 
             const event = termio.readEvent(&self.stdin_scratch, &stdin_filled) catch {
                 self.lost = true;
@@ -232,10 +242,55 @@ const Ui = struct {
     }
 
     fn onPairing(self: *Ui, payload: []const u8) void {
-        if (self.shown != .quiet_host) return;
-        self.gpa.free(self.pairing);
-        self.pairing = self.gpa.dupe(u8, payload) catch "";
+        if (self.shown != .quiet_host or self.pairing != .pending or payload.len < 5) return;
+        const request = std.mem.readInt(u32, payload[0..4], .little);
+        if (self.pairing.pending != request) return;
+        const body = payload[5..];
+        self.pairing = .failed;
+        if (payload[4] == 0 and validPairingCode(body)) {
+            self.pairing = .{ .visible = body[0..32].* };
+            self.quiet();
+        } else {
+            self.showPairingFeedback(if (payload[4] == 1) body else "Could not issue a pairing code");
+        }
+    }
+
+    fn hidePairing(self: *Ui) void {
+        if (self.pairing == .idle) return;
+        const visible = self.pairing == .visible;
+        self.pairing = .idle;
+        if (visible) self.quiet();
+    }
+
+    fn clearPairingFeedback(self: *Ui) void {
+        if (self.pairing_feedback) |feedback| self.gpa.free(feedback.text);
+        self.pairing_feedback = null;
+    }
+
+    fn showPairingFeedback(self: *Ui, text: []const u8) void {
+        self.clearPairingFeedback();
+        const owned = self.gpa.dupe(u8, text) catch return;
+        self.pairing_feedback = .{ .text = owned, .expires = termio.monotonicMs() + pairing_feedback_ms };
         self.quiet();
+    }
+
+    fn expirePairingFeedback(self: *Ui) void {
+        const feedback = self.pairing_feedback orelse return;
+        if (termio.monotonicMs() < feedback.expires) return;
+        self.clearPairingFeedback();
+        self.quiet();
+    }
+
+    fn copyPairing(self: *Ui, k: termio.Key) void {
+        if (self.pairing != .visible) return;
+        const click = k.code.click;
+        if (click.release or click.button & ~@as(u16, 28) != 0) return;
+        if (!self.screen.pairingHit(click.row, click.column)) return;
+        termio.copyPairingCode(&self.pairing.visible) catch {
+            self.showPairingFeedback("Could not copy pairing code");
+            return;
+        };
+        self.showPairingFeedback(if (@import("builtin").os.tag == .windows) "Pairing code copied" else "Pairing code sent to clipboard");
     }
 
     fn onEntries(self: *Ui, payload: []const u8) void {
@@ -282,14 +337,17 @@ const Ui = struct {
     }
 
     fn turnTo(self: *Ui, next: lifecycle.Face) void {
+        if (self.shown == .quiet_host and next != .quiet_host) {
+            self.pairing = .idle;
+            self.clearPairingFeedback();
+            self.keyboard_flags = 0;
+        }
         self.shown = next;
         switch (next) {
             .quiet_host => {
                 self.quiet();
             },
             .cli => {
-                self.gpa.free(self.pairing);
-                self.pairing = "";
                 if (self.transient) |t| {
                     self.gpa.free(t);
                     self.transient = null;
@@ -311,10 +369,7 @@ const Ui = struct {
                     self.onNotice(msg);
                 }
             },
-            .gone => {
-                if (!self.dry) _ = self.screen.giveBack();
-            },
-            .opening, .headless => {},
+            .opening, .headless, .gone => {},
         }
     }
 
@@ -333,6 +388,11 @@ const Ui = struct {
             .resize => {
                 if (self.shown == .quiet_host) self.quiet() else self.redraw(&.{});
             },
+            .keyboard_flags => |flags| if (self.shown == .quiet_host) {
+                self.keyboard_flags = flags;
+                if (!termio.quietKeyReleases(flags)) self.hidePairing();
+            },
+            .focus_lost => self.hidePairing(),
             .lost => {
                 self.screen.cut();
                 self.host.tell(self.host.ctx, @backingInt(host_mod.LifecycleEvent.terminal_lost), 0);
@@ -343,6 +403,33 @@ const Ui = struct {
     }
 
     fn onKey(self: *Ui, k: termio.Key) void {
+        if (k.phase == .release) {
+            if (isG(k) or (k.code == .control and !k.modifiers.control)) self.hidePairing();
+            return;
+        }
+        if (self.shown == .quiet_host) {
+            switch (k.code) {
+                .enter => {
+                    if (k.phase != .press) return;
+                    const url = host_mod.urlOf(self.config);
+                    _ = self.host.open_paired(self.host.ctx, url.ptr, url.len);
+                    return;
+                },
+                .click => return self.copyPairing(k),
+                else => {},
+            }
+            if (isG(k) and k.modifiers.control and !k.modifiers.alt and !k.modifiers.shift and !k.modifiers.other) {
+                if (k.phase != .press or self.pairing != .idle) return;
+                if (!k.tracks_hold or !termio.quietKeyReleases(self.keyboard_flags)) {
+                    self.showPairingFeedback("Pairing needs terminal key release support");
+                    return;
+                }
+                self.pairing_request +%= 1;
+                self.pairing = .{ .pending = self.pairing_request };
+                self.host.tell(self.host.ctx, @backingInt(host_mod.LifecycleEvent.pair_code), self.pairing_request);
+                return;
+            }
+        }
         if (k.modifiers.control) {
             if (k.code == .char and k.code.char == 'c' and !self.hinted) {
                 self.hinted = true;
@@ -351,15 +438,9 @@ const Ui = struct {
             return;
         }
         switch (self.shown) {
-            .quiet_host => {
-                if (k.code == .esc) {
-                    self.host.tell(self.host.ctx, @backingInt(host_mod.LifecycleEvent.back), 0);
-                } else if (k.code == .enter) {
-                    const url = host_mod.urlOf(self.config);
-                    _ = self.host.open_paired(self.host.ctx, url.ptr, url.len);
-                } else if (k.code == .char and (k.code.char == 'c' or k.code.char == 'C')) {
-                    self.host.tell(self.host.ctx, @backingInt(host_mod.LifecycleEvent.pair_code), 0);
-                }
+            .quiet_host => if (k.code == .esc and k.phase == .press) {
+                self.hidePairing();
+                self.host.tell(self.host.ctx, @backingInt(host_mod.LifecycleEvent.back), 0);
             },
             .stopping => |s| {
                 if (self.screen.isQuiet()) return;
@@ -502,9 +583,14 @@ const Ui = struct {
         if (self.dry) return;
         const written = self.screen.quiet(.{
             .url = host_mod.urlOf(self.config),
-            .code = self.pairing,
+            .code = if (self.pairing == .visible) &self.pairing.visible else "",
             .key = host_mod.tokenOf(self.config),
-            .transient = if (self.transient) |t| std.mem.trim(u8, t, &std.ascii.whitespace) else null,
+            .transient = if (self.pairing_feedback) |feedback|
+                feedback.text
+            else if (self.transient) |t|
+                std.mem.trim(u8, t, &std.ascii.whitespace)
+            else
+                null,
         });
         self.drawn(written);
     }
@@ -676,18 +762,30 @@ fn editing(key: termio.Key) ?editor_mod.Edit {
     };
 }
 
-fn pollStdin(timeout_ms: i32) bool {
-    return termio.waitReadable(timeout_ms);
+fn isG(key: termio.Key) bool {
+    return key.code == .char and key.code.char == 'g';
+}
+
+fn validPairingCode(code: []const u8) bool {
+    if (code.len != 32) return false;
+    for (code) |byte| {
+        switch (byte) {
+            '0'...'9', 'a'...'f' => {},
+            else => return false,
+        }
+    }
+    return true;
 }
 
 const StubHost = struct {
     gpa: std.mem.Allocator,
     events: std.ArrayList(Queued) = .empty,
-    tells: std.ArrayList(u32) = .empty,
+    tells: std.ArrayList(Tell) = .empty,
     lines: std.ArrayList([]u8) = .empty,
     opened: usize = 0,
 
     const Queued = struct { kind: host_mod.HostEventKind, bytes: []u8 };
+    const Tell = struct { event: u32, arg: u32 };
 
     fn deinit(self: *StubHost) void {
         for (self.events.items) |e| self.gpa.free(e.bytes);
@@ -710,6 +808,15 @@ const StubHost = struct {
 
     fn pushNotice(self: *StubHost, text: []const u8) !void {
         try self.events.append(self.gpa, .{ .kind = .notice, .bytes = try self.gpa.dupe(u8, text) });
+    }
+
+    fn pushPairing(self: *StubHost, id: u32, status: u8, body: []const u8) !void {
+        const bytes = try self.gpa.alloc(u8, 5 + body.len);
+        errdefer self.gpa.free(bytes);
+        std.mem.writeInt(u32, bytes[0..4], id, .little);
+        bytes[4] = status;
+        @memcpy(bytes[5..], body);
+        try self.events.append(self.gpa, .{ .kind = .pairing, .bytes = bytes });
     }
 
     fn pushAsking(self: *StubHost, going: u64) !void {
@@ -755,9 +862,8 @@ const StubHost = struct {
     }
 
     fn tell(ctx: *anyopaque, event: u32, arg: u32) callconv(.c) void {
-        _ = arg;
         const self: *StubHost = @ptrCast(@alignCast(ctx));
-        self.tells.append(self.gpa, event) catch {};
+        self.tells.append(self.gpa, .{ .event = event, .arg = arg }) catch {};
     }
 
     fn carryLine(ctx: *anyopaque, line_ptr: [*]const u8, line_len: usize) callconv(.c) void {
@@ -831,7 +937,7 @@ test "dry city ui drains host face entries and handles quiet keys via host" {
     ui.onKey(.{ .code = .esc });
     ui.onKey(.{ .code = .enter });
     try std.testing.expect(stub.tells.items.len >= 1);
-    try std.testing.expectEqual(@backingInt(host_mod.LifecycleEvent.back), stub.tells.items[0]);
+    try std.testing.expectEqual(@backingInt(host_mod.LifecycleEvent.back), stub.tells.items[0].event);
     try std.testing.expectEqual(@as(usize, 1), stub.opened);
 }
 
@@ -889,5 +995,74 @@ test "host asking event arms quit confirm and enter drains" {
     ui.onKey(.{ .code = .enter });
     try std.testing.expect(ui.asking == null);
     try std.testing.expectEqual(@as(usize, 1), stub.tells.items.len);
-    try std.testing.expectEqual(@backingInt(host_mod.LifecycleEvent.quit_drain), stub.tells.items[0]);
+    try std.testing.expectEqual(@backingInt(host_mod.LifecycleEvent.quit_drain), stub.tells.items[0].event);
+}
+
+test "the quiet host reveals only for the current hold and always accepts Enter" {
+    const gpa = std.testing.allocator;
+    var stub: StubHost = .{ .gpa = gpa };
+    defer stub.deinit();
+    const url = "http://127.0.0.1:3425/";
+    const config: host_mod.CityConfig = .{
+        .url_ptr = url.ptr,
+        .url_len = url.len,
+        .city_ptr = "demo",
+        .city_len = 4,
+        .token_ptr = null,
+        .token_len = 0,
+        .surface = 1,
+    };
+    const host = stub.asHost();
+    var ui: Ui = undefined;
+    try ui.init(gpa, &config, &host);
+    defer ui.deinit();
+    ui.dry = true;
+    ui.turnTo(.quiet_host);
+
+    try feed(&ui, "c");
+    try feed(&ui, "\x07");
+    try std.testing.expectEqual(@as(usize, 0), stub.tells.items.len);
+    try feed(&ui, "\x1b[?11u");
+    try feed(&ui, "\x1b[103;5u");
+    try feed(&ui, "\x1b[103;5:2u");
+    const first = stub.tells.items[0];
+    try std.testing.expectEqual(@backingInt(host_mod.LifecycleEvent.pair_code), first.event);
+    try std.testing.expectEqual(@as(usize, 1), stub.tells.items.len);
+    try feed(&ui, "\x1b[103;5:3u");
+    try feed(&ui, "\x1b[103;5u");
+    const second = stub.tells.items[1];
+    const code = "0123456789abcdef0123456789abcdef";
+    try stub.pushPairing(first.arg, 0, code);
+    ui.drainHost();
+    try std.testing.expect(ui.pairing == .pending);
+    try stub.pushPairing(second.arg, 0, code);
+    ui.drainHost();
+    try std.testing.expectEqualStrings(code, &ui.pairing.visible);
+    try feed(&ui, "\x1b[120;5:3u");
+    try feed(&ui, "\x1b[57442;5:3u");
+    try std.testing.expect(ui.pairing == .visible);
+    try feed(&ui, "\x1b[13;5u");
+    try std.testing.expectEqual(@as(usize, 1), stub.opened);
+    try feed(&ui, "\x1b[57448;1:3u");
+    try std.testing.expect(ui.pairing == .idle);
+    try feed(&ui, "\x1b[103;5:2u");
+    try std.testing.expectEqual(@as(usize, 2), stub.tells.items.len);
+
+    try feed(&ui, "\x1b[103;5u");
+    try stub.pushPairing(stub.tells.items[2].arg, 1, "Could not issue a pairing code");
+    ui.drainHost();
+    try std.testing.expect(ui.pairing == .failed);
+    try std.testing.expectEqualStrings("Could not issue a pairing code", ui.pairing_feedback.?.text);
+    ui.pairing_feedback.?.expires = 0;
+    ui.expirePairingFeedback();
+    try std.testing.expect(ui.pairing_feedback == null);
+    try feed(&ui, "\x1b[O");
+    try std.testing.expect(ui.pairing == .idle);
+}
+
+fn feed(ui: *Ui, bytes: []const u8) !void {
+    var used: usize = 0;
+    const event = termio.parseOne(bytes, &used) orelse return error.InvalidTestEvent;
+    try std.testing.expectEqual(bytes.len, used);
+    _ = ui.handleEvent(event);
 }

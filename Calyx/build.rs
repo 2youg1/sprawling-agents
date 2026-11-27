@@ -41,6 +41,9 @@ fn build() -> Result<(), String> {
     println!("cargo::rustc-link-lib=static={LIBRARY}");
     let target_os = std::env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     let target_env = std::env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
+    if target_os == "windows" {
+        println!("cargo::rustc-link-lib=dylib=user32");
+    }
     if (target_os == "linux" || target_os == "macos") && target_env != "musl" {
         println!("cargo::rustc-link-lib=dylib=c");
         println!("cargo::rustc-link-lib=dylib=pthread");

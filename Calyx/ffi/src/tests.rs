@@ -390,31 +390,34 @@ fn a_replying_draft_sits_above_the_composer() {
 }
 
 #[test]
-fn the_quiet_host_is_two_lines_in_the_middle_of_the_window() {
-    let scene = Scene::quiet(&Quiet {
-        columns: 80,
-        rows: 12,
-        url: "http://127.0.0.1:7341/",
-        code: "K7M2QX9P",
-        key: None,
-        transient: Some("the city is closing; the runs under way finish first"),
-    });
-    let (bytes, _) = drawn(&scene);
-    let (shown, _) = screen(80, 12, &[bytes]);
-    let wanted = [
-        "",
-        "",
-        "",
-        "",
-        "",
-        "              http://127.0.0.1:7341/",
-        "              pairing code   K7M2QX9P",
-        "",
-        "              the city is closing; the runs under way finish first",
-    ]
-    .join("\n");
-    println!("{shown}");
-    assert_eq!(shown, wanted);
+fn the_quiet_host_centers_each_line_and_keeps_enter_visible_while_revealed() {
+    let code = "0123456789abcdef0123456789abcdef";
+    let centered = |row: &str| format!("{:>width$}", row, width = (40 + row.chars().count()) / 2);
+    for third in ["Hold Ctrl+G for code · click to copy", code] {
+        let scene = Scene::quiet(&Quiet {
+            columns: 40,
+            rows: 12,
+            url: "http://127.0.0.1:7341/",
+            code: if third == code { code } else { "" },
+            key: None,
+            transient: Some("Copy requested"),
+        });
+        let (bytes, _) = drawn(&scene);
+        let (shown, _) = screen(40, 12, &[bytes]);
+        let wanted = [
+            String::new(),
+            String::new(),
+            String::new(),
+            String::new(),
+            centered("http://127.0.0.1:7341/"),
+            centered("Enter: open WebUI"),
+            centered(third),
+            String::new(),
+            centered("Copy requested"),
+        ]
+        .join("\n");
+        assert_eq!(shown, wanted);
+    }
 }
 
 #[test]

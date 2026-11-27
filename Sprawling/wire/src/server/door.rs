@@ -308,7 +308,7 @@ fn refused() -> AxError {
         "pair a browser",
         "the code was wrong, used or expired",
     )
-    .with_recovery("press C in the city terminal and paste a fresh pairing code")
+    .with_recovery("hold Ctrl+G in the quiet host, click the code to copy it, and paste the fresh pairing code")
 }
 
 fn unsigned(recovery: &str) -> AxError {

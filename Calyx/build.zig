@@ -56,6 +56,7 @@ pub fn build(b: *std.Build) void {
         .omit_frame_pointer = true,
         .unwind_tables = .none,
     });
+    if (target.result.os.tag == .windows) shell_mod.linkSystemLibrary("user32", .{});
     const shell = b.addLibrary(.{
         .name = "sprawling_calyx_shell",
         .linkage = .static,
@@ -71,6 +72,7 @@ pub fn build(b: *std.Build) void {
         .imports = &shell_imports,
         .link_libc = true,
     });
+    if (target.result.os.tag == .windows) calyx_mod.linkSystemLibrary("user32", .{});
     const calyx = b.addExecutable(.{
         .name = "calyx",
         .root_module = calyx_mod,
@@ -84,15 +86,15 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
-    const shell_tests = b.addTest(.{
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("shell/root.zig"),
-            .target = target,
-            .optimize = optimize,
-            .imports = &shell_imports,
-            .link_libc = true,
-        }),
+    const shell_test_mod = b.createModule(.{
+        .root_source_file = b.path("shell/root.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &shell_imports,
+        .link_libc = true,
     });
+    if (target.result.os.tag == .windows) shell_test_mod.linkSystemLibrary("user32", .{});
+    const shell_tests = b.addTest(.{ .root_module = shell_test_mod });
     const test_step = b.step("test", "Run Calyx Zig leaf and shell tests");
     const run_leaf = b.addRunArtifact(leaf_tests);
     test_step.dependOn(&run_leaf.step);

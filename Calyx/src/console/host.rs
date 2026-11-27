@@ -309,7 +309,7 @@ impl CityHost for Bridge {
         (kind.code(), bytes.len())
     }
 
-    fn tell(&self, event: u32, _arg: u32) {
+    fn tell(&self, event: u32, arg: u32) {
         let mapped = match event {
             0 => Event::Web,
             1 => Event::Back,
@@ -317,20 +317,27 @@ impl CityHost for Bridge {
             3 => Event::Quit(Asker::Console, CloseMode::Interrupt),
             4 => Event::TerminalLost,
             5 => {
+                let mut reply = arg.to_le_bytes().to_vec();
                 match self.inside.door.issue_display_code() {
-                    Ok(code) => self.push(HostEventKind::Pairing, code.into_bytes()),
-                    Err(err) => self.push(
-                        HostEventKind::Notice,
-                        format!(
-                            "```toml\ncode = {:?}\naction = {:?}\nsubject = {:?}\nrecovery = {:?}\n```",
-                            err.code().as_str(),
-                            err.action(),
-                            err.subject(),
-                            err.recovery(),
-                        )
-                        .into_bytes(),
-                    ),
+                    Ok(code) => {
+                        reply.push(0);
+                        reply.extend_from_slice(code.as_bytes());
+                    }
+                    Err(err) => {
+                        reply.push(1);
+                        reply.extend_from_slice(
+                            format!(
+                                "Could not issue a pairing code\n```toml\ncode = {:?}\naction = {:?}\nsubject = {:?}\nrecovery = {:?}\n```",
+                                err.code().as_str(),
+                                err.action(),
+                                err.subject(),
+                                err.recovery(),
+                            )
+                            .as_bytes(),
+                        );
+                    }
                 }
+                self.push(HostEventKind::Pairing, reply);
                 return;
             }
             _ => return,

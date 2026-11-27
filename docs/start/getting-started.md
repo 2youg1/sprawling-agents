@@ -304,7 +304,7 @@ The version line comes from the binary. A checkout built without release provena
 sprawling up ./cities/first
 ```
 
-When the directory holds no city yet, this command raises one, serves it on `127.0.0.1:2501`, and opens the page in the browser your operating system uses for links — already paired. The terminal becomes the **quiet host**: two lines with the serving address and the key to show a pairing code.
+When the directory holds no city yet, this command raises one, serves it on `127.0.0.1:2501`, and opens the page in the browser your operating system uses for links — already paired. The terminal becomes the **quiet host**: three lines with the address, the Enter shortcut, and pairing instructions.
 
 Closing the browser stops no work. The city keeps the port, so open the address again, or press Enter in the quiet host, and you are back on the page.
 
@@ -316,7 +316,7 @@ The CLI shows the room you are speaking to: what you said, each run's model, how
 
 See [Calyx](../../Calyx/README.md#city-vs-mei) for the terminal interface and a command completion example.
 
-The browser `/web` opens is paired without typing: `/web` hands it a one-time open code through a file only your account can read, and the page keeps a device key in that browser's own storage, so the plain address opens the city from then on. A second browser, or one whose storage was cleared, asks for a pairing code. Press C in the quiet host, copy the code, and paste it into the browser within two minutes. Each code enrolls one browser. **settings** lists the paired browsers, and can make the city forget any of them.
+The browser `/web` opens is paired without typing: `/web` hands it a one-time open code through a file only your account can read, and the page keeps a device key in that browser's own storage, so the plain address opens the city from then on. A second browser, or one whose storage was cleared, asks for a pairing code. Hold Ctrl+G in the quiet host, click the code to copy it, and paste it into the browser within two minutes. Each code enrolls one browser. **settings** lists the paired browsers, and can make the city forget any of them.
 
 `/quit` closes the city in order, typed in the CLI or on a page this computer opened. With runs going, it asks once: Enter waits for them to finish, `n` stops them now, and Esc keeps the city serving. Stopping now waits at most four seconds for the runs to reach a safe point; after that the city closes without writing its handoff, and the next start freezes the runs it left open.
 
@@ -560,7 +560,7 @@ After updating: run `sprawling version` and `sprawling help`, confirm that PATH 
 | A file is missing | **the recycle bin**: every row says how to get that file back |
 | A setting does not take effect | `sprawling check <city>` prints each error in the city's TOML files |
 | An editor link does nothing | The editor chosen under **settings** → **advanced** is not the one registered on this computer, or the folder entered there is not this computer's absolute path |
-| The page asks for a pairing code | This browser holds no device key for this city yet, or its storage was cleared. Type the code the terminal shows, or type `/web` in the CLI, which pairs the browser it opens |
+| The page asks for a pairing code | This browser holds no device key for this city yet, or its storage was cleared. Hold Ctrl+G in the quiet host and click the code to copy it, or type `/web` in the CLI, which pairs the browser it opens |
 | A script on this computer is refused for a missing credential | No key file exists for that port: the city is not served on that port here, or another account started it. Start it, or pass `--token` |
 | A thinking level is refused before the run starts | The model in force does not offer the level `/effort` or the dispatch named; `E_CONFIG_INVALID` lists the levels it offers |
 | This computer lacks something the city needs | `sprawling doctor` lists it, and `--install` asks before installing each item |

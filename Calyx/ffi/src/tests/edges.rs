@@ -10,10 +10,6 @@
     reason = "test code"
 )]
 
-//! The edges of a frame: what a record cannot make the terminal do, a
-//! scene the leaf refuses, the cursor once no live region is drawn, and
-//! what gives way first in a narrow or a short window.
-
 use std::num::NonZeroU16;
 
 use super::{drawn, live, screen, transcript};
@@ -65,9 +61,6 @@ fn a_scene_cut_short_is_refused_rather_than_read_past() {
     }
 }
 
-/// A frame with no live region, as the console draws once the terminal
-/// is handed back, leaves the cursor shown: every frame hides it while it
-/// draws.
 #[test]
 fn a_frame_without_a_live_region_leaves_the_cursor_shown() {
     let entries = vec![Entry::Note {
@@ -88,8 +81,6 @@ fn a_frame_without_a_live_region_leaves_the_cursor_shown() {
     assert!(!parser.screen().hide_cursor());
 }
 
-/// In a narrow window the resident's name stays and the time and the key
-/// that stops the run give way first.
 #[test]
 fn a_narrow_working_row_keeps_who_is_working() {
     let mut narrow = live("", 0, None);
@@ -108,10 +99,8 @@ fn a_narrow_working_row_keeps_who_is_working() {
     assert_eq!(shown.lines().nth(1), Some("● mayor is working"), "{shown}");
 }
 
-/// A window too short for the transient keeps the address and the code,
-/// and draws no transient over them.
 #[test]
-fn a_short_window_drops_the_transient_rather_than_cover_the_code() {
+fn a_two_row_window_keeps_the_address_and_opening_instruction() {
     let scene = Scene::quiet(&Quiet {
         columns: 60,
         rows: 2,
@@ -124,11 +113,10 @@ fn a_short_window_drops_the_transient_rather_than_cover_the_code() {
     let (shown, _) = screen(60, 2, &[bytes]);
     assert_eq!(
         shown,
-        "                  http://127.0.0.1:7341/\n                  pairing code   K7M2QX9P"
+        "                   http://127.0.0.1:7341/\n                     Enter: open WebUI"
     );
 }
 
-/// Real leaf calls cover automatic growth and capacity beyond the retry limit.
 #[test]
 fn growing_a_frame_preserves_the_complete_output() {
     let entries = [Entry::Reply {

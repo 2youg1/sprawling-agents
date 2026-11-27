@@ -40,6 +40,7 @@ pub const Screen = struct {
     previous: ?part.Part = null,
     frame: std.ArrayList(u8) = .empty,
     refused: ?Refused = null,
+    pairing_region: ?struct { size: termio.Size, code: leaf.quiet.CodeRegion } = null,
 
     pub fn deinit(self: *Screen) void {
         self.frame.deinit(self.gpa);
@@ -119,9 +120,11 @@ pub const Screen = struct {
         else blk: {
             const erased = self.frameEntries(&.{}, null);
             termio.enterAlternate() catch break :blk self.fail();
+            termio.enterQuietInput() catch break :blk self.fail();
             self.erase = 0;
             break :blk erased;
         };
+        if (entered == .lost) return .lost;
         const size = termio.size();
         var scene = write.Scene.quietFrame(self.gpa, .{
             .columns = size.columns,
@@ -130,14 +133,34 @@ pub const Screen = struct {
             .code = lines.code,
             .key = lines.key,
             .transient = lines.transient,
-        }) catch return entered;
+        }) catch return self.erasePairingCode();
         defer scene.deinit(self.gpa);
-        _ = drawScene(self.gpa, scene.bytes.items, &self.frame) catch return entered;
-        return worst(entered, self.flushFrame());
+        _ = drawScene(self.gpa, scene.bytes.items, &self.frame) catch return self.erasePairingCode();
+        const flushed = self.flushFrame();
+        self.pairing_region = null;
+        if (flushed == .shown) {
+            if (leaf.quiet.codeRegion(size.columns, size.rows, lines.code)) |region| {
+                self.pairing_region = .{ .size = size, .code = region };
+            }
+        }
+        return flushed;
+    }
+
+    pub fn pairingHit(self: *const Screen, row: u16, column: u16) bool {
+        const region = self.pairing_region orelse return false;
+        return region.code.contains(row, column) and std.meta.eql(region.size, termio.size());
+    }
+
+    fn erasePairingCode(self: *Screen) Written {
+        if (self.pairing_region == null) return .shown;
+        self.pairing_region = null;
+        return self.writeSlice("\x1b[2J\x1b[H");
     }
 
     pub fn leaveQuiet(self: *Screen) Written {
         if (!termio.isAlternate()) return .shown;
+        self.pairing_region = null;
+        termio.leaveQuietInput() catch return self.fail();
         termio.leaveAlternate() catch return self.fail();
         return .shown;
     }
