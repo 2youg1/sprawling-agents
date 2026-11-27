@@ -43,7 +43,7 @@
 | | | Space | 同 Enter：平台把两个键都送进同一个 `onClick`，所以一次判定挡住指针、Enter 与 Space 三种输入 |
 | `icon_button.solid.tsx` 只有图标的键 | APG Button | Enter／Space | 激活；`why` 在场时 `onclick` 原地返回 |
 | `path.solid.tsx` 的显示控件（一个 `icon_button`） | APG Button | Enter／Space | 地址解析得出时发 `reveal`；解析不出时 `aria-disabled="true"`，点击落进一个空操作 |
-| PDF 工具栏的「夜间模式」 | APG Toggle Button | Enter／Space | 切换当前阅读面的配色，`aria-pressed` 反映选择，按钮保持名称与焦点（D32a） |
+| 带 `pressed` 的 `button.solid.tsx`，含 PDF 工具栏的「夜间模式」 | APG Toggle Button | Enter／Space | 通过原生按钮激活，`aria-pressed` 反映调用方的选择，按钮保持名称与焦点（D32a） |
 | `field.solid.tsx` | 有标签的文本框（无复合模式） | 平台的单行编辑键 | 由浏览器实现，本部件不截获 |
 | | | ↑／↓（`kind="number"`） | 按 `step` 增减，由平台实现 |
 | `inspect/patch.solid.tsx` 的行号栏（调用方给了 `talk` 地址时：检视面的 diff 与 `changes.solid.tsx` 打开的一行） | 链接 | Enter | 把「路径:新行号」（删去的行是「路径@旧提交:旧行号」）和该行的引文接到那个地址的草稿之后，再打开那段对话；composer 挂载时从草稿门读出它。每行一站 Tab，不给 `talk` 的页面行号栏不取焦 |
@@ -56,6 +56,8 @@
 | `building/sandbox.solid.tsx` 的保存 | APG Button | Enter | 整值发 `configureSandbox`；燃料不是正整数时按不动，`why` 说为什么 |
 
 `button.solid.tsx` 的 `aria-*`：`aria-disabled` 在 `loading` 或 `why` 在场时为 `"true"`，`aria-busy` 只在 `loading` 时为 `"true"`，`why` 在场时 `aria-describedby` 指向 `Tip` 的 id。**用 `aria-disabled` 而不是 `disabled`**：控件因此留在 Tab 序列里，键盘到得了它，读屏也读得到它为什么按不动。调用方给了 `name` 时键的可访问名字是 `name`（写成 `aria-label`），面子仍是 `label`：行内动作的面子可以只是动词（「忘掉」），名字仍带行首文字已指出的对象（「忘掉 Firefox · Windows」），因为行的主文字不在键自己的名字里（4-57b）。
+
+切换键与一次性动作共用同一个按钮部件，原生激活和不可用状态的判定由同一处承担。调用方省略 `pressed` 时接线包省略属性，提供该值时接线包写 `aria-pressed="true"` 或 `"false"`。外观为切换键写 `data-control="surface"`，由公共主题标出已按下的状态。
 
 `icon_button.solid.tsx` 的 `aria-*`：名字恒为 `aria-label`，取调用方给的 `label`；它的 `Tip` 在键可用时画同一个名字，不可用时画 `why`；`aria-describedby` 只在 `why` 在场时指向 `Tip`，因为可用时提示与名字是同一句，再读一遍只是重复；`aria-disabled` 恰在 `why` 在场时为 `"true"`。名字经 `Tip` 画出而不是写进 `title`，因为 `title` 键盘到不了、触屏看不见（设计 4-18）。键画在 `control-sm` 的方框里；`pointer: coarse` 下命中区由 `::before` 扩到 `--spacing-touch`（44），画出的方框不变（`docs/frontend-method.md` §4-34）。
 

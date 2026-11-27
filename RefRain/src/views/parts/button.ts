@@ -19,6 +19,7 @@ export interface ButtonProps {
   readonly type?: "button" | "submit";
 
   readonly loading?: boolean;
+  readonly pressed?: boolean;
   readonly glyph?: GlyphName | undefined;
   readonly result?: ButtonResult | undefined;
 
@@ -32,6 +33,7 @@ export interface ButtonWire {
   readonly "aria-busy": boolean;
   readonly "aria-describedby": string | undefined;
   readonly "aria-label": string | undefined;
+  readonly "aria-pressed": "true" | "false" | undefined;
   readonly onclick: () => void;
 }
 
@@ -67,6 +69,7 @@ export function lookOf(props: ButtonProps): ButtonLook {
       "aria-busy": state === "loading",
       "aria-describedby": hint,
       "aria-label": props.name,
+      "aria-pressed": props.pressed === undefined ? undefined : props.pressed ? "true" : "false",
       onclick: () => {
         if (state !== "idle") return;
         props.onPress?.();

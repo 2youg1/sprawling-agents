@@ -39,7 +39,8 @@ export default function Look(look: ButtonLook) {
         aria-busy={wire()["aria-busy"] ? "true" : "false"}
         aria-label={wire()["aria-label"]}
         aria-describedby={wire()["aria-describedby"]}
-        data-control=""
+        aria-pressed={wire()["aria-pressed"]}
+        data-control={wire()["aria-pressed"] === undefined ? "" : "surface"}
         data-control-state={look.state === "loading" ? "pending" : look.result}
         data-state={look.state}
         class={[SHAPE, WEAR[look.tone], MUTED]}

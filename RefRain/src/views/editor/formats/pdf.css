@@ -46,7 +46,7 @@
   color: var(--color-text);
 }
 
-.pdf-control:is(:hover, [aria-pressed="true"]) {
+.pdf-control:hover {
   border-color: var(--color-accent);
 }
 

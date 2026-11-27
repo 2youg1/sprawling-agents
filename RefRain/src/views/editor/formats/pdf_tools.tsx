@@ -10,6 +10,7 @@ import { fill, say, type Key } from "../../../core/lang";
 import type { Lang } from "../../../core/lang";
 import { storeValue } from "../../../core/solid_store";
 import { BRIGHTNESS, wallpaperSettings } from "../../../core/wallpaper";
+import Button from "../../parts/button.solid";
 import type { ContextTool } from "../../parts/context_tools";
 import Glyph from "../../parts/glyph.solid";
 import { short } from "../reading";
@@ -371,16 +372,14 @@ export function PdfReaderControls(props: {
           </button>
         </div>
       </Show>
-      <button
-        type="button"
-        class="pdf-control pdf-reader-night"
-        data-control="surface"
-        aria-pressed={props.night ? "true" : "false"}
-        onClick={props.onNight}
-      >
-        <Glyph name="moon" size="sm" />
-        {say(props.lang, "pdf_night")}
-      </button>
+      <div class="pdf-reader-night">
+        <Button
+          label={say(props.lang, "pdf_night")}
+          glyph="moon"
+          pressed={props.night}
+          onPress={props.onNight}
+        />
+      </div>
     </div>
   );
 }
