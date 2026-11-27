@@ -7,21 +7,15 @@ const RASTER_BYTES = 48 * 1024 ** 2;
 
 export interface PdfRaster {
   readonly original: HTMLCanvasElement;
-  readonly clear: HTMLCanvasElement | null;
   readonly full: boolean;
 }
 
 function weight(raster: PdfRaster): number {
-  return (
-    4 *
-    (raster.original.width * raster.original.height +
-      (raster.clear?.width ?? 0) * (raster.clear?.height ?? 0))
-  );
+  return 4 * raster.original.width * raster.original.height;
 }
 
 export function releaseRaster(raster: PdfRaster): void {
   raster.original.width = raster.original.height = 0;
-  if (raster.clear !== null) raster.clear.width = raster.clear.height = 0;
 }
 
 export class PdfRasterCache {

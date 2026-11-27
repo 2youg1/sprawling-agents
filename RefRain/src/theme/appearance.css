@@ -11,12 +11,11 @@
   --reading-filter: brightness(calc(0.6 + 0.8 * var(--reading-level)));
   --pdf-upper-level: max(0, calc(var(--reading-level) - 0.5));
   --pdf-paper-lightness: calc(0.13 + 0.08 * var(--reading-level) + 0.04 * var(--pdf-upper-level));
-  --pdf-ink-lightness: calc(
-    0.8378 + 0.0124 * var(--reading-level) - 0.0036 * var(--pdf-upper-level)
+  --pdf-paper: oklch(
+    from var(--color-page) var(--pdf-paper-lightness) calc(c * var(--chroma)) h / 1
   );
-  --pdf-paper: oklch(var(--pdf-paper-lightness) 0.023 247);
-  --pdf-ink: oklch(var(--pdf-ink-lightness) 0.01656 247);
-  --pdf-surround: oklch(max(0.08, calc(var(--pdf-paper-lightness) - 0.04)) 0.01035 247);
+  --pdf-ink: oklch(from var(--pdf-paper) 0.90 c h);
+  --pdf-surround: oklch(from var(--pdf-paper) max(0.08, calc(l - 0.04)) c h);
   --color-reading-canvas: var(--reading-canvas, var(--color-page));
   --color-markdown-marker: var(--color-text-quiet);
 }
@@ -118,6 +117,8 @@
   :root[data-theme="light"] {
     --reading-canvas: Canvas;
     --reading-filter: none;
+    --pdf-paper: Canvas;
+    --pdf-ink: CanvasText;
     --pdf-surround: Canvas;
   }
 

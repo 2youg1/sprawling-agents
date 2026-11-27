@@ -1807,6 +1807,10 @@
     "en": "Hold for original",
     "zh": "按住看原图"
   },
+  "pdf_night": {
+    "en": "Night mode",
+    "zh": "夜间模式"
+  },
   "pdf_details": {
     "en": "Document details",
     "zh": "文档详情"

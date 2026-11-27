@@ -298,6 +298,8 @@ export function PdfReaderControls(props: {
   readonly first: number;
   readonly last: number;
   readonly total: number;
+  readonly night: boolean;
+  readonly onNight: () => void;
   readonly onLayout: (layout: PdfLayout) => void;
   readonly onScale: (scale: number) => void;
   readonly onTurn: (direction: number) => void;
@@ -369,6 +371,16 @@ export function PdfReaderControls(props: {
           </button>
         </div>
       </Show>
+      <button
+        type="button"
+        class="pdf-control pdf-reader-night"
+        data-control="surface"
+        aria-pressed={props.night ? "true" : "false"}
+        onClick={props.onNight}
+      >
+        <Glyph name="moon" size="sm" />
+        {say(props.lang, "pdf_night")}
+      </button>
     </div>
   );
 }

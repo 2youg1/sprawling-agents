@@ -5,7 +5,14 @@
 
 import { expect, test } from "bun:test";
 
-import { PdfPageHeights } from "./pdf_position";
+import { bookPageWidth, PdfPageHeights } from "./pdf_position";
+
+test("the largest book spread fits both axes and accounts for a lone last page", () => {
+  const viewport = { width: 1616, height: 900, paddingTop: 4, gap: 4 };
+  expect(bookPageWidth(viewport, [842 / 595, 1.5])).toBe(600);
+  expect(bookPageWidth({ ...viewport, height: 2000 }, [1.4, 1.3])).toBe(806);
+  expect(bookPageWidth({ ...viewport, width: 344 }, [0.6])).toBe(344);
+});
 
 test("the first measured page estimates unknown heights without moving an anchor to another page", () => {
   const heights = new PdfPageHeights(2_000);

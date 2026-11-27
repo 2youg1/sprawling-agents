@@ -43,6 +43,7 @@
 | | | Space | 同 Enter：平台把两个键都送进同一个 `onClick`，所以一次判定挡住指针、Enter 与 Space 三种输入 |
 | `icon_button.solid.tsx` 只有图标的键 | APG Button | Enter／Space | 激活；`why` 在场时 `onclick` 原地返回 |
 | `path.solid.tsx` 的显示控件（一个 `icon_button`） | APG Button | Enter／Space | 地址解析得出时发 `reveal`；解析不出时 `aria-disabled="true"`，点击落进一个空操作 |
+| PDF 工具栏的「夜间模式」 | APG Toggle Button | Enter／Space | 切换当前阅读面的配色，`aria-pressed` 反映选择，按钮保持名称与焦点（D32a） |
 | `field.solid.tsx` | 有标签的文本框（无复合模式） | 平台的单行编辑键 | 由浏览器实现，本部件不截获 |
 | | | ↑／↓（`kind="number"`） | 按 `step` 增减，由平台实现 |
 | `inspect/patch.solid.tsx` 的行号栏（调用方给了 `talk` 地址时：检视面的 diff 与 `changes.solid.tsx` 打开的一行） | 链接 | Enter | 把「路径:新行号」（删去的行是「路径@旧提交:旧行号」）和该行的引文接到那个地址的草稿之后，再打开那段对话；composer 挂载时从草稿门读出它。每行一站 Tab，不给 `talk` 的页面行号栏不取焦 |
