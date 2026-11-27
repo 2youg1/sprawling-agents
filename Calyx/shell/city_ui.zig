@@ -763,7 +763,7 @@ fn editing(key: termio.Key) ?editor_mod.Edit {
 }
 
 fn isG(key: termio.Key) bool {
-    return key.code == .char and key.code.char == 'g';
+    return key.code == .char and (key.base_layout orelse key.code.char) == 'g';
 }
 
 fn validPairingCode(code: []const u8) bool {
@@ -1022,13 +1022,13 @@ test "the quiet host reveals only for the current hold and always accepts Enter"
     try feed(&ui, "c");
     try feed(&ui, "\x07");
     try std.testing.expectEqual(@as(usize, 0), stub.tells.items.len);
-    try feed(&ui, "\x1b[?11u");
-    try feed(&ui, "\x1b[103;5u");
-    try feed(&ui, "\x1b[103;5:2u");
+    try feed(&ui, "\x1b[?15u");
+    try feed(&ui, "\x1b[1087::103;5u");
+    try feed(&ui, "\x1b[1087::103;5:2u");
+    try std.testing.expectEqual(@as(usize, 1), stub.tells.items.len);
     const first = stub.tells.items[0];
     try std.testing.expectEqual(@backingInt(host_mod.LifecycleEvent.pair_code), first.event);
-    try std.testing.expectEqual(@as(usize, 1), stub.tells.items.len);
-    try feed(&ui, "\x1b[103;5:3u");
+    try feed(&ui, "\x1b[1087::103;5:3u");
     try feed(&ui, "\x1b[103;5u");
     const second = stub.tells.items[1];
     const code = "0123456789abcdef0123456789abcdef";

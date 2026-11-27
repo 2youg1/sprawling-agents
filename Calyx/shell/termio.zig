@@ -43,6 +43,7 @@ pub const Key = struct {
     modifiers: Modifiers = .{},
     phase: KeyPhase = .press,
     tracks_hold: bool = false,
+    base_layout: ?u21 = null,
 };
 
 pub const Size = struct { columns: u16, rows: u16 };
@@ -183,21 +184,28 @@ pub fn plainKeyboard() Error!void {
     if (protocols.bracketed_paste) try writeAll("\x1b[?2004l");
 }
 
-const quiet_keyboard_flags = 11;
+const quiet_release_flags = 11;
+const quiet_keyboard_flags = quiet_release_flags | 4;
 
 pub fn quietKeyReleases(flags: u16) bool {
-    return is_windows or flags & quiet_keyboard_flags == quiet_keyboard_flags;
+    return is_windows or flags & quiet_release_flags == quiet_release_flags;
 }
 
 pub fn enterQuietInput() Error!void {
     windows_g_held = false;
-    if (inputProtocols(activeInputBackend()).kitty_keyboard) try writeAll("\x1b[>11u\x1b[?u\x1b[?1004h");
+    if (inputProtocols(activeInputBackend()).kitty_keyboard) {
+        try writeAll(std.fmt.comptimePrint("\x1b[>{d}u\x1b[?u\x1b[?1004h", .{quiet_keyboard_flags}));
+    }
     try trackPointer();
 }
 
 pub fn leaveQuietInput() Error!void {
-    try untrackPointer();
-    if (inputProtocols(activeInputBackend()).kitty_keyboard) try writeAll("\x1b[?1004l\x1b[<u");
+    const pointer_result = untrackPointer();
+    const keyboard_result = if (inputProtocols(activeInputBackend()).kitty_keyboard)
+        writeAll("\x1b[?1004l\x1b[<u")
+    else {};
+    try pointer_result;
+    return keyboard_result;
 }
 
 pub fn trackPointer() Error!void {
@@ -501,7 +509,7 @@ fn readEventWindows() Error!?Event {
             const key = record.event.key;
             return windowsKeyRecord(key.virtual_key, key.unicode, key.control, key.down != 0, &windows_g_held);
         },
-        FOCUS_EVENT => return if (record.event.focused == 0) .focus_lost else null,
+        FOCUS_EVENT => return windowsFocusRecord(record.event.focused != 0, &windows_g_held),
         else => return null,
     }
 }
@@ -635,6 +643,11 @@ fn windowsKeyEvent(virtual_key: u16, unit: u16, control: u32) ?Event {
         else => return windowsKey(unit, mods),
     };
     return .{ .key = .{ .code = code, .modifiers = mods } };
+}
+
+fn windowsFocusRecord(focused: bool, g_held: *bool) ?Event {
+    g_held.* = false;
+    return if (focused) null else .focus_lost;
 }
 
 fn windowsKeyRecord(virtual_key: u16, unit: u16, control: u32, down: bool, g_held: *bool) ?Event {
@@ -832,6 +845,8 @@ fn parseKitty(fields: []const u8) Event {
     var groups = std.mem.splitScalar(u8, fields, ';');
     var code_parts = std.mem.splitScalar(u8, groups.next().?, ':');
     const cp = std.fmt.parseInt(u21, code_parts.first(), 10) catch return unknown;
+    _ = code_parts.next();
+    const base_layout = if (code_parts.next()) |base| std.fmt.parseInt(u21, base, 10) catch null else null;
     var mod_parts = std.mem.splitScalar(u8, groups.next() orelse "1", ':');
     const modifier_field = mod_parts.next().?;
     const mods = if (modifier_field.len == 0) 1 else std.fmt.parseInt(u16, modifier_field, 10) catch return unknown;
@@ -849,6 +864,7 @@ fn parseKitty(fields: []const u8) Event {
         .modifiers = modifiersFromParam(mods),
         .phase = keyPhase(kind) orelse return unknown,
         .tracks_hold = true,
+        .base_layout = base_layout,
     } };
 }
 
@@ -1293,6 +1309,9 @@ test "Kitty reports the chord, native modifiers, focus loss, and modified clicks
     try std.testing.expect(down.modifiers.control and down.phase == .press);
     try std.testing.expect(parseOne("\x1b[103;5:2u", &used).?.key.phase == .repeat);
     try std.testing.expect(parseOne("\x1b[103:71;5:3u", &used).?.key.phase == .release);
+    const cyrillic = parseOne("\x1b[1087::103;5u", &used).?.key;
+    try std.testing.expectEqual(@as(u21, 1087), cyrillic.code.char);
+    try std.testing.expectEqual(@as(?u21, 'g'), cyrillic.base_layout);
     const up = parseOne("\x1b[57442;1:3u", &used).?.key;
     try std.testing.expect(up.code == .control and up.phase == .release and !up.modifiers.control);
     try std.testing.expect(parseOne("\x1b[13;5u", &used).?.key.code == .enter);
@@ -1309,5 +1328,14 @@ test "Windows G repeats stay repeats when Control is released and pressed again"
     try std.testing.expect(windowsKeyRecord(0x11, 0, 0, false, &held).?.key.code == .control);
     try std.testing.expect(windowsKeyRecord('G', 7, 8, true, &held).?.key.phase == .repeat);
     try std.testing.expect(windowsKeyRecord('G', 0, 8, false, &held).?.key.phase == .release);
+    try std.testing.expect(windowsKeyRecord('G', 7, 8, true, &held).?.key.phase == .press);
+}
+
+test "Windows focus changes discard a G hold whose release was missed" {
+    var held = false;
+    try std.testing.expect(windowsKeyRecord('G', 7, 8, true, &held).?.key.phase == .press);
+    try std.testing.expect(windowsFocusRecord(false, &held).? == .focus_lost);
+    try std.testing.expect(!held);
+    try std.testing.expect(windowsFocusRecord(true, &held) == null);
     try std.testing.expect(windowsKeyRecord('G', 7, 8, true, &held).?.key.phase == .press);
 }

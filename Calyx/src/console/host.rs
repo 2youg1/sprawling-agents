@@ -327,7 +327,7 @@ impl CityHost for Bridge {
                         reply.push(1);
                         reply.extend_from_slice(
                             format!(
-                                "Could not issue a pairing code\n```toml\ncode = {:?}\naction = {:?}\nsubject = {:?}\nrecovery = {:?}\n```",
+                                "Could not issue a pairing code\n```toml\ncode = {:?}\naction = {:?}\nsubject = {:?}\nrule = \"a pairing code requires fresh operating-system randomness\"\nrecovery = {:?}\n```",
                                 err.code().as_str(),
                                 err.action(),
                                 err.subject(),

@@ -160,8 +160,10 @@ pub const Screen = struct {
     pub fn leaveQuiet(self: *Screen) Written {
         if (!termio.isAlternate()) return .shown;
         self.pairing_region = null;
-        termio.leaveQuietInput() catch return self.fail();
-        termio.leaveAlternate() catch return self.fail();
+        const input_result = termio.leaveQuietInput();
+        const screen_result = termio.leaveAlternate();
+        input_result catch return self.fail();
+        screen_result catch return self.fail();
         return .shown;
     }
 
