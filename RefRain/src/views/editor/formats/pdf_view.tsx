@@ -69,7 +69,7 @@ export function PdfReading(props: ReadingProps) {
   const turns = () => pagesPerTurn(layout());
   const continuous = () => layout() === "continuous";
   const [original, setOriginal] = createSignal(false);
-  const [night, setNight] = createSignal(false);
+  const [night, setNight] = createSignal(untrack(() => props.initialNight ?? false));
   const [zoom, setZoom] = createSignal<Zoomed>();
   let scroller: HTMLDivElement | undefined;
   let pages: HTMLDivElement | undefined;

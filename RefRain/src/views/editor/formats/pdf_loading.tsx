@@ -23,6 +23,7 @@ export interface PdfProps {
   readonly version: string | null;
   readonly name: string;
   readonly lang: Lang;
+  readonly initialNight?: boolean;
   readonly progress?: PdfProgress | null | undefined;
   readonly onProgress?: ((progress: PdfProgress) => void) | undefined;
   readonly reference?: PdfReference | null | undefined;
